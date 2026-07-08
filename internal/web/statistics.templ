@@ -1,0 +1,102 @@
+package web
+
+import "github.com/daknoblo/Haushaltsbuch/internal/store"
+
+templ StatisticsPage(nav Nav, vm StatisticsVM) {
+	@Layout(nav) {
+		<div class="page-head">
+			<h1>Statistiken</h1>
+			<div class="spacer"></div>
+			<a class="btn no-print" href={ templ.SafeURL("/export/statistics.pdf?m=" + nav.Month) }>PDF exportieren</a>
+		</div>
+		if nav.ActiveHousehold.ID == 0 {
+			@noHousehold()
+		} else {
+			<div class="grid grid-3 mb-2">
+				<div class="stat">
+					<div class="stat-label">Ø Einnahmen</div>
+					<div class="stat-value pos">{ FormatEUR(vm.AvgIncome) }</div>
+					<div class="stat-sub">letzte { len(vm.Months) } Monate</div>
+				</div>
+				<div class="stat">
+					<div class="stat-label">Ø Ausgaben</div>
+					<div class="stat-value neg">{ FormatEUR(vm.AvgExpense) }</div>
+					<div class="stat-sub">letzte { len(vm.Months) } Monate</div>
+				</div>
+				<div class="stat">
+					<div class="stat-label">Ø Saldo</div>
+					<div class="stat-value">
+						@signedMoney(vm.AvgIncome - vm.AvgExpense)
+					</div>
+					<div class="stat-sub">pro Monat</div>
+				</div>
+			</div>
+			<div class="card card-pad mb-2">
+				<div class="flex mb-1">
+					<h2>Einnahmen &amp; Ausgaben</h2>
+					<div class="spacer"></div>
+					<span class="badge"><span class="dot" style="background-color:var(--success)"></span> Einnahmen</span>
+					<span class="badge"><span class="dot" style="background-color:var(--danger)"></span> Ausgaben</span>
+				</div>
+				if len(vm.Months) == 0 {
+					<p class="muted small">Noch keine Daten.</p>
+				} else {
+					<div class="vchart">
+						for _, m := range vm.Months {
+							<div class="vcol">
+								<div class="flex" style="align-items:flex-end; gap:3px; height:100%">
+									<div style={ "height:" + BarWidth(m.IncomeCents, vm.MaxCents) + "; background:var(--success); width:14px; border-radius:4px 4px 0 0" } title={ FormatEUR(m.IncomeCents) }></div>
+									<div style={ "height:" + BarWidth(m.ExpenseCents, vm.MaxCents) + "; background:var(--danger); width:14px; border-radius:4px 4px 0 0" } title={ FormatEUR(m.ExpenseCents) }></div>
+								</div>
+								<div class="vcol-label">{ m.Label() }</div>
+							</div>
+						}
+					</div>
+				}
+			</div>
+			<div class="grid grid-3">
+				<div class="card card-pad">
+					<h3 class="mb-1">Fix / Variabel ({ MonthLabel(vm.Current.Month) })</h3>
+					<div class="list-row">
+						<span class="badge badge-fix">Fix</span>
+						<div class="spacer"></div>
+						<span class="mono">{ FormatEUR(vm.Current.ByCostNature[store.CostFix]) }</span>
+					</div>
+					<div class="list-row">
+						<span class="badge badge-variable">Variabel</span>
+						<div class="spacer"></div>
+						<span class="mono">{ FormatEUR(vm.Current.ByCostNature[store.CostVariable]) }</span>
+					</div>
+				</div>
+				<div class="card card-pad">
+					<h3 class="mb-1">50 / 30 / 20</h3>
+					<div class="list-row">
+						<span class="badge badge-need">Bedarf</span>
+						<div class="spacer"></div>
+						<span class="mono">{ FormatEUR(vm.Current.ByBudgetClass[store.ClassNeed]) }</span>
+					</div>
+					<div class="list-row">
+						<span class="badge badge-want">Wunsch</span>
+						<div class="spacer"></div>
+						<span class="mono">{ FormatEUR(vm.Current.ByBudgetClass[store.ClassWant]) }</span>
+					</div>
+					<div class="list-row">
+						<span class="badge badge-saving">Sparen</span>
+						<div class="spacer"></div>
+						<span class="mono">{ FormatEUR(vm.Current.ByBudgetClass[store.ClassSaving]) }</span>
+					</div>
+				</div>
+				<div class="card card-pad">
+					<h3 class="mb-1">Top Kategorien</h3>
+					if len(vm.Current.Categories) == 0 {
+						<p class="muted small">Keine Daten.</p>
+					} else {
+						for _, c := range vm.Current.Categories {
+							@hbar(c.Label, c.Cents, MaxLabeled(vm.Current.Categories))
+						}
+					}
+				</div>
+			</div>
+		}
+	}
+}

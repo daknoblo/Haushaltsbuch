@@ -1,0 +1,23 @@
+.git
+.github
+.devcontainer
+*.md
+docs/
+deploy/
+
+# Local data / SQLite
+*.db
+*.db-wal
+*.db-shm
+appdata/
+
+# Build artifacts
+bin/
+out/
+haushaltsbuch
+
+# Tooling
+/tailwindcss
+node_modules/
+
+.DS_Store

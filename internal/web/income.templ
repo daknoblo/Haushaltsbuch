@@ -1,0 +1,86 @@
+package web
+
+import (
+	"strconv"
+
+	"github.com/daknoblo/Haushaltsbuch/internal/store"
+)
+
+templ IncomePage(nav Nav, vm IncomeVM) {
+	@Layout(nav) {
+		<div class="page-head">
+			<h1>Einnahmen</h1>
+			<span class="badge">{ nav.CurrentMonthLabel() }</span>
+			<div class="spacer"></div>
+			<span class="muted small">Summe</span>
+			<span class="stat-value" style="font-size:1.2rem">{ FormatEUR(vm.TotalCents) }</span>
+			<button
+				class="btn no-print"
+				hx-post={ "/income/copy?from=" + nav.PrevMonth() + "&to=" + nav.Month }
+				hx-swap="none"
+				hx-confirm={ "Einnahmen aus " + MonthLabel(nav.PrevMonth()) + " übernehmen?" }
+			>Aus Vormonat übernehmen</button>
+		</div>
+		if nav.ActiveHousehold.ID == 0 {
+			@noHousehold()
+		} else {
+			<p class="muted small mb-2">
+				Trage je Person das Einkommen dieses Monats ein. Für Sonderzahlungen oder
+				Boni füge einfach eine weitere Zeile hinzu. Alles wird automatisch gespeichert.
+			</p>
+			<div class="grid grid-2">
+				for _, mv := range vm.Members {
+					@incomeMemberCard(nav, mv)
+				}
+			</div>
+		}
+	}
+}
+
+templ incomeMemberCard(nav Nav, mv IncomeMemberVM) {
+	<div class="card">
+		<div class="card-head">
+			<span class="flex gap-sm">
+				@memberDot(mv.Member.Color)
+				<h2>{ mv.Member.Name }</h2>
+			</span>
+			<div class="spacer"></div>
+			<span class="mono">{ FormatEUR(mv.TotalCents) }</span>
+		</div>
+		<div class="card-pad">
+			<div id={ "inclines-" + strconv.FormatInt(mv.Member.ID, 10) } class="flex-col">
+				for _, in := range mv.Lines {
+					@IncomeLineView(in)
+				}
+			</div>
+			<button
+				class="btn btn-sm mt-1"
+				hx-post={ "/income/new?member=" + strconv.FormatInt(mv.Member.ID, 10) + "&m=" + nav.Month }
+				hx-target={ "#inclines-" + strconv.FormatInt(mv.Member.ID, 10) }
+				hx-swap="beforeend"
+			>+ Zeile</button>
+		</div>
+	</div>
+}
+
+templ IncomeLineView(in store.Income) {
+	<form
+		id={ "inc-" + strconv.FormatInt(in.ID, 10) }
+		class="flex gap-sm"
+		hx-post={ "/income/" + strconv.FormatInt(in.ID, 10) }
+		hx-trigger="change, keyup changed delay:700ms"
+		hx-target="this"
+		hx-swap="outerHTML"
+	>
+		<input type="text" name="name" value={ in.Name } placeholder="z. B. Gehalt" style="flex:2"/>
+		<input type="number" step="0.01" name="amount" value={ CentsToInput(in.AmountCents) } style="width:120px"/>
+		<button
+			type="button"
+			class="btn btn-ghost btn-icon"
+			hx-post={ "/income/" + strconv.FormatInt(in.ID, 10) + "/delete" }
+			hx-target={ "#inc-" + strconv.FormatInt(in.ID, 10) }
+			hx-swap="outerHTML"
+			aria-label="Zeile löschen"
+		>✕</button>
+	</form>
+}

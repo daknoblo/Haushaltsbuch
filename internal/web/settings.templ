@@ -1,0 +1,195 @@
+package web
+
+import (
+	"strconv"
+
+	"github.com/daknoblo/Haushaltsbuch/internal/store"
+)
+
+templ SettingsPage(nav Nav, vm SettingsVM) {
+	@Layout(nav) {
+		<div class="page-head">
+			<h1>Einstellungen</h1>
+		</div>
+		<div class="grid grid-2">
+			<div class="card" id="haushalte">
+				<div class="card-head"><h2>Haushalte</h2></div>
+				<div class="card-pad">
+					<div id="household-list" class="flex-col">
+						for _, h := range vm.Households {
+							@HouseholdRowView(h, vm.ActiveID)
+						}
+					</div>
+					<form
+						class="flex gap-sm mt-2"
+						hx-post="/households"
+						hx-target="#household-list"
+						hx-swap="beforeend"
+						hx-on::after-request="this.reset()"
+					>
+						<input type="text" name="name" placeholder="Neuer Haushalt" style="flex:1" required/>
+						<button class="btn btn-primary btn-sm" type="submit">Hinzufügen</button>
+					</form>
+				</div>
+			</div>
+			<div class="card" id="personen">
+				<div class="card-head"><h2>Personen</h2></div>
+				<div class="card-pad">
+					<div id="member-list" class="flex-col">
+						for _, m := range vm.Members {
+							@MemberRowView(m)
+						}
+					</div>
+					<form
+						class="flex gap-sm mt-2"
+						hx-post="/members"
+						hx-target="#member-list"
+						hx-swap="beforeend"
+						hx-on::after-request="this.reset()"
+					>
+						<input type="text" name="name" placeholder="Name" style="flex:1" required/>
+						<button class="btn btn-primary btn-sm" type="submit">Hinzufügen</button>
+					</form>
+				</div>
+			</div>
+			<div class="card" id="sektionen">
+				<div class="card-head"><h2>Sektionen</h2></div>
+				<div class="card-pad">
+					<div id="section-list" class="flex-col">
+						for _, s := range vm.Sections {
+							@SectionRowView(s)
+						}
+					</div>
+					<form
+						class="flex gap-sm mt-2"
+						hx-post="/sections"
+						hx-target="#section-list"
+						hx-swap="beforeend"
+						hx-on::after-request="this.reset()"
+					>
+						<input type="text" name="name" placeholder="Neue Sektion" style="flex:1" required/>
+						<button class="btn btn-primary btn-sm" type="submit">Hinzufügen</button>
+					</form>
+				</div>
+			</div>
+			<div class="card" id="kategorien">
+				<div class="card-head"><h2>Kategorien</h2></div>
+				<div class="card-pad">
+					<div id="category-list" class="flex-col">
+						for _, c := range vm.Categories {
+							@CategoryRowView(c)
+						}
+					</div>
+					<form
+						class="flex gap-sm mt-2"
+						hx-post="/categories"
+						hx-target="#category-list"
+						hx-swap="beforeend"
+						hx-on::after-request="this.reset()"
+					>
+						<input type="text" name="name" placeholder="Neue Kategorie" style="flex:1" required/>
+						<button class="btn btn-primary btn-sm" type="submit">Hinzufügen</button>
+					</form>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+templ HouseholdRowView(h store.Household, activeID int64) {
+	<div id={ "hh-" + strconv.FormatInt(h.ID, 10) } class="list-row">
+		<form
+			style="flex:1"
+			hx-post={ "/households/" + strconv.FormatInt(h.ID, 10) }
+			hx-trigger="change, keyup changed delay:700ms"
+			hx-target="this"
+			hx-swap="none"
+		>
+			<input type="text" name="name" value={ h.Name }/>
+		</form>
+		if h.ID == activeID {
+			<span class="badge badge-fix">Aktiv</span>
+		} else {
+			<button
+				class="btn btn-sm"
+				hx-post={ "/households/activate?id=" + strconv.FormatInt(h.ID, 10) }
+				hx-swap="none"
+			>aktivieren</button>
+		}
+		<button
+			class="btn btn-ghost btn-icon"
+			hx-post={ "/households/" + strconv.FormatInt(h.ID, 10) + "/delete" }
+			hx-swap="none"
+			hx-confirm="Haushalt inkl. aller Daten löschen?"
+			aria-label="Löschen"
+		>✕</button>
+	</div>
+}
+
+templ MemberRowView(m store.Member) {
+	<div id={ "mem-" + strconv.FormatInt(m.ID, 10) } class="list-row">
+		<form
+			class="flex gap-sm"
+			style="flex:1"
+			hx-post={ "/members/" + strconv.FormatInt(m.ID, 10) }
+			hx-trigger="change, keyup changed delay:700ms"
+			hx-target="this"
+			hx-swap="none"
+		>
+			<input type="color" name="color" value={ ColorOr(m.Color) } style="width:42px; height:36px; padding:2px"/>
+			<input type="text" name="name" value={ m.Name } style="flex:1"/>
+		</form>
+		<button
+			class="btn btn-ghost btn-icon"
+			hx-post={ "/members/" + strconv.FormatInt(m.ID, 10) + "/delete" }
+			hx-target={ "#mem-" + strconv.FormatInt(m.ID, 10) }
+			hx-swap="outerHTML"
+			hx-confirm="Person löschen?"
+			aria-label="Löschen"
+		>✕</button>
+	</div>
+}
+
+templ SectionRowView(s store.Section) {
+	<div id={ "sec-" + strconv.FormatInt(s.ID, 10) } class="list-row">
+		<form
+			style="flex:1"
+			hx-post={ "/sections/" + strconv.FormatInt(s.ID, 10) }
+			hx-trigger="change, keyup changed delay:700ms"
+			hx-target="this"
+			hx-swap="none"
+		>
+			<input type="text" name="name" value={ s.Name }/>
+		</form>
+		<button
+			class="btn btn-ghost btn-icon"
+			hx-post={ "/sections/" + strconv.FormatInt(s.ID, 10) + "/delete" }
+			hx-target={ "#sec-" + strconv.FormatInt(s.ID, 10) }
+			hx-swap="outerHTML"
+			hx-confirm="Sektion löschen? Ausgaben bleiben erhalten."
+			aria-label="Löschen"
+		>✕</button>
+	</div>
+}
+
+templ CategoryRowView(c store.Category) {
+	<div id={ "cat-" + strconv.FormatInt(c.ID, 10) } class="list-row">
+		<form
+			style="flex:1"
+			hx-post={ "/categories/" + strconv.FormatInt(c.ID, 10) }
+			hx-trigger="change, keyup changed delay:700ms"
+			hx-target="this"
+			hx-swap="none"
+		>
+			<input type="text" name="name" value={ c.Name }/>
+		</form>
+		<button
+			class="btn btn-ghost btn-icon"
+			hx-post={ "/categories/" + strconv.FormatInt(c.ID, 10) + "/delete" }
+			hx-target={ "#cat-" + strconv.FormatInt(c.ID, 10) }
+			hx-swap="outerHTML"
+			hx-confirm="Kategorie löschen?"
+			aria-label="Löschen"
+		>✕</button>
+	</div>
+}

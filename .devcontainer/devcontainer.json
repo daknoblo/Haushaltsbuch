@@ -1,0 +1,23 @@
+{
+  "name": "Haushaltsbuch",
+  "image": "mcr.microsoft.com/devcontainers/go:1.25",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "a-h.templ",
+        "ms-azuretools.vscode-docker",
+        "github.vscode-github-actions"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "go.lintTool": "golangci-lint"
+      }
+    }
+  },
+  "postCreateCommand": "go mod download"
+}

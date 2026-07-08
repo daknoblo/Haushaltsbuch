@@ -1,0 +1,52 @@
+package web
+
+import "github.com/daknoblo/Haushaltsbuch/internal/store"
+
+templ money(cents int64) {
+	<span class="mono">{ FormatEUR(cents) }</span>
+}
+
+templ signedMoney(cents int64) {
+	if cents < 0 {
+		<span class="neg mono">{ FormatEUR(cents) }</span>
+	} else {
+		<span class="pos mono">{ FormatEUR(cents) }</span>
+	}
+}
+
+templ costBadge(c store.CostNature) {
+	if c == store.CostVariable {
+		<span class="badge badge-variable">Variabel</span>
+	} else {
+		<span class="badge badge-fix">Fix</span>
+	}
+}
+
+templ classBadge(b store.BudgetClass) {
+	switch b {
+		case store.ClassWant:
+			<span class="badge badge-want">Wunsch</span>
+		case store.ClassSaving:
+			<span class="badge badge-saving">Sparen</span>
+		default:
+			<span class="badge badge-need">Bedarf</span>
+	}
+}
+
+templ memberDot(color string) {
+	if color != "" {
+		<span class="dot" style={ "background-color:" + color }></span>
+	} else {
+		<span class="dot" style="background-color:#94a3b8"></span>
+	}
+}
+
+templ hbar(label string, cents, max int64) {
+	<div class="hbar-row">
+		<div class="small nowrap">{ label }</div>
+		<div class="hbar-track">
+			<div class="hbar-fill" style={ "width:" + BarWidth(cents, max) }></div>
+		</div>
+		<div class="small mono right">{ FormatEUR(cents) }</div>
+	</div>
+}
