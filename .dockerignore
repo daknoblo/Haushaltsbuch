@@ -14,7 +14,7 @@ appdata/
 # Build artifacts
 bin/
 out/
-haushaltsbuch
+/haushaltsbuch
 
 # Tooling
 /tailwindcss
