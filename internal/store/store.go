@@ -47,7 +47,7 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
-	// SQLite is a single-writer database; serialising access avoids
+	// SQLite is a single-writer database; serializing access avoids
 	// SQLITE_BUSY errors in this low-traffic personal application.
 	db.SetMaxOpenConns(1)
 

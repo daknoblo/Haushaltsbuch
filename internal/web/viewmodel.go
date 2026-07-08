@@ -40,7 +40,7 @@ func MaxLabeled(items []calc.LabeledTotal) int64 {
 	return m
 }
 
-// ColorOr returns c or a neutral fallback colour when c is empty.
+// ColorOr returns c or a neutral fallback color when c is empty.
 func ColorOr(c string) string {
 	if c == "" {
 		return "#94a3b8"
