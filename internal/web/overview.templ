@@ -1,0 +1,137 @@
+package web
+
+import "github.com/daknoblo/Haushaltsbuch/internal/store"
+
+templ OverviewPage(nav Nav, vm OverviewVM) {
+	@Layout(nav) {
+		<div class="page-head">
+			<h1>Übersicht</h1>
+			<span class="badge">{ nav.CurrentMonthLabel() }</span>
+			<div class="spacer"></div>
+			<a class="btn no-print" href={ templ.SafeURL("/export/overview.pdf?m=" + nav.Month) }>PDF exportieren</a>
+		</div>
+		if nav.ActiveHousehold.ID == 0 {
+			@noHousehold()
+		} else {
+			<div class="grid grid-3 mb-2">
+				<div class="stat">
+					<div class="stat-label">Einnahmen</div>
+					<div class="stat-value pos">{ FormatEUR(vm.Report.IncomeCents) }</div>
+					<div class="stat-sub">{ nav.CurrentMonthLabel() }</div>
+				</div>
+				<div class="stat">
+					<div class="stat-label">Ausgaben</div>
+					<div class="stat-value neg">{ FormatEUR(vm.Report.ExpenseCents) }</div>
+					<div class="stat-sub">monatlich normalisiert</div>
+				</div>
+				<div class="stat">
+					<div class="stat-label">Saldo</div>
+					<div class="stat-value">
+						@signedMoney(vm.Report.BalanceCents)
+					</div>
+					<div class="stat-sub">Einnahmen − Ausgaben</div>
+				</div>
+			</div>
+			<div class="grid grid-2">
+				<div class="card">
+					<div class="card-head"><h2>Personen</h2></div>
+					<table>
+						<thead>
+							<tr>
+								<th>Person</th>
+								<th class="num">Einnahmen</th>
+								<th class="num">Ausgaben</th>
+								<th class="num">Saldo</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, m := range vm.Report.Members {
+								<tr>
+									<td>
+										<span class="flex gap-sm">
+											@memberDot(m.Member.Color)
+											{ m.Member.Name }
+										</span>
+									</td>
+									<td class="num mono">{ FormatEUR(m.IncomeCents) }</td>
+									<td class="num mono">{ FormatEUR(m.ExpenseCents) }</td>
+									<td class="num">
+										@signedMoney(m.BalanceCents)
+									</td>
+								</tr>
+							}
+							if vm.Report.UnassignedCents != 0 {
+								<tr>
+									<td class="muted">Nicht zugeordnet</td>
+									<td class="num muted">—</td>
+									<td class="num mono muted">{ FormatEUR(vm.Report.UnassignedCents) }</td>
+									<td class="num muted">—</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+				<div class="card card-pad">
+					<h2 class="mb-1">Nach Sektion</h2>
+					if len(vm.Report.Sections) == 0 {
+						<p class="muted small">Noch keine Ausgaben erfasst.</p>
+					} else {
+						for _, s := range vm.Report.Sections {
+							@hbar(s.Label, s.Cents, MaxLabeled(vm.Report.Sections))
+						}
+					}
+				</div>
+			</div>
+			<div class="grid grid-3 mt-2">
+				<div class="card card-pad">
+					<h3 class="mb-1">Nach Kategorie</h3>
+					if len(vm.Report.Categories) == 0 {
+						<p class="muted small">Keine Kategorien.</p>
+					} else {
+						for _, c := range vm.Report.Categories {
+							@hbar(c.Label, c.Cents, MaxLabeled(vm.Report.Categories))
+						}
+					}
+				</div>
+				<div class="card card-pad">
+					<h3 class="mb-1">Fix / Variabel</h3>
+					<div class="list-row">
+						<span class="badge badge-fix">Fix</span>
+						<div class="spacer"></div>
+						<span class="mono">{ FormatEUR(vm.Report.ByCostNature[store.CostFix]) }</span>
+					</div>
+					<div class="list-row">
+						<span class="badge badge-variable">Variabel</span>
+						<div class="spacer"></div>
+						<span class="mono">{ FormatEUR(vm.Report.ByCostNature[store.CostVariable]) }</span>
+					</div>
+				</div>
+				<div class="card card-pad">
+					<h3 class="mb-1">Bedarf / Wunsch / Sparen</h3>
+					<div class="list-row">
+						<span class="badge badge-need">Bedarf</span>
+						<div class="spacer"></div>
+						<span class="mono">{ FormatEUR(vm.Report.ByBudgetClass[store.ClassNeed]) }</span>
+					</div>
+					<div class="list-row">
+						<span class="badge badge-want">Wunsch</span>
+						<div class="spacer"></div>
+						<span class="mono">{ FormatEUR(vm.Report.ByBudgetClass[store.ClassWant]) }</span>
+					</div>
+					<div class="list-row">
+						<span class="badge badge-saving">Sparen</span>
+						<div class="spacer"></div>
+						<span class="mono">{ FormatEUR(vm.Report.ByBudgetClass[store.ClassSaving]) }</span>
+					</div>
+				</div>
+			</div>
+		}
+	}
+}
+
+templ noHousehold() {
+	<div class="card card-pad empty">
+		<p>Noch kein Haushalt vorhanden.</p>
+		<a class="btn btn-primary mt-1" href="/settings">Haushalt anlegen</a>
+	</div>
+}

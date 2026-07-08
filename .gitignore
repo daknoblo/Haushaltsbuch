@@ -1,0 +1,32 @@
+# Build output
+/bin/
+/out/
+/haushaltsbuch
+haushaltsbuch
+
+# Local data / SQLite
+*.db
+*.db-wal
+*.db-shm
+/appdata/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Security scan output
+*.sarif
+results.json
+gosec*
+
+# Tooling binaries
+/tailwindcss
+
+# Node (Tailwind, optional)
+node_modules/
+
+# OS / editor noise
+.DS_Store
+.idea/
+.vscode/

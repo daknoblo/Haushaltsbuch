@@ -1,0 +1,66 @@
+package web
+
+import "strconv"
+
+templ Layout(nav Nav) {
+	<!DOCTYPE html>
+	<html lang="de">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<meta name="color-scheme" content="light"/>
+			<title>Haushaltsbuch</title>
+			<link rel="stylesheet" href="/assets/app.css"/>
+		</head>
+		<body>
+			@topbar(nav)
+			<main class="content">
+				{ children... }
+			</main>
+			<div id="save-indicator" class="save-indicator">
+				<span class="dot"></span> Gespeichert
+			</div>
+			<script src="/assets/htmx.min.js"></script>
+			<script src="/assets/app.js"></script>
+		</body>
+	</html>
+}
+
+templ topbar(nav Nav) {
+	<header class="topbar">
+		<div class="topbar-inner">
+			<div class="brand">
+				<div class="brand-logo">H</div>
+				<span>Haushaltsbuch</span>
+			</div>
+			if len(nav.Households) > 0 {
+				<select
+					class="select-household"
+					name="id"
+					hx-post="/households/activate"
+					hx-trigger="change"
+					hx-swap="none"
+				>
+					for _, h := range nav.Households {
+						<option value={ strconv.FormatInt(h.ID, 10) } selected?={ h.ID == nav.ActiveHousehold.ID }>{ h.Name }</option>
+					}
+				</select>
+			}
+			<nav class="nav">
+				<a href="/" class={ templ.KV("active", nav.IsActive("overview")) }>Übersicht</a>
+				<a href="/expenses" class={ templ.KV("active", nav.IsActive("expenses")) }>Ausgaben</a>
+				<a href="/income" class={ templ.KV("active", nav.IsActive("income")) }>Einnahmen</a>
+				<a href="/statistics" class={ templ.KV("active", nav.IsActive("statistics")) }>Statistiken</a>
+				<a href="/settings" class={ templ.KV("active", nav.IsActive("settings")) }>Einstellungen</a>
+			</nav>
+			<div class="spacer"></div>
+			if nav.ShowMonthNav {
+				<div class="month-nav no-print">
+					<a class="btn btn-icon btn-sm" href={ templ.SafeURL(nav.MonthURL(nav.PrevMonth())) } aria-label="Vorheriger Monat">‹</a>
+					<span class="month-label">{ nav.CurrentMonthLabel() }</span>
+					<a class="btn btn-icon btn-sm" href={ templ.SafeURL(nav.MonthURL(nav.NextMonth())) } aria-label="Nächster Monat">›</a>
+				</div>
+			}
+		</div>
+	</header>
+}

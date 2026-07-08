@@ -1,0 +1,186 @@
+package web
+
+import (
+	"strconv"
+
+	"github.com/daknoblo/Haushaltsbuch/internal/store"
+)
+
+templ ExpensesPage(nav Nav, vm ExpensesVM) {
+	@Layout(nav) {
+		<div class="page-head">
+			<h1>Ausgaben</h1>
+			<div class="spacer"></div>
+			<a class="btn no-print" href={ templ.SafeURL("/export/expenses.pdf") }>PDF exportieren</a>
+			<a class="btn" href="/settings#sektionen">Sektionen verwalten</a>
+		</div>
+		if nav.ActiveHousehold.ID == 0 {
+			@noHousehold()
+		} else {
+			<p class="muted small mb-2">
+				Änderungen werden automatisch gespeichert. Lege je Ausgabe fest: Betrag,
+				Rhythmus, Typ und wer sie trägt.
+			</p>
+			<div class="flex-col">
+				for _, g := range vm.Groups {
+					@expenseSection(g, vm)
+				}
+			</div>
+		}
+	}
+}
+
+templ expenseSection(g SectionGroup, vm ExpensesVM) {
+	<div class="card">
+		<div class="card-head">
+			<h2>{ g.Title() }</h2>
+			<div class="spacer"></div>
+			<span class="badge">{ FormatEUR(g.TotalCents) } / Monat</span>
+		</div>
+		<div class="card-pad">
+			<div id={ "section-" + strconv.FormatInt(g.SectionID(), 10) } class="flex-col">
+				for _, e := range g.Expenses {
+					@ExpenseRowView(e, vm)
+				}
+			</div>
+			<button
+				class="btn btn-sm mt-1"
+				hx-post={ "/expenses/new?section_id=" + strconv.FormatInt(g.SectionID(), 10) }
+				hx-target={ "#section-" + strconv.FormatInt(g.SectionID(), 10) }
+				hx-swap="beforeend"
+			>+ Ausgabe</button>
+		</div>
+	</div>
+}
+
+templ ExpenseRowView(e ExpenseRow, vm ExpensesVM) {
+	<form
+		id={ e.DOMID() }
+		class="editor"
+		hx-post={ e.PostURL() }
+		hx-trigger="change, keyup changed delay:700ms"
+		hx-target="this"
+		hx-swap="outerHTML"
+	>
+		<div class="field-row">
+			<div class="field" style="flex:2">
+				<label>Bezeichnung</label>
+				<input type="text" name="name" value={ e.Expense.Name } placeholder="z. B. Miete"/>
+			</div>
+			<div class="field">
+				<label>Betrag (€)</label>
+				<input type="number" step="0.01" min="0" name="amount" value={ CentsToInput(e.Expense.AmountCents) }/>
+			</div>
+			<div class="field">
+				<label>Rhythmus</label>
+				<select name="frequency">
+					for _, opt := range FrequencyOptions() {
+						<option value={ opt.Value } selected?={ opt.Value == string(e.Expense.Frequency) }>{ opt.Label }</option>
+					}
+				</select>
+			</div>
+		</div>
+		<div class="field-row">
+			<div class="field">
+				<label>Sektion</label>
+				<select name="section_id">
+					<option value="0" selected?={ e.Expense.SectionID == nil }>Ohne Sektion</option>
+					for _, s := range vm.Sections {
+						<option value={ strconv.FormatInt(s.ID, 10) } selected?={ e.Expense.SectionID != nil && *e.Expense.SectionID == s.ID }>{ s.Name }</option>
+					}
+				</select>
+			</div>
+			<div class="field">
+				<label>Kategorie</label>
+				<select name="category_id">
+					<option value="0" selected?={ e.Expense.CategoryID == nil }>— Kategorie —</option>
+					for _, c := range vm.Categories {
+						<option value={ strconv.FormatInt(c.ID, 10) } selected?={ e.Expense.CategoryID != nil && *e.Expense.CategoryID == c.ID }>{ c.Name }</option>
+					}
+				</select>
+			</div>
+			<div class="field">
+				<label>Kostenart</label>
+				<select name="cost_nature">
+					for _, opt := range CostNatureOptions() {
+						<option value={ opt.Value } selected?={ opt.Value == string(e.Expense.CostNature) }>{ opt.Label }</option>
+					}
+				</select>
+			</div>
+			<div class="field">
+				<label>Klasse</label>
+				<select name="budget_class">
+					for _, opt := range BudgetClassOptions() {
+						<option value={ opt.Value } selected?={ opt.Value == string(e.Expense.BudgetClass) }>{ opt.Label }</option>
+					}
+				</select>
+			</div>
+		</div>
+		<div class="field-row">
+			<div class="field">
+				<label>Art</label>
+				<label class="flex gap-sm small" style="font-weight:500">
+					<input type="checkbox" name="is_oneoff" checked?={ e.Expense.IsOneOff }/>
+					Einmalige Ausgabe
+				</label>
+			</div>
+			if e.Expense.IsOneOff {
+				<div class="field">
+					<label>Datum</label>
+					<input type="date" name="occurred_on" value={ e.Expense.OccurredOn }/>
+				</div>
+			} else {
+				<div class="field">
+					<label>Gültig ab</label>
+					<input type="month" name="active_from" value={ e.Expense.ActiveFrom }/>
+				</div>
+				<div class="field">
+					<label>Gültig bis (optional)</label>
+					<input type="month" name="active_until" value={ e.Expense.ActiveUntil }/>
+				</div>
+			}
+		</div>
+		<div class="field-row">
+			<div class="field">
+				<label>Aufteilung</label>
+				<select name="split_mode">
+					for _, opt := range SplitModeOptions() {
+						<option value={ opt.Value } selected?={ opt.Value == string(e.Expense.SplitMode) }>{ opt.Label }</option>
+					}
+				</select>
+			</div>
+			<div class="field" style="flex:3">
+				<label>Wer trägt die Ausgabe?</label>
+				<div class="flex wrap gap-sm">
+					for _, m := range vm.Members {
+						<label class={ "member-chip", templ.KV("selected", e.HasMember(m.ID)) }>
+							<input type="checkbox" name={ "m_" + strconv.FormatInt(m.ID, 10) } checked?={ e.HasMember(m.ID) }/>
+							@memberDot(m.Color)
+							{ m.Name }
+							if e.Expense.SplitMode == store.SplitPercent {
+								<input class="inline" style="width:64px" type="number" step="0.1" min="0" name={ "v_" + strconv.FormatInt(m.ID, 10) } value={ e.PercentInput(m.ID) }/>
+								<span class="small">%</span>
+							} else if e.Expense.SplitMode == store.SplitFixed {
+								<input class="inline" style="width:82px" type="number" step="0.01" min="0" name={ "v_" + strconv.FormatInt(m.ID, 10) } value={ e.FixedInput(m.ID) }/>
+								<span class="small">€</span>
+							}
+						</label>
+					}
+				</div>
+			</div>
+		</div>
+		<div class="flex" style="border-top:1px solid var(--border); padding-top:10px; margin-top:4px">
+			<span class="small muted">Entspricht monatlich</span>
+			<span class="mono">{ FormatEUR(e.MonthlyCents()) }</span>
+			<div class="spacer"></div>
+			<button
+				type="button"
+				class="btn btn-danger btn-sm"
+				hx-post={ e.DeleteURL() }
+				hx-target={ "#" + e.DOMID() }
+				hx-swap="outerHTML"
+				hx-confirm="Diese Ausgabe wirklich löschen?"
+			>Löschen</button>
+		</div>
+	</form>
+}
