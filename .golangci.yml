@@ -6,6 +6,10 @@ linters:
   enable:
     - misspell
   settings:
+    misspell:
+      locale: US
+      ignore-rules:
+        - Variabel
     errcheck:
       exclude-functions:
         - (io.Closer).Close
