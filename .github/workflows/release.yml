@@ -9,6 +9,7 @@ permissions:
   contents: read
   packages: write
   security-events: write
+  id-token: write
 
 jobs:
   release:
@@ -75,6 +76,12 @@ jobs:
             CHANNEL=${{ steps.channel.outputs.channel }}
             COMMIT=${{ github.sha }}
             DATE=${{ github.event.repository.updated_at }}
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign image (keyless)
+        run: cosign sign --yes "${{ steps.img.outputs.name }}@${{ steps.build.outputs.digest }}"
 
       - name: Trivy vulnerability scan
         uses: aquasecurity/trivy-action@v0.36.0
