@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 	"github.com/daknoblo/Haushaltsbuch/internal/web"
@@ -79,7 +78,7 @@ func (s *Server) handleExpenseUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	e.Name = strings.TrimSpace(r.FormValue("name"))
+	e.Name = cleanName(r.FormValue("name"))
 	e.AmountCents, _ = web.ParseCents(r.FormValue("amount"))
 
 	e.Frequency = store.Frequency(r.FormValue("frequency"))
@@ -100,9 +99,9 @@ func (s *Server) handleExpenseUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	e.IsOneOff = r.FormValue("is_oneoff") != ""
-	e.OccurredOn = strings.TrimSpace(r.FormValue("occurred_on"))
-	e.ActiveFrom = strings.TrimSpace(r.FormValue("active_from"))
-	e.ActiveUntil = strings.TrimSpace(r.FormValue("active_until"))
+	e.OccurredOn = cleanDate(r.FormValue("occurred_on"))
+	e.ActiveFrom = cleanMonth(r.FormValue("active_from"))
+	e.ActiveUntil = cleanMonth(r.FormValue("active_until"))
 
 	if secID := parseID(r.FormValue("section_id")); secID != 0 {
 		e.SectionID = &secID

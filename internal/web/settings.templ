@@ -25,7 +25,7 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 						hx-post="/households"
 						hx-target="#household-list"
 						hx-swap="beforeend"
-						hx-on::after-request="this.reset()"
+						data-reset-on-success
 					>
 						<input type="text" name="name" placeholder="Neuer Haushalt" style="flex:1" required/>
 						<button class="btn btn-primary btn-sm" type="submit">Hinzufügen</button>
@@ -45,7 +45,7 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 						hx-post="/members"
 						hx-target="#member-list"
 						hx-swap="beforeend"
-						hx-on::after-request="this.reset()"
+						data-reset-on-success
 					>
 						<input type="text" name="name" placeholder="Name" style="flex:1" required/>
 						<button class="btn btn-primary btn-sm" type="submit">Hinzufügen</button>
@@ -65,7 +65,7 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 						hx-post="/sections"
 						hx-target="#section-list"
 						hx-swap="beforeend"
-						hx-on::after-request="this.reset()"
+						data-reset-on-success
 					>
 						<input type="text" name="name" placeholder="Neue Sektion" style="flex:1" required/>
 						<button class="btn btn-primary btn-sm" type="submit">Hinzufügen</button>
@@ -85,7 +85,7 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 						hx-post="/categories"
 						hx-target="#category-list"
 						hx-swap="beforeend"
-						hx-on::after-request="this.reset()"
+						data-reset-on-success
 					>
 						<input type="text" name="name" placeholder="Neue Kategorie" style="flex:1" required/>
 						<button class="btn btn-primary btn-sm" type="submit">Hinzufügen</button>

@@ -28,6 +28,31 @@ func (s *Store) ListIncomes(householdID int64, yearMonth string) ([]Income, erro
 	return out, rows.Err()
 }
 
+// ListIncomesRange returns all income lines of a household for the inclusive
+// month range [fromMonth, toMonth], keyed by month. It lets callers build
+// reports for several months from a single query.
+func (s *Store) ListIncomesRange(householdID int64, fromMonth, toMonth string) (map[string][]Income, error) {
+	rows, err := s.db.Query(
+		`SELECT id, household_id, member_id, year_month, name, amount_cents, sort_order
+		 FROM incomes WHERE household_id = ? AND year_month BETWEEN ? AND ?
+		 ORDER BY year_month, member_id, sort_order, id`, householdID, fromMonth, toMonth)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(map[string][]Income)
+	for rows.Next() {
+		var in Income
+		if err := rows.Scan(&in.ID, &in.HouseholdID, &in.MemberID, &in.YearMonth,
+			&in.Name, &in.AmountCents, &in.SortOrder); err != nil {
+			return nil, err
+		}
+		out[in.YearMonth] = append(out[in.YearMonth], in)
+	}
+	return out, rows.Err()
+}
+
 // GetIncome returns a single income line by id.
 func (s *Store) GetIncome(id int64) (Income, error) {
 	var in Income

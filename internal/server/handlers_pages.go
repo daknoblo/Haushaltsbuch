@@ -94,47 +94,36 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 // ---- view-model builders ----
 
 func (s *Server) buildExpensesVM(householdID int64) (web.ExpensesVM, error) {
-	members, err := s.store.ListMembers(householdID)
-	if err != nil {
-		return web.ExpensesVM{}, err
-	}
-	sections, err := s.store.ListSections(householdID)
-	if err != nil {
-		return web.ExpensesVM{}, err
-	}
-	categories, err := s.store.ListCategories(householdID)
-	if err != nil {
-		return web.ExpensesVM{}, err
-	}
-	expenses, err := s.store.ListExpenses(householdID)
-	if err != nil {
-		return web.ExpensesVM{}, err
-	}
-	splits, err := s.store.ListSplitsForHousehold(householdID)
+	data, err := s.loadHouseholdData(householdID)
 	if err != nil {
 		return web.ExpensesVM{}, err
 	}
 
-	rowsBySection := make(map[int64][]web.ExpenseRow)
-	for _, e := range expenses {
+	rowsBySection := make(map[int64][]web.ExpenseRow, len(data.sections)+1)
+	for _, e := range data.expenses {
 		var sid int64
 		if e.SectionID != nil {
 			sid = *e.SectionID
 		}
-		rowsBySection[sid] = append(rowsBySection[sid], web.ExpenseRow{Expense: e, Splits: splits[e.ID]})
+		rowsBySection[sid] = append(rowsBySection[sid], web.ExpenseRow{Expense: e, Splits: data.splits[e.ID]})
 	}
 
-	var groups []web.SectionGroup
-	for i := range sections {
-		sec := sections[i]
+	groups := make([]web.SectionGroup, 0, len(data.sections)+1)
+	for i := range data.sections {
+		sec := data.sections[i]
 		rows := rowsBySection[sec.ID]
 		groups = append(groups, web.SectionGroup{Section: &sec, Expenses: rows, TotalCents: sumMonthly(rows)})
 	}
-	if rows := rowsBySection[0]; len(rows) > 0 || len(sections) == 0 {
+	if rows := rowsBySection[0]; len(rows) > 0 || len(data.sections) == 0 {
 		groups = append(groups, web.SectionGroup{Section: nil, Expenses: rows, TotalCents: sumMonthly(rows)})
 	}
 
-	return web.ExpensesVM{Groups: groups, Members: members, Sections: sections, Categories: categories}, nil
+	return web.ExpensesVM{
+		Groups:     groups,
+		Members:    data.members,
+		Sections:   data.sections,
+		Categories: data.categories,
+	}, nil
 }
 
 func (s *Server) buildIncomeVM(householdID int64, month string) (web.IncomeVM, error) {
@@ -166,49 +155,47 @@ func (s *Server) buildIncomeVM(householdID int64, month string) (web.IncomeVM, e
 func (s *Server) buildStatisticsVM(householdID int64, month string) (web.StatisticsVM, error) {
 	const window = 12
 
-	months := make([]string, 0, window)
-	m := web.ShiftMonth(month, -(window - 1))
-	for i := 0; i < window; i++ {
-		months = append(months, m)
-		m = web.ShiftMonth(m, 1)
+	months := make([]string, window)
+	for i := range months {
+		months[i] = web.ShiftMonth(month, i-(window-1))
 	}
 
-	var vm web.StatisticsVM
+	// The whole window is aggregated from a single load of the household data
+	// plus one range query for the income lines.
+	data, err := s.loadHouseholdData(householdID)
+	if err != nil {
+		return web.StatisticsVM{}, err
+	}
+	incomes, err := s.store.ListIncomesRange(householdID, months[0], month)
+	if err != nil {
+		return web.StatisticsVM{}, err
+	}
+
+	vm := web.StatisticsVM{Months: make([]web.StatMonth, 0, window)}
 	var sumIncome, sumExpense int64
 	var dataMonths int64
 	for _, mm := range months {
-		rep, err := s.buildMonthReport(householdID, mm)
-		if err != nil {
-			return web.StatisticsVM{}, err
-		}
+		rep := data.report(mm, incomes[mm])
 		vm.Months = append(vm.Months, web.StatMonth{
 			Month:        mm,
 			IncomeCents:  rep.IncomeCents,
 			ExpenseCents: rep.ExpenseCents,
 			BalanceCents: rep.BalanceCents,
 		})
-		if rep.IncomeCents > vm.MaxCents {
-			vm.MaxCents = rep.IncomeCents
-		}
-		if rep.ExpenseCents > vm.MaxCents {
-			vm.MaxCents = rep.ExpenseCents
-		}
+		vm.MaxCents = max(vm.MaxCents, rep.IncomeCents, rep.ExpenseCents)
 		if rep.IncomeCents != 0 || rep.ExpenseCents != 0 {
 			sumIncome += rep.IncomeCents
 			sumExpense += rep.ExpenseCents
 			dataMonths++
+		}
+		if mm == month {
+			vm.Current = rep
 		}
 	}
 	if dataMonths > 0 {
 		vm.AvgIncome = sumIncome / dataMonths
 		vm.AvgExpense = sumExpense / dataMonths
 	}
-
-	cur, err := s.buildMonthReport(householdID, month)
-	if err != nil {
-		return web.StatisticsVM{}, err
-	}
-	vm.Current = cur
 	return vm, nil
 }
 

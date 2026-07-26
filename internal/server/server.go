@@ -4,7 +4,6 @@ package server
 import (
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/a-h/templ"
 
@@ -78,18 +77,23 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /export/statistics.pdf", s.handleExportStatistics)
 	mux.HandleFunc("GET /export/expenses.pdf", s.handleExportExpenses)
 
-	return s.recoverer(s.logRequests(mux))
+	// Outermost middleware first: a panic anywhere below is still recovered and
+	// still logged with the resulting status code.
+	return s.recoverer(s.logRequests(securityHeaders(s.sameOrigin(limitBody(compressResponses(mux))))))
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
 }
 
-// render writes a templ component as an HTML response.
+// render writes a templ component as an HTML response. Responses contain
+// personal financial data and are therefore never cached.
 func (s *Server) render(w http.ResponseWriter, r *http.Request, c templ.Component) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
 	if err := c.Render(r.Context(), w); err != nil {
 		s.logger.Error("render failed", "err", err, "path", r.URL.Path)
 	}
@@ -100,50 +104,12 @@ func (s *Server) serverError(w http.ResponseWriter, r *http.Request, err error) 
 	http.Error(w, "Interner Serverfehler", http.StatusInternalServerError)
 }
 
-// ---- middleware ----
-
+// cacheControl marks the embedded static assets as privately cacheable. They
+// change only with a new binary, so a short lifetime is enough to avoid
+// re-downloads without serving stale files after an upgrade.
 func cacheControl(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "public, max-age=3600")
-		next.ServeHTTP(w, r)
-	})
-}
-
-type statusRecorder struct {
-	http.ResponseWriter
-	status int
-}
-
-func (r *statusRecorder) WriteHeader(code int) {
-	r.status = code
-	r.ResponseWriter.WriteHeader(code)
-}
-
-func (s *Server) logRequests(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
-		next.ServeHTTP(rec, r)
-		if r.URL.Path == "/healthz" {
-			return
-		}
-		s.logger.Info("request",
-			"method", r.Method,
-			"path", r.URL.Path,
-			"status", rec.status,
-			"duration", time.Since(start).String(),
-		)
-	})
-}
-
-func (s *Server) recoverer(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			if rec := recover(); rec != nil {
-				s.logger.Error("panic recovered", "err", rec, "path", r.URL.Path)
-				http.Error(w, "Interner Serverfehler", http.StatusInternalServerError)
-			}
-		}()
+		w.Header().Set("Cache-Control", "private, max-age=3600")
 		next.ServeHTTP(w, r)
 	})
 }

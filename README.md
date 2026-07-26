@@ -1,40 +1,43 @@
 # Haushaltsbuch
 
-Eine kleine, eigenständige Anwendung zur Verwaltung von Einnahmen und Ausgaben
-mehrerer Haushalte. Läuft als **ein einzelnes, statisches Binary** in einem
-minimalen Docker-Container (distroless, non-root).
+A small, self-contained application for managing the income and expenses of one
+or more households. It ships as a **single static binary** in a minimal Docker
+container (distroless, non-root).
 
-- **Backend:** Go (CGO-frei), SQLite über `modernc.org/sqlite`
-- **Frontend:** server-gerendert mit [templ](https://templ.guide) + HTMX,
-  eigenes, in das Binary eingebettetes CSS – kein Node/Build-Schritt nötig
-- **PDF-Export:** rein in Go über [maroto](https://maroto.tech)
+- **Backend:** Go (CGO-free), SQLite via `modernc.org/sqlite`
+- **Frontend:** server-rendered with [templ](https://templ.guide) + HTMX and
+  hand-written CSS embedded into the binary – no Node build step required
+- **PDF export:** pure Go via [maroto](https://maroto.tech)
 
----
-
-## Funktionen
-
-- **Mehrere Haushalte** mit jederzeit genau einem aktiven Haushalt; Wechsel über
-  ein Dropdown in der Kopfzeile, Anlegen/Umbenennen/Löschen in den Einstellungen.
-- **Ausgaben** je Sektion gruppiert, mit
-  - Rhythmus **wöchentlich / monatlich / jährlich** (auf Monat normalisiert),
-  - **einmaligen** datierten Ausgaben,
-  - **Kategorie**, **Fix/Variabel** und **Bedarf/Wunsch/Sparen** (50/30/20),
-  - flexibler **Aufteilung** pro Ausgabe: gleichmäßig, prozentual oder feste
-    Beträge – z. B. Miete 50/50, Versicherung 100 % auf eine Person.
-- **Einnahmen** je Person und Monat, beliebig viele Zeilen (z. B. Gehalt +
-  Sonderzahlung/Bonus), mit „aus Vormonat übernehmen".
-- **Übersicht** je Monat: Einnahmen, Ausgaben, Saldo – gesamt und pro Person,
-  aufgeschlüsselt nach Sektion, Kategorie, Kostenart und 50/30/20.
-- **Statistiken** über die letzten 12 Monate mit Durchschnitten und Verlauf.
-- **PDF-Export** von Übersicht, Statistiken und Ausgabenliste.
-- **Automatisches Speichern**: alle Eingaben werden beim Verlassen/Ändern eines
-  Feldes sofort gespeichert – ohne Speichern-Button.
+> The user interface is in German; code, comments and this documentation are in
+> English.
 
 ---
 
-## Schnellstart
+## Features
 
-### Mit Docker
+- **Multiple households**, exactly one of which is active at a time. Switch via
+  the header dropdown; create, rename and delete them in the settings.
+- **Expenses** grouped by section, with
+  - a **weekly / monthly / yearly** rhythm (normalised to a monthly amount),
+  - **one-off** dated expenses,
+  - **category**, **fixed/variable** and **need/want/saving** (50/30/20),
+  - a flexible **split** per expense: equal, percentage or fixed amounts –
+    e.g. rent 50/50, insurance 100 % on one person.
+- **Income** per person and month with an arbitrary number of lines (e.g. salary
+  plus bonus) and a "copy from previous month" action.
+- **Overview** per month: income, expenses and balance – in total and per
+  person, broken down by section, category, cost nature and 50/30/20.
+- **Statistics** for the last 12 months including averages and a trend chart.
+- **PDF export** of the overview, the statistics and the expense list.
+- **Automatic saving**: every input is persisted as soon as a field changes –
+  there is no save button.
+
+---
+
+## Quick start
+
+### With Docker
 
 ```sh
 docker run -d --name haushaltsbuch \
@@ -44,86 +47,98 @@ docker run -d --name haushaltsbuch \
   ghcr.io/daknoblo/haushaltsbuch:stable
 ```
 
-Danach im Browser: <http://localhost:8080>
+Then open <http://localhost:8080> in a browser.
 
-### Mit Docker Compose
+### With Docker Compose
 
-Siehe [deploy/docker-compose.example.yml](deploy/docker-compose.example.yml):
+See [deploy/docker-compose.example.yml](deploy/docker-compose.example.yml):
 
 ```sh
 cp deploy/docker-compose.example.yml docker-compose.yml
 docker compose up -d
 ```
 
-### Lokal (Entwicklung)
+### Locally (development)
 
 ```sh
 make run
-# oder
+# or
 go run ./cmd/haushaltsbuch
 ```
 
-Standardmäßig lauscht die App auf `:8080` und legt die Datenbank unter
-`appdata/haushaltsbuch.db` an.
+By default the application listens on `:8080` and creates its database at
+`appdata/haushaltsbuch.db`.
 
 ---
 
-## Konfiguration
+## Configuration
 
-Alle Einstellungen erfolgen über Umgebungsvariablen mit dem Präfix `HB_`:
+All settings are provided through environment variables prefixed with `HB_`:
 
-| Variable       | Default                    | Beschreibung                         |
+| Variable       | Default                    | Description                          |
 | -------------- | -------------------------- | ------------------------------------ |
-| `HB_ADDR`      | `:8080`                    | Listen-Adresse                       |
-| `HB_DB_PATH`   | `appdata/haushaltsbuch.db` | Pfad zur SQLite-Datenbank            |
+| `HB_ADDR`      | `:8080`                    | Listen address                       |
+| `HB_DB_PATH`   | `appdata/haushaltsbuch.db` | Path to the SQLite database          |
 | `HB_LOG_LEVEL` | `info`                     | `debug`, `info`, `warn`, `error`     |
-| `TZ`           | (System)                   | IANA-Zeitzone, z. B. `Europe/Berlin` |
+| `TZ`           | (system)                   | IANA time zone, e.g. `Europe/Berlin` |
 
-Im Container ist `HB_DB_PATH` auf `/app/appdata/haushaltsbuch.db` gesetzt; das
-Verzeichnis `/app/appdata` ist als Volume angelegt.
-
----
-
-## Sicherheit
-
-> **Keine eingebaute Authentifizierung.** Die Anwendung ist für den Betrieb in
-> einem vertrauenswürdigen Netzwerk bzw. hinter einem Reverse-Proxy/VPN gedacht
-> und sollte **nicht direkt ins Internet** exponiert werden.
-
-- Minimale Angriffsfläche: distroless-Basis, non-root (UID/GID 65532),
-  statisches Binary, empfohlenes read-only Root-Filesystem (nur das Datenvolume
-  ist beschreibbar).
-- Alle SQL-Zugriffe sind parametrisiert.
-- Das Container-Image wird in der CI mit Trivy auf CRITICAL/HIGH-Schwachstellen
-  gescannt.
+Inside the container `HB_DB_PATH` points at `/app/appdata/haushaltsbuch.db`; the
+directory `/app/appdata` is declared as a volume. An invalid `TZ` value is
+reported as a warning at startup and the application falls back to UTC.
 
 ---
 
-## Entwicklung
+## Security
+
+> **No built-in authentication.** The application is meant to run inside a
+> trusted network or behind a reverse proxy/VPN and must **not** be exposed
+> directly to the internet.
+
+- Minimal attack surface: distroless base image, non-root (UID/GID 65532),
+  static binary and a recommended read-only root filesystem (only the data
+  volume is writable).
+- Every response carries a strict `Content-Security-Policy` (`default-src
+  'self'`, no `unsafe-eval`) plus `X-Content-Type-Options`, `X-Frame-Options`,
+  `Referrer-Policy` and cross-origin isolation headers.
+- State-changing requests (anything other than `GET`/`HEAD`/`OPTIONS`) are
+  rejected with `403` when the browser reports them as cross-site
+  (`Sec-Fetch-Site`, falling back to `Origin`). This protects the
+  unauthenticated instance against CSRF.
+- Request bodies are capped at 1 MiB and the HTTP server enforces read, write
+  and idle timeouts.
+- Pages are served with `Cache-Control: no-store` so that financial data is not
+  written to shared or disk caches.
+- All SQL access uses parameterised queries; names, colours, dates and
+  identifiers are validated before they reach the store.
+- The container image is scanned for CRITICAL/HIGH vulnerabilities with Trivy in
+  CI.
+
+---
+
+## Development
 
 ```sh
-make help      # verfügbare Targets
-make build     # statisches Binary nach bin/
-make test      # Tests mit Race-Detector
+make help      # list available targets
+make build     # compile a static binary into bin/
+make test      # run the test suite with the race detector
 make vet       # go vet
-make generate  # templ-Templates neu generieren (*_templ.go)
-make docker    # Container-Image bauen
+make generate  # regenerate the templ templates (*_templ.go)
+make docker    # build the container image
 ```
 
-Das Web-UI nutzt [templ](https://templ.guide). Nach Änderungen an `*.templ`
-müssen die generierten Dateien mit `make generate` (bzw.
-`go tool templ generate`) aktualisiert und **mitkommittet** werden – dadurch
-baut das Projekt ohne die templ-Toolchain.
+The web UI uses [templ](https://templ.guide). After changing a `*.templ` file
+the generated files must be refreshed with `make generate` (i.e.
+`go tool templ generate`) and **committed** – this keeps the project buildable
+without the templ toolchain.
 
-### Projektstruktur
+### Project layout
 
 ```
-cmd/haushaltsbuch/      Einstiegspunkt (Flags, Wiring, Graceful Shutdown)
-internal/config/        Konfiguration aus HB_-Env-Variablen
-internal/store/         SQLite-Zugriff + Migrationen
-internal/calc/          Monatsberechnung (Normalisierung, Aufteilung)
-internal/server/        HTTP-Routing, Handler, PDF-Export
-internal/web/           templ-Templates, Assets, View-Models, Formatierung
-internal/logbuf/        In-Memory-Log-Puffer
-internal/version/       Build-Metadaten
+cmd/haushaltsbuch/      Entry point (flags, wiring, graceful shutdown)
+internal/config/        Configuration from HB_ environment variables
+internal/store/         SQLite access and migrations
+internal/calc/          Monthly aggregation (normalisation, split allocation)
+internal/server/        HTTP routing, middleware, handlers, PDF export
+internal/web/           templ templates, assets, view models, formatting
+internal/version/       Build metadata injected via -ldflags
 ```

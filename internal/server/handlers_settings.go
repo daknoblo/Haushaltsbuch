@@ -2,7 +2,6 @@ package server
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/web"
 )
@@ -12,7 +11,7 @@ var memberColors = []string{"#2563eb", "#db2777", "#059669", "#d97706", "#7c3aed
 // ---- households ----
 
 func (s *Server) handleHouseholdCreate(w http.ResponseWriter, r *http.Request) {
-	name := strings.TrimSpace(r.FormValue("name"))
+	name := cleanName(r.FormValue("name"))
 	if name == "" {
 		http.Error(w, "Name fehlt", http.StatusBadRequest)
 		return
@@ -32,7 +31,7 @@ func (s *Server) handleHouseholdCreate(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleHouseholdRename(w http.ResponseWriter, r *http.Request) {
 	id := parseID(r.PathValue("id"))
-	name := strings.TrimSpace(r.FormValue("name"))
+	name := cleanName(r.FormValue("name"))
 	if id == 0 || name == "" {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -91,12 +90,16 @@ func (s *Server) handleMemberCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Kein aktiver Haushalt", http.StatusBadRequest)
 		return
 	}
-	name := strings.TrimSpace(r.FormValue("name"))
+	name := cleanName(r.FormValue("name"))
 	if name == "" {
 		http.Error(w, "Name fehlt", http.StatusBadRequest)
 		return
 	}
-	existing, _ := s.store.ListMembers(active)
+	existing, err := s.store.ListMembers(active)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
 	color := memberColors[len(existing)%len(memberColors)]
 	m, err := s.store.CreateMember(active, name, color)
 	if err != nil {
@@ -108,8 +111,8 @@ func (s *Server) handleMemberCreate(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleMemberUpdate(w http.ResponseWriter, r *http.Request) {
 	id := parseID(r.PathValue("id"))
-	name := strings.TrimSpace(r.FormValue("name"))
-	color := strings.TrimSpace(r.FormValue("color"))
+	name := cleanName(r.FormValue("name"))
+	color := cleanColor(r.FormValue("color"))
 	if id == 0 || name == "" {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -142,7 +145,7 @@ func (s *Server) handleSectionCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Kein aktiver Haushalt", http.StatusBadRequest)
 		return
 	}
-	name := strings.TrimSpace(r.FormValue("name"))
+	name := cleanName(r.FormValue("name"))
 	if name == "" {
 		http.Error(w, "Name fehlt", http.StatusBadRequest)
 		return
@@ -157,7 +160,7 @@ func (s *Server) handleSectionCreate(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleSectionRename(w http.ResponseWriter, r *http.Request) {
 	id := parseID(r.PathValue("id"))
-	name := strings.TrimSpace(r.FormValue("name"))
+	name := cleanName(r.FormValue("name"))
 	if id == 0 || name == "" {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -190,7 +193,7 @@ func (s *Server) handleCategoryCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Kein aktiver Haushalt", http.StatusBadRequest)
 		return
 	}
-	name := strings.TrimSpace(r.FormValue("name"))
+	name := cleanName(r.FormValue("name"))
 	if name == "" {
 		http.Error(w, "Name fehlt", http.StatusBadRequest)
 		return
@@ -205,7 +208,7 @@ func (s *Server) handleCategoryCreate(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCategoryRename(w http.ResponseWriter, r *http.Request) {
 	id := parseID(r.PathValue("id"))
-	name := strings.TrimSpace(r.FormValue("name"))
+	name := cleanName(r.FormValue("name"))
 	if id == 0 || name == "" {
 		w.WriteHeader(http.StatusNoContent)
 		return

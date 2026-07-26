@@ -3,7 +3,6 @@ package server
 import (
 	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 	"github.com/daknoblo/Haushaltsbuch/internal/web"
@@ -22,6 +21,16 @@ func (s *Server) handleIncomeCreate(w http.ResponseWriter, r *http.Request) {
 	member := parseID(r.URL.Query().Get("member"))
 	if member == 0 {
 		http.Error(w, "Person fehlt", http.StatusBadRequest)
+		return
+	}
+	// Only members of the active household may receive income lines.
+	m, err := s.store.GetMember(member)
+	if errors.Is(err, store.ErrNotFound) || (err == nil && m.HouseholdID != active) {
+		http.Error(w, "Unbekannte Person", http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		s.serverError(w, r, err)
 		return
 	}
 	month := web.NormalizeMonth(r.URL.Query().Get("m"))
@@ -45,7 +54,7 @@ func (s *Server) handleIncomeUpdate(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	name := strings.TrimSpace(r.FormValue("name"))
+	name := cleanName(r.FormValue("name"))
 	amount, _ := web.ParseCents(r.FormValue("amount"))
 	if err := s.store.UpdateIncome(id, name, amount); err != nil {
 		s.serverError(w, r, err)

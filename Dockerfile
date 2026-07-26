@@ -3,19 +3,20 @@
 # ---- Build stage ----
 ARG GO_VERSION=1.26
 FROM golang:${GO_VERSION}-alpine AS builder
-RUN apk add --no-cache ca-certificates git
 WORKDIR /src
 
-# Cache dependencies first.
+# Cache dependencies first so that source-only changes do not re-download them.
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
 COPY . .
 ARG VERSION=dev
 ARG CHANNEL=local
 ARG COMMIT=unknown
 ARG DATE=unknown
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
     -ldflags="-s -w \
       -X github.com/daknoblo/Haushaltsbuch/internal/version.Version=${VERSION} \
       -X github.com/daknoblo/Haushaltsbuch/internal/version.Channel=${CHANNEL} \

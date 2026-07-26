@@ -26,6 +26,13 @@
     if (verb && verb.toLowerCase() !== "get") {
       flashSaved();
     }
+    // Clear "add new entry" forms after a successful submit. Handled here
+    // instead of an inline hx-on attribute so the Content-Security-Policy can
+    // stay free of 'unsafe-eval'.
+    var el = d.elt;
+    if (el && el.tagName === "FORM" && el.hasAttribute("data-reset-on-success")) {
+      el.reset();
+    }
   });
 
   // Full page refresh when the server asks for it (e.g. after switching

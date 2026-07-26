@@ -2,7 +2,10 @@ package server
 
 import (
 	"net/http"
+	"regexp"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/calc"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
@@ -48,25 +51,49 @@ func (s *Server) buildNav(r *http.Request, active, path string, showMonth bool) 
 	}, nil
 }
 
+// householdData bundles the household-scoped data that every month report
+// needs. Loading it once allows several months to be aggregated without
+// re-querying the same rows.
+type householdData struct {
+	members    []store.Member
+	sections   []store.Section
+	categories []store.Category
+	expenses   []store.Expense
+	splits     map[int64][]store.ExpenseSplit
+}
+
+// loadHouseholdData reads members, sections, categories, expenses and splits of
+// a household.
+func (s *Server) loadHouseholdData(householdID int64) (householdData, error) {
+	var d householdData
+	var err error
+	if d.members, err = s.store.ListMembers(householdID); err != nil {
+		return householdData{}, err
+	}
+	if d.sections, err = s.store.ListSections(householdID); err != nil {
+		return householdData{}, err
+	}
+	if d.categories, err = s.store.ListCategories(householdID); err != nil {
+		return householdData{}, err
+	}
+	if d.expenses, err = s.store.ListExpenses(householdID); err != nil {
+		return householdData{}, err
+	}
+	if d.splits, err = s.store.ListSplitsForHousehold(householdID); err != nil {
+		return householdData{}, err
+	}
+	return d, nil
+}
+
+// report aggregates the already loaded household data for a single month.
+func (d householdData) report(month string, incomes []store.Income) calc.MonthReport {
+	return calc.BuildMonthReport(month, d.members, d.sections, d.categories,
+		d.expenses, d.splits, incomes)
+}
+
 // buildMonthReport loads all data for a household/month and aggregates it.
 func (s *Server) buildMonthReport(householdID int64, month string) (calc.MonthReport, error) {
-	members, err := s.store.ListMembers(householdID)
-	if err != nil {
-		return calc.MonthReport{}, err
-	}
-	sections, err := s.store.ListSections(householdID)
-	if err != nil {
-		return calc.MonthReport{}, err
-	}
-	categories, err := s.store.ListCategories(householdID)
-	if err != nil {
-		return calc.MonthReport{}, err
-	}
-	expenses, err := s.store.ListExpenses(householdID)
-	if err != nil {
-		return calc.MonthReport{}, err
-	}
-	splits, err := s.store.ListSplitsForHousehold(householdID)
+	data, err := s.loadHouseholdData(householdID)
 	if err != nil {
 		return calc.MonthReport{}, err
 	}
@@ -74,7 +101,7 @@ func (s *Server) buildMonthReport(householdID int64, month string) (calc.MonthRe
 	if err != nil {
 		return calc.MonthReport{}, err
 	}
-	return calc.BuildMonthReport(month, members, sections, categories, expenses, splits, incomes), nil
+	return data.report(month, incomes), nil
 }
 
 // expenseContext returns the members, sections and categories needed to render
@@ -98,10 +125,57 @@ func (s *Server) expenseContext(householdID int64) (web.ExpensesVM, error) {
 // parseID parses a decimal id, returning 0 on failure.
 func parseID(s string) int64 {
 	id, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
+	if err != nil || id < 0 {
 		return 0
 	}
 	return id
+}
+
+// maxNameLen bounds free-text names so that a single request cannot store an
+// unbounded amount of data.
+const maxNameLen = 120
+
+// cleanName trims a user supplied name and truncates it to maxNameLen runes.
+func cleanName(s string) string {
+	s = strings.TrimSpace(s)
+	if r := []rune(s); len(r) > maxNameLen {
+		s = string(r[:maxNameLen])
+	}
+	return s
+}
+
+// hexColorRe matches the "#rrggbb" values produced by <input type="color">.
+var hexColorRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+
+// cleanColor returns c when it is a valid hex color and "" otherwise.
+func cleanColor(c string) string {
+	c = strings.TrimSpace(c)
+	if hexColorRe.MatchString(c) {
+		return strings.ToLower(c)
+	}
+	return ""
+}
+
+// cleanMonth returns ym when it is a valid "YYYY-MM" value and "" otherwise.
+// Empty means "no bound" for the active_from/active_until fields.
+func cleanMonth(ym string) string {
+	ym = strings.TrimSpace(ym)
+	if ym == "" || !web.ValidMonth(ym) {
+		return ""
+	}
+	return ym
+}
+
+// cleanDate returns d when it is a valid "YYYY-MM-DD" value and "" otherwise.
+func cleanDate(d string) string {
+	d = strings.TrimSpace(d)
+	if d == "" {
+		return ""
+	}
+	if _, err := time.Parse("2006-01-02", d); err != nil {
+		return ""
+	}
+	return d
 }
 
 // hxRefresh instructs htmx to perform a full page refresh.

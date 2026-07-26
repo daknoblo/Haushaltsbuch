@@ -20,7 +20,6 @@ import (
 	_ "time/tzdata"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/config"
-	"github.com/daknoblo/Haushaltsbuch/internal/logbuf"
 	"github.com/daknoblo/Haushaltsbuch/internal/server"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 	"github.com/daknoblo/Haushaltsbuch/internal/version"
@@ -46,9 +45,7 @@ func main() {
 		return
 	}
 
-	logBuf := logbuf.New(500)
-	base := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: cfg.LogLevel})
-	logger := slog.New(logbuf.NewHandler(base, logBuf))
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: cfg.LogLevel}))
 	slog.SetDefault(logger)
 
 	if err := run(cfg, logger); err != nil {
@@ -62,6 +59,16 @@ func main() {
 func run(cfg config.Config, logger *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	// Go resolves TZ lazily and silently falls back to UTC; report it instead.
+	if cfg.TZ != "" {
+		loc, err := time.LoadLocation(cfg.TZ)
+		if err != nil {
+			logger.Warn("invalid time zone, falling back to UTC", "tz", cfg.TZ, "err", err)
+		} else {
+			time.Local = loc
+		}
+	}
 
 	st, err := store.Open(cfg.DBPath)
 	if err != nil {
@@ -78,6 +85,12 @@ func run(cfg config.Config, logger *slog.Logger) error {
 		Addr:              cfg.Addr,
 		Handler:           srv.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		// Generous enough for the largest PDF export.
+		WriteTimeout:   60 * time.Second,
+		IdleTimeout:    120 * time.Second,
+		MaxHeaderBytes: 1 << 16,
+		ErrorLog:       slog.NewLogLogger(logger.Handler(), slog.LevelError),
 	}
 
 	errCh := make(chan error, 1)

@@ -57,7 +57,7 @@ func SettingsPage(nav Nav, vm SettingsVM) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</div><form class=\"flex gap-sm mt-2\" hx-post=\"/households\" hx-target=\"#household-list\" hx-swap=\"beforeend\" hx-on::after-request=\"this.reset()\"><input type=\"text\" name=\"name\" placeholder=\"Neuer Haushalt\" style=\"flex:1\" required> <button class=\"btn btn-primary btn-sm\" type=\"submit\">Hinzufügen</button></form></div></div><div class=\"card\" id=\"personen\"><div class=\"card-head\"><h2>Personen</h2></div><div class=\"card-pad\"><div id=\"member-list\" class=\"flex-col\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</div><form class=\"flex gap-sm mt-2\" hx-post=\"/households\" hx-target=\"#household-list\" hx-swap=\"beforeend\" data-reset-on-success><input type=\"text\" name=\"name\" placeholder=\"Neuer Haushalt\" style=\"flex:1\" required> <button class=\"btn btn-primary btn-sm\" type=\"submit\">Hinzufügen</button></form></div></div><div class=\"card\" id=\"personen\"><div class=\"card-head\"><h2>Personen</h2></div><div class=\"card-pad\"><div id=\"member-list\" class=\"flex-col\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -67,7 +67,7 @@ func SettingsPage(nav Nav, vm SettingsVM) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><form class=\"flex gap-sm mt-2\" hx-post=\"/members\" hx-target=\"#member-list\" hx-swap=\"beforeend\" hx-on::after-request=\"this.reset()\"><input type=\"text\" name=\"name\" placeholder=\"Name\" style=\"flex:1\" required> <button class=\"btn btn-primary btn-sm\" type=\"submit\">Hinzufügen</button></form></div></div><div class=\"card\" id=\"sektionen\"><div class=\"card-head\"><h2>Sektionen</h2></div><div class=\"card-pad\"><div id=\"section-list\" class=\"flex-col\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><form class=\"flex gap-sm mt-2\" hx-post=\"/members\" hx-target=\"#member-list\" hx-swap=\"beforeend\" data-reset-on-success><input type=\"text\" name=\"name\" placeholder=\"Name\" style=\"flex:1\" required> <button class=\"btn btn-primary btn-sm\" type=\"submit\">Hinzufügen</button></form></div></div><div class=\"card\" id=\"sektionen\"><div class=\"card-head\"><h2>Sektionen</h2></div><div class=\"card-pad\"><div id=\"section-list\" class=\"flex-col\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -77,7 +77,7 @@ func SettingsPage(nav Nav, vm SettingsVM) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div><form class=\"flex gap-sm mt-2\" hx-post=\"/sections\" hx-target=\"#section-list\" hx-swap=\"beforeend\" hx-on::after-request=\"this.reset()\"><input type=\"text\" name=\"name\" placeholder=\"Neue Sektion\" style=\"flex:1\" required> <button class=\"btn btn-primary btn-sm\" type=\"submit\">Hinzufügen</button></form></div></div><div class=\"card\" id=\"kategorien\"><div class=\"card-head\"><h2>Kategorien</h2></div><div class=\"card-pad\"><div id=\"category-list\" class=\"flex-col\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div><form class=\"flex gap-sm mt-2\" hx-post=\"/sections\" hx-target=\"#section-list\" hx-swap=\"beforeend\" data-reset-on-success><input type=\"text\" name=\"name\" placeholder=\"Neue Sektion\" style=\"flex:1\" required> <button class=\"btn btn-primary btn-sm\" type=\"submit\">Hinzufügen</button></form></div></div><div class=\"card\" id=\"kategorien\"><div class=\"card-head\"><h2>Kategorien</h2></div><div class=\"card-pad\"><div id=\"category-list\" class=\"flex-col\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -87,7 +87,7 @@ func SettingsPage(nav Nav, vm SettingsVM) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div><form class=\"flex gap-sm mt-2\" hx-post=\"/categories\" hx-target=\"#category-list\" hx-swap=\"beforeend\" hx-on::after-request=\"this.reset()\"><input type=\"text\" name=\"name\" placeholder=\"Neue Kategorie\" style=\"flex:1\" required> <button class=\"btn btn-primary btn-sm\" type=\"submit\">Hinzufügen</button></form></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div><form class=\"flex gap-sm mt-2\" hx-post=\"/categories\" hx-target=\"#category-list\" hx-swap=\"beforeend\" data-reset-on-success><input type=\"text\" name=\"name\" placeholder=\"Neue Kategorie\" style=\"flex:1\" required> <button class=\"btn btn-primary btn-sm\" type=\"submit\">Hinzufügen</button></form></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
