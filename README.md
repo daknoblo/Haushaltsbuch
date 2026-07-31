@@ -142,3 +142,8 @@ internal/server/        HTTP routing, middleware, handlers, PDF export
 internal/web/           templ templates, assets, view models, formatting
 internal/version/       Build metadata injected via -ldflags
 ```
+
+
+## License
+
+Released under the [MIT License](LICENSE).
