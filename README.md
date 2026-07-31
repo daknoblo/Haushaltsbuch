@@ -1,5 +1,10 @@
 # Haushaltsbuch
 
+[![CI](https://github.com/daknoblo/Haushaltsbuch/actions/workflows/ci.yml/badge.svg)](https://github.com/daknoblo/Haushaltsbuch/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/daknoblo/Haushaltsbuch)](https://goreportcard.com/report/github.com/daknoblo/Haushaltsbuch)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![GHCR](https://img.shields.io/badge/ghcr.io-haushaltsbuch-blue?logo=docker)](https://github.com/daknoblo/Haushaltsbuch/pkgs/container/haushaltsbuch)
+
 A small, self-contained application for managing the income and expenses of one
 or more households. It ships as a **single static binary** in a minimal Docker
 container (distroless, non-root).
