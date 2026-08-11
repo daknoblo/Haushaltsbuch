@@ -118,6 +118,10 @@ reported as a warning at startup and the application falls back to UTC.
   identifiers are validated before they reach the store.
 - The container image is scanned for CRITICAL/HIGH vulnerabilities with Trivy in
   CI.
+- Static analysis and supply-chain checks run in CI: CodeQL (push, pull request
+  and weekly schedule), `go vet`, golangci-lint, `govulncheck` and a dependency
+  review on every pull request. Dependabot keeps Go modules, GitHub Actions and
+  the base image up to date.
 
 ---
 
