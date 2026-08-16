@@ -1,12 +1,20 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"errors"
+	"strings"
 )
 
 type scanner interface {
 	Scan(dest ...any) error
+}
+
+// SplitInput is a member's participation in an expense as submitted by the UI.
+type SplitInput struct {
+	MemberID int64
+	Value    float64
 }
 
 const expenseColumns = `id, household_id, section_id, category_id, name, amount_cents,
@@ -41,8 +49,8 @@ func scanExpense(sc scanner) (Expense, error) {
 }
 
 // ListExpenses returns all expenses of a household.
-func (s *Store) ListExpenses(householdID int64) ([]Expense, error) {
-	rows, err := s.db.Query(
+func (s *Store) ListExpenses(ctx context.Context, householdID int64) ([]Expense, error) {
+	rows, err := s.q.QueryContext(ctx,
 		`SELECT `+expenseColumns+` FROM expenses
 		 WHERE household_id = ?
 		 ORDER BY sort_order, id`, householdID)
@@ -63,8 +71,8 @@ func (s *Store) ListExpenses(householdID int64) ([]Expense, error) {
 }
 
 // GetExpense returns a single expense by id.
-func (s *Store) GetExpense(id int64) (Expense, error) {
-	e, err := scanExpense(s.db.QueryRow(
+func (s *Store) GetExpense(ctx context.Context, id int64) (Expense, error) {
+	e, err := scanExpense(s.q.QueryRowContext(ctx,
 		`SELECT `+expenseColumns+` FROM expenses WHERE id = ?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return Expense{}, ErrNotFound
@@ -72,56 +80,124 @@ func (s *Store) GetExpense(id int64) (Expense, error) {
 	return e, err
 }
 
-// CreateExpense inserts a new expense and returns it. CreatedAt/UpdatedAt and
-// SortOrder are assigned automatically.
-func (s *Store) CreateExpense(e Expense) (Expense, error) {
-	ts := now()
-	res, err := s.db.Exec(
-		`INSERT INTO expenses
-			(household_id, section_id, category_id, name, amount_cents, frequency,
-			 cost_nature, budget_class, is_oneoff, occurred_on, active_from,
-			 active_until, split_mode, sort_order, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-			(SELECT COALESCE(MAX(sort_order)+1, 0) FROM expenses WHERE household_id = ?), ?, ?)`,
-		e.HouseholdID, nullInt(e.SectionID), nullInt(e.CategoryID), e.Name, e.AmountCents,
-		string(e.Frequency), string(e.CostNature), string(e.BudgetClass), boolToInt(e.IsOneOff),
-		e.OccurredOn, e.ActiveFrom, e.ActiveUntil, string(e.SplitMode),
-		e.HouseholdID, ts, ts,
-	)
+// These sub-selects resolve to NULL unless the referenced row belongs to the
+// same household, so a forged id cannot create a cross-household reference.
+const (
+	sectionRef  = `(SELECT id FROM sections WHERE id = ? AND household_id = ?)`
+	categoryRef = `(SELECT id FROM categories WHERE id = ? AND household_id = ?)`
+)
+
+// CreateExpense inserts a new expense together with its splits and returns it.
+// CreatedAt/UpdatedAt and SortOrder are assigned automatically.
+func (s *Store) CreateExpense(ctx context.Context, e Expense, splits []SplitInput) (Expense, error) {
+	var created Expense
+	err := s.withTx(ctx, func(tx *Store) error {
+		ts := now()
+		res, err := tx.q.ExecContext(ctx,
+			`INSERT INTO expenses
+				(household_id, section_id, category_id, name, amount_cents, frequency,
+				 cost_nature, budget_class, is_oneoff, occurred_on, active_from,
+				 active_until, split_mode, sort_order, created_at, updated_at)
+			 VALUES (?, `+sectionRef+`, `+categoryRef+`, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+				(SELECT COALESCE(MAX(sort_order)+1, 0) FROM expenses WHERE household_id = ?), ?, ?)`,
+			e.HouseholdID,
+			nullInt(e.SectionID), e.HouseholdID,
+			nullInt(e.CategoryID), e.HouseholdID,
+			e.Name, e.AmountCents,
+			string(e.Frequency), string(e.CostNature), string(e.BudgetClass), boolToInt(e.IsOneOff),
+			e.OccurredOn, e.ActiveFrom, e.ActiveUntil, string(e.SplitMode),
+			e.HouseholdID, ts, ts,
+		)
+		if err != nil {
+			return err
+		}
+		id, err := res.LastInsertId()
+		if err != nil {
+			return err
+		}
+		if err := tx.replaceSplits(ctx, id, e.HouseholdID, splits); err != nil {
+			return err
+		}
+		created, err = tx.GetExpense(ctx, id)
+		return err
+	})
 	if err != nil {
 		return Expense{}, err
 	}
-	id, err := res.LastInsertId()
-	if err != nil {
-		return Expense{}, err
+	return created, nil
+}
+
+// SaveExpense persists all mutable fields of e together with its splits in a
+// single transaction. The update is scoped to e.HouseholdID.
+func (s *Store) SaveExpense(ctx context.Context, e Expense, splits []SplitInput) error {
+	return s.withTx(ctx, func(tx *Store) error {
+		err := affected(tx.q.ExecContext(ctx,
+			`UPDATE expenses SET
+				section_id = `+sectionRef+`, category_id = `+categoryRef+`, name = ?,
+				amount_cents = ?, frequency = ?, cost_nature = ?, budget_class = ?,
+				is_oneoff = ?, occurred_on = ?, active_from = ?, active_until = ?,
+				split_mode = ?, updated_at = ?
+			 WHERE id = ? AND household_id = ?`,
+			nullInt(e.SectionID), e.HouseholdID,
+			nullInt(e.CategoryID), e.HouseholdID,
+			e.Name, e.AmountCents, string(e.Frequency),
+			string(e.CostNature), string(e.BudgetClass), boolToInt(e.IsOneOff), e.OccurredOn,
+			e.ActiveFrom, e.ActiveUntil, string(e.SplitMode), now(), e.ID, e.HouseholdID,
+		))
+		if err != nil {
+			return err
+		}
+		return tx.replaceSplits(ctx, e.ID, e.HouseholdID, splits)
+	})
+}
+
+// DeleteExpense removes an expense of a household and its splits (cascade).
+func (s *Store) DeleteExpense(ctx context.Context, householdID, id int64) error {
+	return affected(s.q.ExecContext(ctx,
+		`DELETE FROM expenses WHERE id = ? AND household_id = ?`, id, householdID))
+}
+
+// ReplaceSplits makes the stored splits of an expense match splits. Member ids
+// outside householdID are silently skipped.
+func (s *Store) ReplaceSplits(ctx context.Context, expenseID, householdID int64, splits []SplitInput) error {
+	return s.withTx(ctx, func(tx *Store) error {
+		return tx.replaceSplits(ctx, expenseID, householdID, splits)
+	})
+}
+
+func (s *Store) replaceSplits(ctx context.Context, expenseID, householdID int64, splits []SplitInput) error {
+	args := make([]any, 0, len(splits)+1)
+	args = append(args, expenseID)
+	marks := make([]string, 0, len(splits))
+	for _, sp := range splits {
+		marks = append(marks, "?")
+		args = append(args, sp.MemberID)
 	}
-	return s.GetExpense(id)
-}
 
-// UpdateExpense persists all mutable fields of e (identified by e.ID).
-func (s *Store) UpdateExpense(e Expense) error {
-	_, err := s.db.Exec(
-		`UPDATE expenses SET
-			section_id = ?, category_id = ?, name = ?, amount_cents = ?, frequency = ?,
-			cost_nature = ?, budget_class = ?, is_oneoff = ?, occurred_on = ?,
-			active_from = ?, active_until = ?, split_mode = ?, updated_at = ?
-		 WHERE id = ?`,
-		nullInt(e.SectionID), nullInt(e.CategoryID), e.Name, e.AmountCents, string(e.Frequency),
-		string(e.CostNature), string(e.BudgetClass), boolToInt(e.IsOneOff), e.OccurredOn,
-		e.ActiveFrom, e.ActiveUntil, string(e.SplitMode), now(), e.ID,
-	)
-	return err
-}
+	del := `DELETE FROM expense_splits WHERE expense_id = ?`
+	if len(marks) > 0 {
+		del += ` AND member_id NOT IN (` + strings.Join(marks, ", ") + `)`
+	}
+	if _, err := s.q.ExecContext(ctx, del, args...); err != nil {
+		return err
+	}
 
-// DeleteExpense removes an expense and its splits (cascade).
-func (s *Store) DeleteExpense(id int64) error {
-	_, err := s.db.Exec(`DELETE FROM expenses WHERE id = ?`, id)
-	return err
+	for _, sp := range splits {
+		if _, err := s.q.ExecContext(ctx,
+			`INSERT INTO expense_splits (expense_id, member_id, value)
+			 SELECT ?, id, ? FROM members WHERE id = ? AND household_id = ?
+			 ON CONFLICT(expense_id, member_id) DO UPDATE SET value = excluded.value`,
+			expenseID, sp.Value, sp.MemberID, householdID,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ListSplits returns the splits of a single expense.
-func (s *Store) ListSplits(expenseID int64) ([]ExpenseSplit, error) {
-	rows, err := s.db.Query(
+func (s *Store) ListSplits(ctx context.Context, expenseID int64) ([]ExpenseSplit, error) {
+	rows, err := s.q.QueryContext(ctx,
 		`SELECT id, expense_id, member_id, value FROM expense_splits
 		 WHERE expense_id = ? ORDER BY id`, expenseID)
 	if err != nil {
@@ -142,8 +218,8 @@ func (s *Store) ListSplits(expenseID int64) ([]ExpenseSplit, error) {
 
 // ListSplitsForHousehold returns all splits of a household's expenses keyed by
 // expense id.
-func (s *Store) ListSplitsForHousehold(householdID int64) (map[int64][]ExpenseSplit, error) {
-	rows, err := s.db.Query(
+func (s *Store) ListSplitsForHousehold(ctx context.Context, householdID int64) (map[int64][]ExpenseSplit, error) {
+	rows, err := s.q.QueryContext(ctx,
 		`SELECT sp.id, sp.expense_id, sp.member_id, sp.value
 		 FROM expense_splits sp
 		 JOIN expenses e ON e.id = sp.expense_id
@@ -163,32 +239,6 @@ func (s *Store) ListSplitsForHousehold(householdID int64) (map[int64][]ExpenseSp
 		out[sp.ExpenseID] = append(out[sp.ExpenseID], sp)
 	}
 	return out, rows.Err()
-}
-
-// AddSplitMember adds a member to an expense's split (no-op if already present).
-func (s *Store) AddSplitMember(expenseID, memberID int64) error {
-	_, err := s.db.Exec(
-		`INSERT INTO expense_splits (expense_id, member_id, value) VALUES (?, ?, 0)
-		 ON CONFLICT(expense_id, member_id) DO NOTHING`,
-		expenseID, memberID)
-	return err
-}
-
-// RemoveSplitMember removes a member from an expense's split.
-func (s *Store) RemoveSplitMember(expenseID, memberID int64) error {
-	_, err := s.db.Exec(
-		`DELETE FROM expense_splits WHERE expense_id = ? AND member_id = ?`,
-		expenseID, memberID)
-	return err
-}
-
-// SetSplitValue upserts the value for a member's split (percent or cents).
-func (s *Store) SetSplitValue(expenseID, memberID int64, value float64) error {
-	_, err := s.db.Exec(
-		`INSERT INTO expense_splits (expense_id, member_id, value) VALUES (?, ?, ?)
-		 ON CONFLICT(expense_id, member_id) DO UPDATE SET value = excluded.value`,
-		expenseID, memberID, value)
-	return err
 }
 
 func nullInt(p *int64) any {

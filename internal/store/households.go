@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"strconv"
@@ -9,8 +10,8 @@ import (
 const stateActiveHousehold = "active_household_id"
 
 // ListHouseholds returns all households ordered for display.
-func (s *Store) ListHouseholds() ([]Household, error) {
-	rows, err := s.db.Query(
+func (s *Store) ListHouseholds(ctx context.Context) ([]Household, error) {
+	rows, err := s.q.QueryContext(ctx,
 		`SELECT id, name, sort_order, created_at FROM households
 		 ORDER BY sort_order, name`)
 	if err != nil {
@@ -30,9 +31,9 @@ func (s *Store) ListHouseholds() ([]Household, error) {
 }
 
 // GetHousehold returns a single household by id.
-func (s *Store) GetHousehold(id int64) (Household, error) {
+func (s *Store) GetHousehold(ctx context.Context, id int64) (Household, error) {
 	var h Household
-	err := s.db.QueryRow(
+	err := s.q.QueryRowContext(ctx,
 		`SELECT id, name, sort_order, created_at FROM households WHERE id = ?`, id,
 	).Scan(&h.ID, &h.Name, &h.SortOrder, &h.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -42,8 +43,8 @@ func (s *Store) GetHousehold(id int64) (Household, error) {
 }
 
 // CreateHousehold inserts a new household and returns it.
-func (s *Store) CreateHousehold(name string) (Household, error) {
-	res, err := s.db.Exec(
+func (s *Store) CreateHousehold(ctx context.Context, name string) (Household, error) {
+	res, err := s.q.ExecContext(ctx,
 		`INSERT INTO households (name, sort_order, created_at)
 		 VALUES (?, (SELECT COALESCE(MAX(sort_order)+1, 0) FROM households), ?)`,
 		name, now(),
@@ -55,32 +56,31 @@ func (s *Store) CreateHousehold(name string) (Household, error) {
 	if err != nil {
 		return Household{}, err
 	}
-	return s.GetHousehold(id)
+	return s.GetHousehold(ctx, id)
 }
 
 // RenameHousehold updates a household's name.
-func (s *Store) RenameHousehold(id int64, name string) error {
-	_, err := s.db.Exec(`UPDATE households SET name = ? WHERE id = ?`, name, id)
-	return err
+func (s *Store) RenameHousehold(ctx context.Context, id int64, name string) error {
+	return affected(s.q.ExecContext(ctx,
+		`UPDATE households SET name = ? WHERE id = ?`, name, id))
 }
 
 // DeleteHousehold removes a household and all of its data (cascade).
-func (s *Store) DeleteHousehold(id int64) error {
-	_, err := s.db.Exec(`DELETE FROM households WHERE id = ?`, id)
-	return err
+func (s *Store) DeleteHousehold(ctx context.Context, id int64) error {
+	return affected(s.q.ExecContext(ctx, `DELETE FROM households WHERE id = ?`, id))
 }
 
 // CountHouseholds returns the number of households.
-func (s *Store) CountHouseholds() (int, error) {
+func (s *Store) CountHouseholds(ctx context.Context) (int, error) {
 	var n int
-	err := s.db.QueryRow(`SELECT COUNT(1) FROM households`).Scan(&n)
+	err := s.q.QueryRowContext(ctx, `SELECT COUNT(1) FROM households`).Scan(&n)
 	return n, err
 }
 
 // ActiveHouseholdID returns the currently active household id, or 0 if none is
 // set or the referenced household no longer exists.
-func (s *Store) ActiveHouseholdID() (int64, error) {
-	v, err := s.GetState(stateActiveHousehold)
+func (s *Store) ActiveHouseholdID(ctx context.Context) (int64, error) {
+	v, err := s.GetState(ctx, stateActiveHousehold)
 	if err != nil {
 		return 0, err
 	}
@@ -92,7 +92,7 @@ func (s *Store) ActiveHouseholdID() (int64, error) {
 		return 0, nil
 	}
 	// Verify it still exists.
-	if _, err := s.GetHousehold(id); errors.Is(err, ErrNotFound) {
+	if _, err := s.GetHousehold(ctx, id); errors.Is(err, ErrNotFound) {
 		return 0, nil
 	} else if err != nil {
 		return 0, err
@@ -101,6 +101,6 @@ func (s *Store) ActiveHouseholdID() (int64, error) {
 }
 
 // SetActiveHousehold marks the given household as active.
-func (s *Store) SetActiveHousehold(id int64) error {
-	return s.SetState(stateActiveHousehold, strconv.FormatInt(id, 10))
+func (s *Store) SetActiveHousehold(ctx context.Context, id int64) error {
+	return s.SetState(ctx, stateActiveHousehold, strconv.FormatInt(id, 10))
 }

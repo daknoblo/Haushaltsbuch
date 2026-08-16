@@ -9,16 +9,26 @@ import (
 	"github.com/daknoblo/Haushaltsbuch/internal/web"
 )
 
-func (s *Server) handleExpenseCreate(w http.ResponseWriter, r *http.Request) {
-	active, err := s.store.ActiveHouseholdID()
+// amountOrKeep parses a submitted amount. A syntactically incomplete value
+// (the auto-save fires on every keystroke, so "12," is normal) keeps the stored
+// amount, while an out-of-range value is reported to the caller.
+func amountOrKeep(submitted string, current int64) (int64, error) {
+	cents, err := web.ParseCents(submitted)
+	if errors.Is(err, web.ErrAmountRange) {
+		return current, err
+	}
 	if err != nil {
-		s.serverError(w, r, err)
+		return current, nil
+	}
+	return cents, nil
+}
+
+func (s *Server) handleExpenseCreate(w http.ResponseWriter, r *http.Request) {
+	active, ok := s.requireActiveHousehold(w, r)
+	if !ok {
 		return
 	}
-	if active == 0 {
-		http.Error(w, "Kein aktiver Haushalt", http.StatusBadRequest)
-		return
-	}
+	ctx := r.Context()
 
 	e := store.Expense{
 		HouseholdID: active,
@@ -33,53 +43,64 @@ func (s *Server) handleExpenseCreate(w http.ResponseWriter, r *http.Request) {
 		e.SectionID = &sectionID
 	}
 
-	created, err := s.store.CreateExpense(e)
-	if err != nil {
-		s.serverError(w, r, err)
-		return
-	}
-
 	// Default split: everyone participates equally.
-	members, err := s.store.ListMembers(active)
+	members, err := s.store.ListMembers(ctx, active)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
 	}
+	splits := make([]store.SplitInput, 0, len(members))
 	for _, m := range members {
-		_ = s.store.AddSplitMember(created.ID, m.ID)
+		splits = append(splits, store.SplitInput{MemberID: m.ID})
 	}
 
-	splits, err := s.store.ListSplits(created.ID)
+	created, err := s.store.CreateExpense(ctx, e, splits)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
 	}
-	ctx, err := s.expenseContext(active)
+	stored, err := s.store.ListSplits(ctx, created.ID)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
 	}
-	s.render(w, r, web.ExpenseRowView(web.ExpenseRow{Expense: created, Splits: splits}, ctx))
+	vmCtx, err := s.expenseContext(ctx, active)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	// A freshly created row opens straight into the editor.
+	s.render(w, r, web.ExpenseRowView(web.ExpenseRow{Expense: created, Splits: stored, Expanded: true}, vmCtx))
 }
 
 func (s *Server) handleExpenseUpdate(w http.ResponseWriter, r *http.Request) {
+	active, ok := s.requireActiveHousehold(w, r)
+	if !ok {
+		return
+	}
+	ctx := r.Context()
 	id := parseID(r.PathValue("id"))
-	e, err := s.store.GetExpense(id)
-	if errors.Is(err, store.ErrNotFound) {
+
+	e, err := s.store.GetExpense(ctx, id)
+	if err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	}
+	if e.HouseholdID != active {
 		http.NotFound(w, r)
 		return
 	}
-	if err != nil {
-		s.serverError(w, r, err)
-		return
-	}
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Ungültige Eingabe", http.StatusBadRequest)
+	if !s.parseForm(w, r) {
 		return
 	}
 
 	e.Name = cleanName(r.FormValue("name"))
-	e.AmountCents, _ = web.ParseCents(r.FormValue("amount"))
+	amount, err := amountOrKeep(r.FormValue("amount"), e.AmountCents)
+	if err != nil {
+		http.Error(w, "Betrag außerhalb des zulässigen Bereichs", http.StatusBadRequest)
+		return
+	}
+	e.AmountCents = amount
 
 	e.Frequency = store.Frequency(r.FormValue("frequency"))
 	if !e.Frequency.Valid() {
@@ -114,57 +135,131 @@ func (s *Server) handleExpenseUpdate(w http.ResponseWriter, r *http.Request) {
 		e.CategoryID = nil
 	}
 
-	if err := s.store.UpdateExpense(e); err != nil {
-		s.serverError(w, r, err)
+	splits, err := s.splitsFromForm(r, e)
+	if err != nil {
+		http.Error(w, "Ungültiger Anteil", http.StatusBadRequest)
+		return
+	}
+	if err := s.store.SaveExpense(ctx, e, splits); err != nil {
+		s.writeStoreError(w, r, err)
 		return
 	}
 
-	// Rebuild splits from the submitted participation checkboxes and values.
-	members, err := s.store.ListMembers(e.HouseholdID)
+	updated, err := s.store.GetExpense(ctx, id)
+	if err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	}
+	stored, err := s.store.ListSplits(ctx, id)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
 	}
+	vmCtx, err := s.expenseContext(ctx, active)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	row := web.ExpenseRow{Expense: updated, Splits: stored, Expanded: r.FormValue("expanded") == "1"}
+	s.render(w, r, web.ExpenseRowView(row, vmCtx))
+}
+
+// splitsFromForm rebuilds the split list from the submitted participation
+// checkboxes and values. Values that cannot be parsed keep their stored value.
+func (s *Server) splitsFromForm(r *http.Request, e store.Expense) ([]store.SplitInput, error) {
+	ctx := r.Context()
+	members, err := s.store.ListMembers(ctx, e.HouseholdID)
+	if err != nil {
+		return nil, err
+	}
+	current, err := s.store.ListSplits(ctx, e.ID)
+	if err != nil {
+		return nil, err
+	}
+	stored := make(map[int64]float64, len(current))
+	for _, sp := range current {
+		stored[sp.MemberID] = sp.Value
+	}
+
+	out := make([]store.SplitInput, 0, len(members))
 	for _, m := range members {
 		key := strconv.FormatInt(m.ID, 10)
 		if r.FormValue("m_"+key) == "" {
-			_ = s.store.RemoveSplitMember(id, m.ID)
 			continue
 		}
-		var val float64
+		val := stored[m.ID]
 		switch e.SplitMode {
 		case store.SplitPercent:
-			val, _ = web.ParseFloatLoose(r.FormValue("v_" + key))
+			if v, err := web.ParseFloatLoose(r.FormValue("v_" + key)); err == nil {
+				val = clampPercent(v)
+			}
 		case store.SplitFixed:
-			cents, _ := web.ParseCents(r.FormValue("v_" + key))
-			val = float64(cents)
+			if cents, err := web.ParseCents(r.FormValue("v_" + key)); err == nil {
+				val = float64(cents)
+			}
+		default: // equal splits ignore the value
+			val = 0
 		}
-		_ = s.store.SetSplitValue(id, m.ID, val)
+		out = append(out, store.SplitInput{MemberID: m.ID, Value: val})
 	}
+	return out, nil
+}
 
-	updated, err := s.store.GetExpense(id)
-	if err != nil {
-		s.serverError(w, r, err)
-		return
+// clampPercent keeps a submitted percentage within 0-100.
+func clampPercent(v float64) float64 {
+	switch {
+	case v < 0:
+		return 0
+	case v > 100:
+		return 100
+	default:
+		return v
 	}
-	splits, err := s.store.ListSplits(id)
-	if err != nil {
-		s.serverError(w, r, err)
-		return
-	}
-	ctx, err := s.expenseContext(e.HouseholdID)
-	if err != nil {
-		s.serverError(w, r, err)
-		return
-	}
-	s.render(w, r, web.ExpenseRowView(web.ExpenseRow{Expense: updated, Splits: splits}, ctx))
 }
 
 func (s *Server) handleExpenseDelete(w http.ResponseWriter, r *http.Request) {
-	id := parseID(r.PathValue("id"))
-	if err := s.store.DeleteExpense(id); err != nil {
-		s.serverError(w, r, err)
+	active, ok := s.requireActiveHousehold(w, r)
+	if !ok {
+		return
+	}
+	if err := s.store.DeleteExpense(r.Context(), active, parseID(r.PathValue("id"))); err != nil {
+		s.writeStoreError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleExpenseMove(w http.ResponseWriter, r *http.Request) {
+	active, ok := s.requireActiveHousehold(w, r)
+	if !ok {
+		return
+	}
+	if !s.parseForm(w, r) {
+		return
+	}
+	delta, ok := parseDelta(r.FormValue("dir"))
+	if !ok {
+		http.Error(w, "Ungültige Richtung", http.StatusBadRequest)
+		return
+	}
+	ctx := r.Context()
+	id := parseID(r.PathValue("id"))
+	e, err := s.store.GetExpense(ctx, id)
+	if err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	}
+	if e.HouseholdID != active {
+		http.NotFound(w, r)
+		return
+	}
+	var sectionID int64
+	if e.SectionID != nil {
+		sectionID = *e.SectionID
+	}
+	if err := s.store.MoveExpense(ctx, active, sectionID, id, delta); err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	}
+	hxRefresh(w)
 }

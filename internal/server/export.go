@@ -1,9 +1,11 @@
 package server
 
 import (
+	"mime"
 	"net/http"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/johnfercher/maroto/v2"
 	"github.com/johnfercher/maroto/v2/pkg/components/text"
@@ -65,23 +67,58 @@ func (s *Server) writePDF(w http.ResponseWriter, r *http.Request, m core.Maroto,
 		return
 	}
 	w.Header().Set("Content-Type", "application/pdf")
-	w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
+	// The filename embeds a user-supplied household name, so it must be encoded
+	// rather than concatenated into the quoted-string form.
+	w.Header().Set("Content-Disposition",
+		mime.FormatMediaType("attachment", map[string]string{"filename": filename}))
 	_, _ = w.Write(doc.GetBytes())
 }
 
-func (s *Server) exportOverviewPDF(w http.ResponseWriter, r *http.Request) {
-	active, err := s.store.ActiveHouseholdID()
+// pdfSlug reduces a household name to characters that are safe and readable in
+// a download filename. Non-ASCII letters are kept; mime.FormatMediaType encodes
+// them per RFC 2231.
+func pdfSlug(name string) string {
+	var b strings.Builder
+	for _, r := range name {
+		switch {
+		case unicode.IsLetter(r), unicode.IsDigit(r), r == '-', r == '_':
+			b.WriteRune(r)
+		case unicode.IsSpace(r):
+			b.WriteRune('-')
+		}
+	}
+	if b.Len() == 0 {
+		return "haushalt"
+	}
+	return b.String()
+}
+
+// exportHousehold resolves the active household for an export request.
+func (s *Server) exportHousehold(w http.ResponseWriter, r *http.Request) (store.Household, bool) {
+	active, err := s.store.ActiveHouseholdID(r.Context())
 	if err != nil {
 		s.serverError(w, r, err)
-		return
+		return store.Household{}, false
 	}
 	if active == 0 {
 		http.Error(w, "Kein aktiver Haushalt", http.StatusBadRequest)
+		return store.Household{}, false
+	}
+	hh, err := s.store.GetHousehold(r.Context(), active)
+	if err != nil {
+		s.writeStoreError(w, r, err)
+		return store.Household{}, false
+	}
+	return hh, true
+}
+
+func (s *Server) exportOverviewPDF(w http.ResponseWriter, r *http.Request) {
+	hh, ok := s.exportHousehold(w, r)
+	if !ok {
 		return
 	}
-	hh, _ := s.store.GetHousehold(active)
 	month := web.NormalizeMonth(r.URL.Query().Get("m"))
-	rep, err := s.buildMonthReport(active, month)
+	rep, err := s.buildMonthReport(r.Context(), hh.ID, month)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -119,18 +156,12 @@ func (s *Server) exportOverviewPDF(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) exportStatisticsPDF(w http.ResponseWriter, r *http.Request) {
-	active, err := s.store.ActiveHouseholdID()
-	if err != nil {
-		s.serverError(w, r, err)
+	hh, ok := s.exportHousehold(w, r)
+	if !ok {
 		return
 	}
-	if active == 0 {
-		http.Error(w, "Kein aktiver Haushalt", http.StatusBadRequest)
-		return
-	}
-	hh, _ := s.store.GetHousehold(active)
 	month := web.NormalizeMonth(r.URL.Query().Get("m"))
-	vm, err := s.buildStatisticsVM(active, month)
+	vm, err := s.buildStatisticsVM(r.Context(), hh.ID, month)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -156,17 +187,11 @@ func (s *Server) exportStatisticsPDF(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) exportExpensesPDF(w http.ResponseWriter, r *http.Request) {
-	active, err := s.store.ActiveHouseholdID()
-	if err != nil {
-		s.serverError(w, r, err)
+	hh, ok := s.exportHousehold(w, r)
+	if !ok {
 		return
 	}
-	if active == 0 {
-		http.Error(w, "Kein aktiver Haushalt", http.StatusBadRequest)
-		return
-	}
-	hh, _ := s.store.GetHousehold(active)
-	vm, err := s.buildExpensesVM(active)
+	vm, err := s.buildExpensesVM(r.Context(), hh.ID)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -200,7 +225,7 @@ func (s *Server) exportExpensesPDF(w http.ResponseWriter, r *http.Request) {
 	m.AddRow(4)
 	pdfKV(m, "Gesamt (monatlich normalisiert)", web.FormatEUR(grand))
 
-	s.writePDF(w, r, m, "ausgaben-"+hh.Name+".pdf")
+	s.writePDF(w, r, m, "ausgaben-"+pdfSlug(hh.Name)+".pdf")
 }
 
 func splitNames(row web.ExpenseRow, names map[int64]string) string {

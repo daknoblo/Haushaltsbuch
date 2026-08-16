@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/calc"
@@ -16,7 +17,7 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	}
 	var vm web.OverviewVM
 	if nav.ActiveHousehold.ID != 0 {
-		rep, err := s.buildMonthReport(nav.ActiveHousehold.ID, nav.Month)
+		rep, err := s.buildMonthReport(r.Context(), nav.ActiveHousehold.ID, nav.Month)
 		if err != nil {
 			s.serverError(w, r, err)
 			return
@@ -34,7 +35,7 @@ func (s *Server) handleExpenses(w http.ResponseWriter, r *http.Request) {
 	}
 	var vm web.ExpensesVM
 	if nav.ActiveHousehold.ID != 0 {
-		vm, err = s.buildExpensesVM(nav.ActiveHousehold.ID)
+		vm, err = s.buildExpensesVM(r.Context(), nav.ActiveHousehold.ID)
 		if err != nil {
 			s.serverError(w, r, err)
 			return
@@ -51,7 +52,7 @@ func (s *Server) handleIncome(w http.ResponseWriter, r *http.Request) {
 	}
 	var vm web.IncomeVM
 	if nav.ActiveHousehold.ID != 0 {
-		vm, err = s.buildIncomeVM(nav.ActiveHousehold.ID, nav.Month)
+		vm, err = s.buildIncomeVM(r.Context(), nav.ActiveHousehold.ID, nav.Month)
 		if err != nil {
 			s.serverError(w, r, err)
 			return
@@ -68,7 +69,7 @@ func (s *Server) handleStatistics(w http.ResponseWriter, r *http.Request) {
 	}
 	var vm web.StatisticsVM
 	if nav.ActiveHousehold.ID != 0 {
-		vm, err = s.buildStatisticsVM(nav.ActiveHousehold.ID, nav.Month)
+		vm, err = s.buildStatisticsVM(r.Context(), nav.ActiveHousehold.ID, nav.Month)
 		if err != nil {
 			s.serverError(w, r, err)
 			return
@@ -83,7 +84,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	vm, err := s.buildSettingsVM()
+	vm, err := s.buildSettingsVM(r.Context())
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -93,8 +94,8 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 
 // ---- view-model builders ----
 
-func (s *Server) buildExpensesVM(householdID int64) (web.ExpensesVM, error) {
-	data, err := s.loadHouseholdData(householdID)
+func (s *Server) buildExpensesVM(ctx context.Context, householdID int64) (web.ExpensesVM, error) {
+	data, err := s.loadHouseholdData(ctx, householdID)
 	if err != nil {
 		return web.ExpensesVM{}, err
 	}
@@ -126,12 +127,12 @@ func (s *Server) buildExpensesVM(householdID int64) (web.ExpensesVM, error) {
 	}, nil
 }
 
-func (s *Server) buildIncomeVM(householdID int64, month string) (web.IncomeVM, error) {
-	members, err := s.store.ListMembers(householdID)
+func (s *Server) buildIncomeVM(ctx context.Context, householdID int64, month string) (web.IncomeVM, error) {
+	members, err := s.store.ListMembers(ctx, householdID)
 	if err != nil {
 		return web.IncomeVM{}, err
 	}
-	incomes, err := s.store.ListIncomes(householdID, month)
+	incomes, err := s.store.ListIncomes(ctx, householdID, month)
 	if err != nil {
 		return web.IncomeVM{}, err
 	}
@@ -139,7 +140,7 @@ func (s *Server) buildIncomeVM(householdID int64, month string) (web.IncomeVM, e
 	for _, in := range incomes {
 		byMember[in.MemberID] = append(byMember[in.MemberID], in)
 	}
-	vm := web.IncomeVM{PrevMonth: web.ShiftMonth(month, -1), HasPrev: true}
+	vm := web.IncomeVM{PrevMonth: web.ShiftMonth(month, -1)}
 	for _, m := range members {
 		lines := byMember[m.ID]
 		var tot int64
@@ -152,7 +153,7 @@ func (s *Server) buildIncomeVM(householdID int64, month string) (web.IncomeVM, e
 	return vm, nil
 }
 
-func (s *Server) buildStatisticsVM(householdID int64, month string) (web.StatisticsVM, error) {
+func (s *Server) buildStatisticsVM(ctx context.Context, householdID int64, month string) (web.StatisticsVM, error) {
 	const window = 12
 
 	months := make([]string, window)
@@ -162,11 +163,11 @@ func (s *Server) buildStatisticsVM(householdID int64, month string) (web.Statist
 
 	// The whole window is aggregated from a single load of the household data
 	// plus one range query for the income lines.
-	data, err := s.loadHouseholdData(householdID)
+	data, err := s.loadHouseholdData(ctx, householdID)
 	if err != nil {
 		return web.StatisticsVM{}, err
 	}
-	incomes, err := s.store.ListIncomesRange(householdID, months[0], month)
+	incomes, err := s.store.ListIncomesRange(ctx, householdID, months[0], month)
 	if err != nil {
 		return web.StatisticsVM{}, err
 	}
@@ -199,12 +200,12 @@ func (s *Server) buildStatisticsVM(householdID int64, month string) (web.Statist
 	return vm, nil
 }
 
-func (s *Server) buildSettingsVM() (web.SettingsVM, error) {
-	households, err := s.store.ListHouseholds()
+func (s *Server) buildSettingsVM(ctx context.Context) (web.SettingsVM, error) {
+	households, err := s.store.ListHouseholds(ctx)
 	if err != nil {
 		return web.SettingsVM{}, err
 	}
-	activeID, err := s.store.ActiveHouseholdID()
+	activeID, err := s.store.ActiveHouseholdID(ctx)
 	if err != nil {
 		return web.SettingsVM{}, err
 	}
@@ -214,13 +215,13 @@ func (s *Server) buildSettingsVM() (web.SettingsVM, error) {
 		categories []store.Category
 	)
 	if activeID != 0 {
-		if members, err = s.store.ListMembers(activeID); err != nil {
+		if members, err = s.store.ListMembers(ctx, activeID); err != nil {
 			return web.SettingsVM{}, err
 		}
-		if sections, err = s.store.ListSections(activeID); err != nil {
+		if sections, err = s.store.ListSections(ctx, activeID); err != nil {
 			return web.SettingsVM{}, err
 		}
-		if categories, err = s.store.ListCategories(activeID); err != nil {
+		if categories, err = s.store.ListCategories(ctx, activeID); err != nil {
 			return web.SettingsVM{}, err
 		}
 	}

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"net/url"
 	"strconv"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/calc"
@@ -78,6 +79,17 @@ func (n Nav) MonthURL(m string) string {
 		p = "/"
 	}
 	return p + "?m=" + m
+}
+
+// AssetURL returns the URL of a static asset with the build version appended.
+// Assets are served as immutable, so the version is what makes a new binary
+// invalidate the cached copies.
+func (n Nav) AssetURL(name string) string {
+	v := n.Version
+	if v == "" {
+		v = "dev"
+	}
+	return "/assets/" + name + "?v=" + url.QueryEscape(v)
 }
 
 // FrequencyLabel returns the German label for a frequency.
@@ -174,6 +186,36 @@ type OverviewVM struct {
 type ExpenseRow struct {
 	Expense store.Expense
 	Splits  []store.ExpenseSplit
+	// Expanded keeps the inline editor open across an auto-save round trip.
+	Expanded bool
+}
+
+// ExpandedValue renders the open state for the hidden form field.
+func (r ExpenseRow) ExpandedValue() string {
+	if r.Expanded {
+		return "1"
+	}
+	return "0"
+}
+
+// RhythmLabel describes how often the expense occurs, for the collapsed row.
+func (r ExpenseRow) RhythmLabel() string {
+	if r.Expense.IsOneOff {
+		return "Einmalig"
+	}
+	return FrequencyLabel(r.Expense.Frequency)
+}
+
+// BudgetClassBadge returns the badge modifier class for the budget class.
+func (r ExpenseRow) BudgetClassBadge() string {
+	switch r.Expense.BudgetClass {
+	case store.ClassWant:
+		return "badge-want"
+	case store.ClassSaving:
+		return "badge-saving"
+	default:
+		return "badge-need"
+	}
 }
 
 // HasMember reports whether a member participates in the split.
@@ -273,7 +315,6 @@ type IncomeVM struct {
 	Members    []IncomeMemberVM
 	TotalCents int64
 	PrevMonth  string
-	HasPrev    bool
 }
 
 // StatMonth is one data point in the statistics timeline.

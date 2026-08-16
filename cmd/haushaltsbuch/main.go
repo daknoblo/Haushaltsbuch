@@ -48,6 +48,11 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: cfg.LogLevel}))
 	slog.SetDefault(logger)
 
+	if err := cfg.Validate(); err != nil {
+		logger.Error("invalid configuration", "err", err)
+		os.Exit(1)
+	}
+
 	if err := run(cfg, logger); err != nil {
 		logger.Error("fatal error", "err", err)
 		os.Exit(1)
@@ -76,7 +81,7 @@ func run(cfg config.Config, logger *slog.Logger) error {
 	}
 	defer func() { _ = st.Close() }()
 
-	if err := st.EnsureSeed(); err != nil {
+	if err := st.EnsureSeed(ctx); err != nil {
 		return fmt.Errorf("seed store: %w", err)
 	}
 

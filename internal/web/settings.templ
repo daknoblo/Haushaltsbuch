@@ -116,6 +116,7 @@ templ HouseholdRowView(h store.Household, activeID int64) {
 				hx-swap="none"
 			>aktivieren</button>
 		}
+		@moveButtons("/households/" + strconv.FormatInt(h.ID, 10))
 		<button
 			class="btn btn-ghost btn-icon"
 			hx-post={ "/households/" + strconv.FormatInt(h.ID, 10) + "/delete" }
@@ -139,6 +140,7 @@ templ MemberRowView(m store.Member) {
 			<input type="color" name="color" value={ ColorOr(m.Color) } style="width:42px; height:36px; padding:2px"/>
 			<input type="text" name="name" value={ m.Name } style="flex:1"/>
 		</form>
+		@moveButtons("/members/" + strconv.FormatInt(m.ID, 10))
 		<button
 			class="btn btn-ghost btn-icon"
 			hx-post={ "/members/" + strconv.FormatInt(m.ID, 10) + "/delete" }
@@ -161,6 +163,7 @@ templ SectionRowView(s store.Section) {
 		>
 			<input type="text" name="name" value={ s.Name }/>
 		</form>
+		@moveButtons("/sections/" + strconv.FormatInt(s.ID, 10))
 		<button
 			class="btn btn-ghost btn-icon"
 			hx-post={ "/sections/" + strconv.FormatInt(s.ID, 10) + "/delete" }

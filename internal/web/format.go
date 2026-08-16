@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -22,6 +23,12 @@ var deMonthsShort = []string{
 // (e.g. 123456 -> "1.234,56").
 func FormatCents(c int64) string {
 	neg := c < 0
+	// Negating math.MinInt64 overflows back to itself, so clamp first.
+	if c < -MaxAmountCents {
+		c = -MaxAmountCents
+	} else if c > MaxAmountCents {
+		c = MaxAmountCents
+	}
 	if neg {
 		c = -c
 	}
@@ -37,18 +44,6 @@ func FormatCents(c int64) string {
 // FormatEUR formats cents as a Euro amount (e.g. "1.234,56 €").
 func FormatEUR(c int64) string {
 	return FormatCents(c) + " €"
-}
-
-// FormatEURf formats a float Euro value (already in Euro, not cents).
-func FormatEURf(euro float64) string {
-	return FormatCents(int64(euro*100 + sign(euro)*0.5))
-}
-
-func sign(f float64) float64 {
-	if f < 0 {
-		return -1
-	}
-	return 1
 }
 
 func groupThousands(n int64) string {
@@ -142,6 +137,14 @@ func formatDecimal(c int64) string {
 	return s
 }
 
+// MaxAmountCents bounds monetary input at 10 billion Euro. Anything beyond is
+// a typo rather than a household figure, and the limit keeps the int64 totals
+// computed in package calc far away from overflow.
+const MaxAmountCents int64 = 1_000_000_000_000
+
+// ErrAmountRange is returned for values outside ±MaxAmountCents.
+var ErrAmountRange = errors.New("web: amount out of range")
+
 // ParseCents parses a user-entered monetary string into cents. It accepts both
 // German ("1.234,56") and plain ("1234.56") notations and an optional "€".
 func ParseCents(s string) (int64, error) {
@@ -163,11 +166,20 @@ func ParseCents(s string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return int64(math.Round(f * 100)), nil
+	// strconv.ParseFloat accepts "NaN" and "Inf"; converting either to int64 is
+	// undefined and would saturate silently.
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0, ErrAmountRange
+	}
+	cents := math.Round(f * 100)
+	if cents > float64(MaxAmountCents) || cents < -float64(MaxAmountCents) {
+		return 0, ErrAmountRange
+	}
+	return int64(cents), nil
 }
 
 // ParseFloatLoose parses a possibly German-formatted decimal (accepting ',' as
-// the decimal separator) into a float64.
+// the decimal separator) into a float64. NaN and infinities are rejected.
 func ParseFloatLoose(s string) (float64, error) {
 	s = strings.TrimSpace(s)
 	s = strings.ReplaceAll(s, " ", "")
@@ -175,5 +187,12 @@ func ParseFloatLoose(s string) (float64, error) {
 	if s == "" {
 		return 0, nil
 	}
-	return strconv.ParseFloat(s, 64)
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, err
+	}
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0, ErrAmountRange
+	}
+	return f, nil
 }

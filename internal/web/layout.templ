@@ -11,7 +11,9 @@ templ Layout(nav Nav) {
 			<meta name="color-scheme" content="light"/>
 			<title>Haushaltsbuch</title>
 			<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232563eb'/%3E%3Ctext x='16' y='23' font-family='sans-serif' font-size='20' font-weight='700' fill='white' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E"/>
-			<link rel="stylesheet" href="/assets/app.css"/>
+			<link rel="stylesheet" href={ nav.AssetURL("app.css") }/>
+			// Applies the stored theme before first paint to avoid a flash.
+			<script src={ nav.AssetURL("theme.js") }></script>
 		</head>
 		<body>
 			@topbar(nav)
@@ -21,8 +23,8 @@ templ Layout(nav Nav) {
 			<div id="save-indicator" class="save-indicator">
 				<span class="dot"></span> Gespeichert
 			</div>
-			<script src="/assets/htmx.min.js"></script>
-			<script src="/assets/app.js"></script>
+			<script src={ nav.AssetURL("htmx.min.js") }></script>
+			<script src={ nav.AssetURL("app.js") }></script>
 		</body>
 	</html>
 }
@@ -62,6 +64,31 @@ templ topbar(nav Nav) {
 					<a class="btn btn-icon btn-sm" href={ templ.SafeURL(nav.MonthURL(nav.NextMonth())) } aria-label="Nächster Monat">›</a>
 				</div>
 			}
+			<button type="button" class="theme-toggle no-print" data-theme-toggle aria-label="Helles oder dunkles Design">
+				<span class="icon-light" aria-hidden="true">◑</span>
+				<span class="icon-dark" aria-hidden="true">◐</span>
+			</button>
 		</div>
 	</header>
+}
+
+// moveButtons renders the reorder controls for a row. The server answers with
+// HX-Refresh, so the surrounding list is redrawn in the new order.
+templ moveButtons(baseURL string) {
+	<span class="flex no-print">
+		<button
+			type="button"
+			class="btn btn-ghost btn-icon btn-sm"
+			hx-post={ baseURL + "/move?dir=up" }
+			hx-swap="none"
+			aria-label="Nach oben"
+		>↑</button>
+		<button
+			type="button"
+			class="btn btn-ghost btn-icon btn-sm"
+			hx-post={ baseURL + "/move?dir=down" }
+			hx-swap="none"
+			aria-label="Nach unten"
+		>↓</button>
+	</span>
 }

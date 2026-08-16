@@ -31,11 +31,14 @@ container (distroless, non-root).
   - a flexible **split** per expense: equal, percentage or fixed amounts –
     e.g. rent 50/50, insurance 100 % on one person.
 - **Income** per person and month with an arbitrary number of lines (e.g. salary
-  plus bonus) and a "copy from previous month" action.
+  plus bonus) and a "copy from previous month" action that refuses to run twice
+  into the same month.
 - **Overview** per month: income, expenses and balance – in total and per
   person, broken down by section, category, cost nature and 50/30/20.
 - **Statistics** for the last 12 months including averages and a trend chart.
 - **PDF export** of the overview, the statistics and the expense list.
+- **Custom ordering**: households, people, sections and expenses can be moved up
+  and down with the arrow buttons.
 - **Automatic saving**: every input is persisted as soon as a field changes –
   there is no save button.
 
@@ -114,8 +117,10 @@ reported as a warning at startup and the application falls back to UTC.
   and idle timeouts.
 - Pages are served with `Cache-Control: no-store` so that financial data is not
   written to shared or disk caches.
-- All SQL access uses parameterised queries; names, colours, dates and
+- All SQL access uses parameterised queries; names, colours, dates, amounts and
   identifiers are validated before they reach the store.
+- Every write is scoped to the active household in SQL, so a forged identifier
+  cannot read or modify another household's data.
 - The container image is scanned for CRITICAL/HIGH vulnerabilities with Trivy in
   CI.
 - Static analysis and supply-chain checks run in CI: CodeQL (push, pull request
@@ -132,6 +137,7 @@ make help      # list available targets
 make build     # compile a static binary into bin/
 make test      # run the test suite with the race detector
 make vet       # go vet
+make lint      # golangci-lint (same version as CI)
 make generate  # regenerate the templ templates (*_templ.go)
 make docker    # build the container image
 ```

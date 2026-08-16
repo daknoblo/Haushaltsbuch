@@ -2,12 +2,15 @@
 package server
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/a-h/templ"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
+	"github.com/daknoblo/Haushaltsbuch/internal/version"
 	"github.com/daknoblo/Haushaltsbuch/internal/web"
 )
 
@@ -45,16 +48,19 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /households/activate", s.handleHouseholdActivate)
 	mux.HandleFunc("POST /households/{id}", s.handleHouseholdRename)
 	mux.HandleFunc("POST /households/{id}/delete", s.handleHouseholdDelete)
+	mux.HandleFunc("POST /households/{id}/move", s.handleHouseholdMove)
 
 	// Members.
 	mux.HandleFunc("POST /members", s.handleMemberCreate)
 	mux.HandleFunc("POST /members/{id}", s.handleMemberUpdate)
 	mux.HandleFunc("POST /members/{id}/delete", s.handleMemberDelete)
+	mux.HandleFunc("POST /members/{id}/move", s.handleMemberMove)
 
 	// Sections.
 	mux.HandleFunc("POST /sections", s.handleSectionCreate)
 	mux.HandleFunc("POST /sections/{id}", s.handleSectionRename)
 	mux.HandleFunc("POST /sections/{id}/delete", s.handleSectionDelete)
+	mux.HandleFunc("POST /sections/{id}/move", s.handleSectionMove)
 
 	// Categories.
 	mux.HandleFunc("POST /categories", s.handleCategoryCreate)
@@ -65,6 +71,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /expenses/new", s.handleExpenseCreate)
 	mux.HandleFunc("POST /expenses/{id}", s.handleExpenseUpdate)
 	mux.HandleFunc("POST /expenses/{id}/delete", s.handleExpenseDelete)
+	mux.HandleFunc("POST /expenses/{id}/move", s.handleExpenseMove)
 
 	// Income.
 	mux.HandleFunc("POST /income/new", s.handleIncomeCreate)
@@ -82,9 +89,19 @@ func (s *Server) Handler() http.Handler {
 	return s.recoverer(s.logRequests(securityHeaders(s.sameOrigin(limitBody(compressResponses(mux))))))
 }
 
-func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
+// handleHealth reports readiness. It touches the database so that the container
+// health check fails when the data volume becomes unavailable.
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
+
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+	if err := s.store.Ping(ctx); err != nil {
+		s.logger.Error("health check failed", "err", err)
+		http.Error(w, "database unavailable", http.StatusServiceUnavailable)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
 }
@@ -104,12 +121,18 @@ func (s *Server) serverError(w http.ResponseWriter, r *http.Request, err error) 
 	http.Error(w, "Interner Serverfehler", http.StatusInternalServerError)
 }
 
-// cacheControl marks the embedded static assets as privately cacheable. They
-// change only with a new binary, so a short lifetime is enough to avoid
-// re-downloads without serving stale files after an upgrade.
+// cacheControl marks the embedded static assets as immutable. Templates link
+// them with a version query, so a new binary produces new URLs and clients pick
+// up changed files immediately instead of waiting for a cache entry to expire.
+// Development builds keep the same version string across rebuilds, so there the
+// assets must not be cached at all.
 func cacheControl(next http.Handler) http.Handler {
+	value := "private, max-age=31536000, immutable"
+	if version.Version == "dev" || version.Version == "" {
+		value = "no-cache"
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "private, max-age=3600")
+		w.Header().Set("Cache-Control", value)
 		next.ServeHTTP(w, r)
 	})
 }

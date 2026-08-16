@@ -16,7 +16,7 @@ LDFLAGS := -s -w \
 	-X $(PKG)/internal/version.Commit=$(COMMIT) \
 	-X $(PKG)/internal/version.Date=$(DATE)
 
-.PHONY: build run test vet tidy generate tools docker clean help
+.PHONY: build run test vet lint tidy generate tools docker clean help
 
 ## build: compile a static, CGO-free binary into bin/
 build:
@@ -34,6 +34,10 @@ test:
 vet:
 	go vet ./...
 
+## lint: run golangci-lint (same version as CI)
+lint:
+	$(shell go env GOPATH)/bin/golangci-lint run ./...
+
 ## tidy: tidy go.mod / go.sum
 tidy:
 	go mod tidy
@@ -45,6 +49,7 @@ generate:
 ## tools: install the templ tool dependency
 tools:
 	go get -tool github.com/a-h/templ/cmd/templ@latest
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
 
 ## docker: build the container image
 docker:

@@ -76,7 +76,7 @@ func allocate(amount float64, e store.Expense, splits []store.ExpenseSplit, memb
 	switch e.SplitMode {
 	case store.SplitPercent:
 		for _, s := range splits {
-			res[s.MemberID] += amount * s.Value / 100.0
+			res[s.MemberID] += amount * clampPercent(s.Value) / 100.0
 		}
 	case store.SplitFixed:
 		factor := 1.0
@@ -84,7 +84,7 @@ func allocate(amount float64, e store.Expense, splits []store.ExpenseSplit, memb
 			factor = e.Frequency.MonthlyFactor()
 		}
 		for _, s := range splits {
-			res[s.MemberID] += s.Value * factor
+			res[s.MemberID] += clampAmount(s.Value) * factor
 		}
 	default: // equal
 		ids := make([]int64, 0, len(splits))
@@ -227,4 +227,35 @@ func BuildMonthReport(
 
 func round(f float64) int64 {
 	return int64(math.Round(f))
+}
+
+// MaxSplitCents bounds a fixed split value, mirroring the limit the input layer
+// applies to amounts.
+const MaxSplitCents = 1_000_000_000_000
+
+// clampPercent keeps a stored percentage inside 0-100 so that legacy or
+// hand-edited rows cannot distort a report.
+func clampPercent(v float64) float64 {
+	switch {
+	case math.IsNaN(v), v < 0:
+		return 0
+	case v > 100:
+		return 100
+	default:
+		return v
+	}
+}
+
+// clampAmount keeps a stored fixed split value inside the supported range.
+func clampAmount(v float64) float64 {
+	switch {
+	case math.IsNaN(v):
+		return 0
+	case v > MaxSplitCents:
+		return MaxSplitCents
+	case v < -MaxSplitCents:
+		return -MaxSplitCents
+	default:
+		return v
+	}
 }

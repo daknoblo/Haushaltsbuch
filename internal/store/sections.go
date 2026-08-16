@@ -1,13 +1,14 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 )
 
 // ListSections returns all sections of a household, ordered for display.
-func (s *Store) ListSections(householdID int64) ([]Section, error) {
-	rows, err := s.db.Query(
+func (s *Store) ListSections(ctx context.Context, householdID int64) ([]Section, error) {
+	rows, err := s.q.QueryContext(ctx,
 		`SELECT id, household_id, name, sort_order
 		 FROM sections WHERE household_id = ?
 		 ORDER BY sort_order, id`, householdID)
@@ -28,9 +29,9 @@ func (s *Store) ListSections(householdID int64) ([]Section, error) {
 }
 
 // GetSection returns a single section by id.
-func (s *Store) GetSection(id int64) (Section, error) {
+func (s *Store) GetSection(ctx context.Context, id int64) (Section, error) {
 	var sec Section
-	err := s.db.QueryRow(
+	err := s.q.QueryRowContext(ctx,
 		`SELECT id, household_id, name, sort_order FROM sections WHERE id = ?`, id,
 	).Scan(&sec.ID, &sec.HouseholdID, &sec.Name, &sec.SortOrder)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -40,8 +41,8 @@ func (s *Store) GetSection(id int64) (Section, error) {
 }
 
 // CreateSection inserts a new section and returns it.
-func (s *Store) CreateSection(householdID int64, name string) (Section, error) {
-	res, err := s.db.Exec(
+func (s *Store) CreateSection(ctx context.Context, householdID int64, name string) (Section, error) {
+	res, err := s.q.ExecContext(ctx,
 		`INSERT INTO sections (household_id, name, sort_order)
 		 VALUES (?, ?, (SELECT COALESCE(MAX(sort_order)+1, 0) FROM sections WHERE household_id = ?))`,
 		householdID, name, householdID,
@@ -53,17 +54,18 @@ func (s *Store) CreateSection(householdID int64, name string) (Section, error) {
 	if err != nil {
 		return Section{}, err
 	}
-	return s.GetSection(id)
+	return s.GetSection(ctx, id)
 }
 
-// RenameSection updates a section's name.
-func (s *Store) RenameSection(id int64, name string) error {
-	_, err := s.db.Exec(`UPDATE sections SET name = ? WHERE id = ?`, name, id)
-	return err
+// RenameSection updates a section's name within a household.
+func (s *Store) RenameSection(ctx context.Context, householdID, id int64, name string) error {
+	return affected(s.q.ExecContext(ctx,
+		`UPDATE sections SET name = ? WHERE id = ? AND household_id = ?`, name, id, householdID))
 }
 
-// DeleteSection removes a section; expenses in it are kept but unassigned.
-func (s *Store) DeleteSection(id int64) error {
-	_, err := s.db.Exec(`DELETE FROM sections WHERE id = ?`, id)
-	return err
+// DeleteSection removes a section of a household; its expenses are kept but
+// become unassigned.
+func (s *Store) DeleteSection(ctx context.Context, householdID, id int64) error {
+	return affected(s.q.ExecContext(ctx,
+		`DELETE FROM sections WHERE id = ? AND household_id = ?`, id, householdID))
 }

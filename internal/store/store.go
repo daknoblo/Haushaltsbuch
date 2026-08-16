@@ -3,15 +3,16 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"errors"
 	"fmt"
 	"io/fs"
-	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite" // pure-Go SQLite driver
@@ -23,9 +24,18 @@ var migrationsFS embed.FS
 // ErrNotFound is returned when a requested row does not exist.
 var ErrNotFound = errors.New("store: not found")
 
+// dbtx is the subset of *sql.DB and *sql.Tx used by the queries, so that every
+// method can run standalone or inside a transaction.
+type dbtx interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
 // Store wraps the SQLite database connection.
 type Store struct {
 	db *sql.DB
+	q  dbtx
 }
 
 // Open opens (creating if necessary) the SQLite database at path, applies
@@ -37,7 +47,7 @@ func Open(path string) (*Store, error) {
 		}
 	}
 
-	dsn := "file:" + url.PathEscape(path) +
+	dsn := "file:" + escapeDSNPath(path) +
 		"?_pragma=busy_timeout(5000)" +
 		"&_pragma=journal_mode(WAL)" +
 		"&_pragma=foreign_keys(ON)" +
@@ -56,12 +66,23 @@ func Open(path string) (*Store, error) {
 		return nil, fmt.Errorf("ping db: %w", err)
 	}
 
-	s := &Store{db: db}
-	if err := s.migrate(); err != nil {
+	s := &Store{db: db, q: db}
+	if err := s.migrate(context.Background()); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 	return s, nil
+}
+
+// escapeDSNPath percent-encodes only the characters that would otherwise
+// terminate or alter the file part of a SQLite URI. Path separators must stay
+// intact, which rules out url.PathEscape.
+func escapeDSNPath(path string) string {
+	return strings.NewReplacer(
+		"%", "%25",
+		"?", "%3f",
+		"#", "%23",
+	).Replace(path)
 }
 
 // Close closes the underlying database.
@@ -69,8 +90,46 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
-func (s *Store) migrate() error {
-	if _, err := s.db.Exec(
+// Ping verifies that the database is reachable.
+func (s *Store) Ping(ctx context.Context) error {
+	return s.db.PingContext(ctx)
+}
+
+// withTx runs fn inside a transaction, rolling back on error. Nested calls
+// reuse the transaction already in progress.
+func (s *Store) withTx(ctx context.Context, fn func(*Store) error) error {
+	if _, ok := s.q.(*sql.Tx); ok {
+		return fn(s)
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := fn(&Store{db: s.db, q: tx}); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// affected turns a statement that matched no row into ErrNotFound.
+func affected(res sql.Result, err error) error {
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) migrate(ctx context.Context) error {
+	if _, err := s.db.ExecContext(ctx,
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
 			version    TEXT PRIMARY KEY,
 			applied_at TEXT NOT NULL
@@ -92,7 +151,7 @@ func (s *Store) migrate() error {
 
 	for _, name := range names {
 		var count int
-		if err := s.db.QueryRow(
+		if err := s.db.QueryRowContext(ctx,
 			`SELECT COUNT(1) FROM schema_migrations WHERE version = ?`, name,
 		).Scan(&count); err != nil {
 			return err
@@ -106,15 +165,15 @@ func (s *Store) migrate() error {
 			return err
 		}
 
-		tx, err := s.db.Begin()
+		tx, err := s.db.BeginTx(ctx, nil)
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(string(content)); err != nil {
+		if _, err := tx.ExecContext(ctx, string(content)); err != nil {
 			_ = tx.Rollback()
 			return fmt.Errorf("apply migration %s: %w", name, err)
 		}
-		if _, err := tx.Exec(
+		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`,
 			name, now(),
 		); err != nil {
@@ -129,9 +188,9 @@ func (s *Store) migrate() error {
 }
 
 // GetState returns the value for key from app_state, or "" if unset.
-func (s *Store) GetState(key string) (string, error) {
+func (s *Store) GetState(ctx context.Context, key string) (string, error) {
 	var v string
-	err := s.db.QueryRow(`SELECT value FROM app_state WHERE key = ?`, key).Scan(&v)
+	err := s.q.QueryRowContext(ctx, `SELECT value FROM app_state WHERE key = ?`, key).Scan(&v)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
@@ -142,8 +201,8 @@ func (s *Store) GetState(key string) (string, error) {
 }
 
 // SetState upserts a key/value pair in app_state.
-func (s *Store) SetState(key, value string) error {
-	_, err := s.db.Exec(
+func (s *Store) SetState(ctx context.Context, key, value string) error {
+	_, err := s.q.ExecContext(ctx,
 		`INSERT INTO app_state (key, value) VALUES (?, ?)
 		 ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
 		key, value,

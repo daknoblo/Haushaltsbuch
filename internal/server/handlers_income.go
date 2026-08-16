@@ -9,13 +9,8 @@ import (
 )
 
 func (s *Server) handleIncomeCreate(w http.ResponseWriter, r *http.Request) {
-	active, err := s.store.ActiveHouseholdID()
-	if err != nil {
-		s.serverError(w, r, err)
-		return
-	}
-	if active == 0 {
-		http.Error(w, "Kein aktiver Haushalt", http.StatusBadRequest)
+	active, ok := s.requireActiveHousehold(w, r)
+	if !ok {
 		return
 	}
 	member := parseID(r.URL.Query().Get("member"))
@@ -23,19 +18,14 @@ func (s *Server) handleIncomeCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Person fehlt", http.StatusBadRequest)
 		return
 	}
-	// Only members of the active household may receive income lines.
-	m, err := s.store.GetMember(member)
-	if errors.Is(err, store.ErrNotFound) || (err == nil && m.HouseholdID != active) {
+	month := web.NormalizeMonth(r.URL.Query().Get("m"))
+
+	// CreateIncome only inserts when the member belongs to the household.
+	in, err := s.store.CreateIncome(r.Context(), active, member, month, "", 0)
+	if errors.Is(err, store.ErrNotFound) {
 		http.Error(w, "Unbekannte Person", http.StatusBadRequest)
 		return
 	}
-	if err != nil {
-		s.serverError(w, r, err)
-		return
-	}
-	month := web.NormalizeMonth(r.URL.Query().Get("m"))
-
-	in, err := s.store.CreateIncome(active, member, month, "", 0)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -44,20 +34,34 @@ func (s *Server) handleIncomeCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleIncomeUpdate(w http.ResponseWriter, r *http.Request) {
+	active, ok := s.requireActiveHousehold(w, r)
+	if !ok {
+		return
+	}
+	ctx := r.Context()
 	id := parseID(r.PathValue("id"))
-	in, err := s.store.GetIncome(id)
-	if errors.Is(err, store.ErrNotFound) {
+
+	in, err := s.store.GetIncome(ctx, id)
+	if err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	}
+	if in.HouseholdID != active {
 		http.NotFound(w, r)
 		return
 	}
-	if err != nil {
-		s.serverError(w, r, err)
+	if !s.parseForm(w, r) {
 		return
 	}
+
 	name := cleanName(r.FormValue("name"))
-	amount, _ := web.ParseCents(r.FormValue("amount"))
-	if err := s.store.UpdateIncome(id, name, amount); err != nil {
-		s.serverError(w, r, err)
+	amount, err := amountOrKeep(r.FormValue("amount"), in.AmountCents)
+	if err != nil {
+		http.Error(w, "Betrag außerhalb des zulässigen Bereichs", http.StatusBadRequest)
+		return
+	}
+	if err := s.store.UpdateIncome(ctx, active, id, name, amount); err != nil {
+		s.writeStoreError(w, r, err)
 		return
 	}
 	in.Name = name
@@ -66,27 +70,31 @@ func (s *Server) handleIncomeUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleIncomeDelete(w http.ResponseWriter, r *http.Request) {
-	id := parseID(r.PathValue("id"))
-	if err := s.store.DeleteIncome(id); err != nil {
-		s.serverError(w, r, err)
+	active, ok := s.requireActiveHousehold(w, r)
+	if !ok {
+		return
+	}
+	if err := s.store.DeleteIncome(r.Context(), active, parseID(r.PathValue("id"))); err != nil {
+		s.writeStoreError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) handleIncomeCopy(w http.ResponseWriter, r *http.Request) {
-	active, err := s.store.ActiveHouseholdID()
-	if err != nil {
-		s.serverError(w, r, err)
-		return
-	}
-	if active == 0 {
-		http.Error(w, "Kein aktiver Haushalt", http.StatusBadRequest)
+	active, ok := s.requireActiveHousehold(w, r)
+	if !ok {
 		return
 	}
 	from := web.NormalizeMonth(r.URL.Query().Get("from"))
 	to := web.NormalizeMonth(r.URL.Query().Get("to"))
-	if _, err := s.store.CopyIncomes(active, from, to); err != nil {
+
+	_, err := s.store.CopyIncomes(r.Context(), active, from, to)
+	if errors.Is(err, store.ErrCopyTargetNotEmpty) {
+		http.Error(w, "Der Zielmonat enthält bereits Einnahmen", http.StatusConflict)
+		return
+	}
+	if err != nil {
 		s.serverError(w, r, err)
 		return
 	}

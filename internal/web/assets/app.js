@@ -19,6 +19,36 @@
     indicator = document.getElementById("save-indicator");
   });
 
+  // Theme toggle. The initial value is applied by theme.js in <head>.
+  function currentTheme() {
+    var set = document.documentElement.getAttribute("data-theme");
+    if (set) return set;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+
+  document.addEventListener("click", function (e) {
+    var toggle = e.target.closest("[data-theme-toggle]");
+    if (!toggle) return;
+    var next = currentTheme() === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try {
+      localStorage.setItem("hb-theme", next);
+    } catch (err) {
+      // Ignore storage failures; the choice then lasts for this page only.
+    }
+  });
+
+  // Mirror the open state of an expense row into its form, so the server
+  // re-renders the row in the same state after an auto-save.
+  document.addEventListener("toggle", function (e) {
+    var details = e.target;
+    if (!details || details.tagName !== "DETAILS") return;
+    var form = details.closest("form");
+    if (!form) return;
+    var field = form.querySelector("[data-expanded-state]");
+    if (field) field.value = details.open ? "1" : "0";
+  }, true);
+
   document.body.addEventListener("htmx:afterRequest", function (e) {
     var d = e.detail;
     if (!d || !d.successful) return;

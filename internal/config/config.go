@@ -3,7 +3,10 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"strings"
 )
@@ -36,6 +39,17 @@ func getenv(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// Validate reports configuration values that would only fail later at startup.
+func (c Config) Validate() error {
+	if _, _, err := net.SplitHostPort(c.Addr); err != nil {
+		return fmt.Errorf("HB_ADDR %q is not a host:port address: %w", c.Addr, err)
+	}
+	if strings.TrimSpace(c.DBPath) == "" {
+		return errors.New("HB_DB_PATH must not be empty")
+	}
+	return nil
 }
 
 func parseLevel(s string) slog.Level {
