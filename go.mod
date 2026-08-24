@@ -2,9 +2,11 @@ module github.com/daknoblo/Haushaltsbuch
 
 go 1.26.1
 
+toolchain go1.26.6
+
 require (
 	github.com/a-h/templ v0.3.1020
-	github.com/johnfercher/maroto/v2 v2.4.0
+	github.com/johnfercher/maroto/v2 v2.4.1
 	modernc.org/sqlite v1.56.0
 )
 

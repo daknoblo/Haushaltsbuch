@@ -20,9 +20,9 @@ import (
 	_ "time/tzdata"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/config"
-	"github.com/daknoblo/Haushaltsbuch/internal/server"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 	"github.com/daknoblo/Haushaltsbuch/internal/version"
+	"github.com/daknoblo/Haushaltsbuch/internal/web"
 )
 
 func main() {
@@ -37,11 +37,11 @@ func main() {
 	cfg := config.Load()
 
 	if healthcheck {
-		os.Exit(runHealthcheck(cfg.Addr))
+		os.Exit(runHealthcheck(cfg.HTTPAddr))
 	}
 	if showVersion {
-		fmt.Printf("haushaltsbuch %s (channel=%s commit=%s date=%s)\n",
-			version.Version, version.Channel, version.Commit, version.Date)
+		fmt.Printf("haushaltsbuch %s (commit=%s date=%s)\n",
+			version.Version, version.Commit, version.Date)
 		return
 	}
 
@@ -75,7 +75,7 @@ func run(cfg config.Config, logger *slog.Logger) error {
 		}
 	}
 
-	st, err := store.Open(cfg.DBPath)
+	st, err := store.Open(cfg.DBPath())
 	if err != nil {
 		return fmt.Errorf("open store: %w", err)
 	}
@@ -85,9 +85,9 @@ func run(cfg config.Config, logger *slog.Logger) error {
 		return fmt.Errorf("seed store: %w", err)
 	}
 
-	srv := server.New(st, logger)
+	srv := web.New(st, logger)
 	httpSrv := &http.Server{
-		Addr:              cfg.Addr,
+		Addr:              cfg.HTTPAddr,
 		Handler:           srv.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
@@ -100,8 +100,8 @@ func run(cfg config.Config, logger *slog.Logger) error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		logger.Info("server starting", "addr", cfg.Addr, "db", cfg.DBPath,
-			"version", version.Version, "channel", version.Channel)
+		logger.Info("server starting", "addr", cfg.HTTPAddr, "data_dir", cfg.DataDir,
+			"version", version.Version)
 		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}

@@ -9,7 +9,7 @@ templ Layout(nav Nav) {
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<meta name="htmx-config" content="{&#34;includeIndicatorStyles&#34;:false}"/>
-			<title>{ nav.Title() } · Haushaltsbuch</title>
+			<title>{ PageTitle(ctx, nav.Active) } · { T(ctx, "app.name") }</title>
 			<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%236366f1'/%3E%3Ctext x='16' y='23' font-family='sans-serif' font-size='20' font-weight='700' fill='white' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E"/>
 			<link rel="stylesheet" href={ nav.AssetURL("app.css") }/>
 			// Applies the stored theme before first paint to avoid a flash.
@@ -40,7 +40,7 @@ templ topbar(nav Nav) {
 				<select
 					class="select-filter max-w-[12rem]"
 					name="id"
-					aria-label="Haushalt wechseln"
+					aria-label={ T(ctx, "nav.household") }
 					hx-post="/households/activate"
 					hx-trigger="change"
 					hx-swap="none"
@@ -50,15 +50,15 @@ templ topbar(nav Nav) {
 					}
 				</select>
 			}
-			<button type="button" class="nav-toggle ml-auto" data-nav-toggle aria-label="Menü" aria-expanded="false">
+			<button type="button" class="nav-toggle ml-auto" data-nav-toggle aria-label={ T(ctx, "nav.menu") } aria-expanded="false">
 				<span aria-hidden="true">☰</span>
 			</button>
 			<nav class="hidden flex-wrap items-center gap-1 text-sm md:flex">
-				@navLink(nav, "overview", "/", "Übersicht")
-				@navLink(nav, "expenses", "/expenses", "Ausgaben")
-				@navLink(nav, "income", "/income", "Einnahmen")
-				@navLink(nav, "statistics", "/statistics", "Statistiken")
-				@navLink(nav, "settings", "/settings", "Einstellungen")
+				@navLink(nav, "overview", "/", T(ctx, "nav.overview"))
+				@navLink(nav, "expenses", "/expenses", T(ctx, "nav.expenses"))
+				@navLink(nav, "income", "/income", T(ctx, "nav.income"))
+				@navLink(nav, "statistics", "/statistics", T(ctx, "nav.statistics"))
+				@navLink(nav, "settings", "/settings", T(ctx, "nav.settings"))
 			</nav>
 			<div class="ml-auto hidden items-center gap-2 md:flex">
 				if nav.ShowMonthNav {
@@ -68,11 +68,11 @@ templ topbar(nav Nav) {
 			</div>
 			<div class="w-full md:hidden" data-nav-panel hidden>
 				<nav class="nav-panel">
-					@navLink(nav, "overview", "/", "Übersicht")
-					@navLink(nav, "expenses", "/expenses", "Ausgaben")
-					@navLink(nav, "income", "/income", "Einnahmen")
-					@navLink(nav, "statistics", "/statistics", "Statistiken")
-					@navLink(nav, "settings", "/settings", "Einstellungen")
+					@navLink(nav, "overview", "/", T(ctx, "nav.overview"))
+					@navLink(nav, "expenses", "/expenses", T(ctx, "nav.expenses"))
+					@navLink(nav, "income", "/income", T(ctx, "nav.income"))
+					@navLink(nav, "statistics", "/statistics", T(ctx, "nav.statistics"))
+					@navLink(nav, "settings", "/settings", T(ctx, "nav.settings"))
 				</nav>
 				<div class="flex items-center gap-2 pb-2">
 					if nav.ShowMonthNav {
@@ -95,14 +95,14 @@ templ navLink(nav Nav, name string, href string, label string) {
 
 templ monthNav(nav Nav) {
 	<div class="flex items-center gap-1 no-print">
-		<a class="btn-icon" href={ templ.SafeURL(nav.MonthURL(nav.PrevMonth())) } aria-label="Vorheriger Monat">‹</a>
+		<a class="btn-icon" href={ templ.SafeURL(nav.MonthURL(nav.PrevMonth())) } aria-label={ T(ctx, "nav.prevMonth") }>‹</a>
 		<span class="min-w-[8rem] text-center text-sm font-medium text-slate-700 dark:text-slate-300">{ nav.CurrentMonthLabel() }</span>
-		<a class="btn-icon" href={ templ.SafeURL(nav.MonthURL(nav.NextMonth())) } aria-label="Nächster Monat">›</a>
+		<a class="btn-icon" href={ templ.SafeURL(nav.MonthURL(nav.NextMonth())) } aria-label={ T(ctx, "nav.nextMonth") }>›</a>
 	</div>
 }
 
 templ themeToggle() {
-	<button type="button" class="btn-icon no-print" data-theme-toggle aria-label="Helles oder dunkles Design">
+	<button type="button" class="btn-icon no-print" data-theme-toggle aria-label={ T(ctx, "nav.theme") }>
 		<span class="hidden dark:inline" aria-hidden="true">☾</span>
 		<span class="dark:hidden" aria-hidden="true">☀</span>
 	</button>
@@ -130,14 +130,14 @@ templ moveButtons(baseURL string) {
 			class="btn-icon h-8 w-8"
 			hx-post={ baseURL + "/move?dir=up" }
 			hx-swap="none"
-			aria-label="Nach oben"
+			aria-label={ T(ctx, "action.moveUp") }
 		>↑</button>
 		<button
 			type="button"
 			class="btn-icon h-8 w-8"
 			hx-post={ baseURL + "/move?dir=down" }
 			hx-swap="none"
-			aria-label="Nach unten"
+			aria-label={ T(ctx, "action.moveDown") }
 		>↓</button>
 	</span>
 }

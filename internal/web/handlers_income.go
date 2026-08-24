@@ -1,11 +1,10 @@
-package server
+package web
 
 import (
 	"errors"
 	"net/http"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
-	"github.com/daknoblo/Haushaltsbuch/internal/web"
 )
 
 func (s *Server) handleIncomeCreate(w http.ResponseWriter, r *http.Request) {
@@ -15,22 +14,22 @@ func (s *Server) handleIncomeCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	member := parseID(r.URL.Query().Get("member"))
 	if member == 0 {
-		http.Error(w, "Person fehlt", http.StatusBadRequest)
+		s.clientError(w, r, http.StatusBadRequest, "error.memberMissing")
 		return
 	}
-	month := web.NormalizeMonth(r.URL.Query().Get("m"))
+	month := NormalizeMonth(r.URL.Query().Get("m"))
 
 	// CreateIncome only inserts when the member belongs to the household.
 	in, err := s.store.CreateIncome(r.Context(), active, member, month, "", 0)
 	if errors.Is(err, store.ErrNotFound) {
-		http.Error(w, "Unbekannte Person", http.StatusBadRequest)
+		s.clientError(w, r, http.StatusBadRequest, "error.memberUnknown")
 		return
 	}
 	if err != nil {
 		s.serverError(w, r, err)
 		return
 	}
-	s.render(w, r, web.IncomeLineView(in))
+	s.render(w, r, IncomeLineView(in))
 }
 
 func (s *Server) handleIncomeUpdate(w http.ResponseWriter, r *http.Request) {
@@ -57,7 +56,7 @@ func (s *Server) handleIncomeUpdate(w http.ResponseWriter, r *http.Request) {
 	name := cleanName(r.FormValue("name"))
 	amount, err := amountOrKeep(r.FormValue("amount"), in.AmountCents)
 	if err != nil {
-		http.Error(w, "Betrag außerhalb des zulässigen Bereichs", http.StatusBadRequest)
+		s.clientError(w, r, http.StatusBadRequest, "error.amountRange")
 		return
 	}
 	if err := s.store.UpdateIncome(ctx, active, id, name, amount); err != nil {
@@ -66,7 +65,7 @@ func (s *Server) handleIncomeUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	in.Name = name
 	in.AmountCents = amount
-	s.render(w, r, web.IncomeLineView(in))
+	s.render(w, r, IncomeLineView(in))
 }
 
 func (s *Server) handleIncomeDelete(w http.ResponseWriter, r *http.Request) {
@@ -86,12 +85,12 @@ func (s *Server) handleIncomeCopy(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	from := web.NormalizeMonth(r.URL.Query().Get("from"))
-	to := web.NormalizeMonth(r.URL.Query().Get("to"))
+	from := NormalizeMonth(r.URL.Query().Get("from"))
+	to := NormalizeMonth(r.URL.Query().Get("to"))
 
 	_, err := s.store.CopyIncomes(r.Context(), active, from, to)
 	if errors.Is(err, store.ErrCopyTargetNotEmpty) {
-		http.Error(w, "Der Zielmonat enthält bereits Einnahmen", http.StatusConflict)
+		s.clientError(w, r, http.StatusConflict, "error.copyTargetUsed")
 		return
 	}
 	if err != nil {

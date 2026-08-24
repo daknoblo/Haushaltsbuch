@@ -21,3 +21,10 @@ out/
 node_modules/
 
 .DS_Store
+
+# Required by REPO-STANDARD.md
+appdata
+data
+bin
+docs
+node_modules

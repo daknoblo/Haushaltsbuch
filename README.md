@@ -12,11 +12,15 @@ container (distroless, non-root).
 
 - **Backend:** Go (CGO-free), SQLite via `modernc.org/sqlite`
 - **Frontend:** server-rendered with [templ](https://templ.guide) + HTMX and
-  hand-written CSS embedded into the binary – no Node build step required
+  Tailwind CSS, compiled into the binary – no Node build step required
 - **PDF export:** pure Go via [maroto](https://maroto.tech)
 
-> The user interface is in German; code, comments and this documentation are in
-> English.
+> The user interface ships in German and English and follows the browser's
+> `Accept-Language`. Code, comments and this documentation are in English.
+
+## Screenshots
+
+_Not captured yet._
 
 ---
 
@@ -53,17 +57,17 @@ docker run -d --name haushaltsbuch \
   -p 8080:8080 \
   -v haushaltsbuch-data:/app/appdata \
   -e TZ=Europe/Berlin \
-  ghcr.io/daknoblo/haushaltsbuch:stable
+  ghcr.io/daknoblo/haushaltsbuch:latest
 ```
 
 Then open <http://localhost:8080> in a browser.
 
 ### With Docker Compose
 
-See [deploy/docker-compose.example.yml](deploy/docker-compose.example.yml):
+See [docker-compose.example.yml](docker-compose.example.yml):
 
 ```sh
-cp deploy/docker-compose.example.yml docker-compose.yml
+cp docker-compose.example.yml docker-compose.yml
 docker compose up -d
 ```
 
@@ -84,16 +88,17 @@ By default the application listens on `:8080` and creates its database at
 
 All settings are provided through environment variables prefixed with `HB_`:
 
-| Variable       | Default                    | Description                          |
-| -------------- | -------------------------- | ------------------------------------ |
-| `HB_ADDR`      | `:8080`                    | Listen address                       |
-| `HB_DB_PATH`   | `appdata/haushaltsbuch.db` | Path to the SQLite database          |
-| `HB_LOG_LEVEL` | `info`                     | `debug`, `info`, `warn`, `error`     |
-| `TZ`           | (system)                   | IANA time zone, e.g. `Europe/Berlin` |
+| Variable | Default | Description |
+| --- | --- | --- |
+| `HB_HTTP_ADDR` | `:8080` | Listen address |
+| `HB_DATA_DIR` | `/appdata` | Directory holding `haushaltsbuch.db` |
+| `HB_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
+| `TZ` | `Europe/Berlin` | IANA time zone |
 
-Inside the container `HB_DB_PATH` points at `/app/appdata/haushaltsbuch.db`; the
-directory `/app/appdata` is declared as a volume. An invalid `TZ` value is
-reported as a warning at startup and the application falls back to UTC.
+The database file is created as `<HB_DATA_DIR>/haushaltsbuch.db`. In the
+container `/appdata` is declared as a volume. Invalid values for `HB_HTTP_ADDR`
+or `HB_DATA_DIR` abort the start with a clear message; an invalid `TZ` is
+reported as a warning and the application falls back to UTC.
 
 ---
 
@@ -134,11 +139,10 @@ reported as a warning at startup and the application falls back to UTC.
 
 ```sh
 make help      # list available targets
+make tailwind  # download the standalone Tailwind CLI (run once)
+make generate  # regenerate the templ templates and the Tailwind CSS
+make check     # everything CI runs: fmt, vet, lint, test, build
 make build     # compile a static binary into bin/
-make test      # run the test suite with the race detector
-make vet       # go vet
-make lint      # golangci-lint (same version as CI)
-make generate  # regenerate the templ templates (*_templ.go)
 make docker    # build the container image
 ```
 
@@ -154,8 +158,8 @@ cmd/haushaltsbuch/      Entry point (flags, wiring, graceful shutdown)
 internal/config/        Configuration from HB_ environment variables
 internal/store/         SQLite access and migrations
 internal/calc/          Monthly aggregation (normalisation, split allocation)
-internal/server/        HTTP routing, middleware, handlers, PDF export
-internal/web/           templ templates, assets, view models, formatting
+internal/i18n/          German and English text catalogs
+internal/web/           HTTP handlers, middleware, routing, templ views, assets
 internal/version/       Build metadata injected via -ldflags
 ```
 

@@ -1,21 +1,47 @@
 version: "2"
-run:
-  timeout: 5m
+
 linters:
-  default: standard
   enable:
+    - bodyclose
+    - contextcheck
+    - errorlint
+    - gocritic
+    - gosec
     - misspell
+    - nilerr
+    - noctx
+    - prealloc
+    - revive
+    - unconvert
+    - unparam
   settings:
-    misspell:
-      locale: US
-      ignore-rules:
-        - Variabel
     errcheck:
       exclude-functions:
         - (io.Closer).Close
         - (io.ReadCloser).Close
         - (*database/sql.Rows).Close
         - (*database/sql.Stmt).Close
+    misspell:
+      locale: US
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters: [errcheck, gosec, dupl, noctx]
+      # The generated templ output is not written by hand.
+      - path: _templ\.go
+        linters: [dupl, gocritic, revive, unparam]
+
+      # --- repository-specific exceptions ---
+
+      # templ components receive the context through Component.Render, which
+      # contextcheck cannot follow, so every render call is reported.
+      - path: internal/web/
+        linters: [contextcheck]
+      # The German catalog contains German words by definition; misspell is
+      # configured for US English.
+      - path: internal/i18n/catalog_de\.go
+        linters: [misspell]
+
 formatters:
   enable:
     - gofmt

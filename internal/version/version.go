@@ -3,8 +3,7 @@ package version
 
 // These values are overridden at build time using -ldflags -X.
 var (
-	Version = "dev"     // vYYYYMMDD-HHMM at build time
-	Channel = "local"   // "stable", "dev" or "local"
+	Version = "dev"     // semver tag, e.g. v1.2.3
 	Commit  = "unknown" // git commit hash
 	Date    = "unknown" // build date (RFC3339)
 )

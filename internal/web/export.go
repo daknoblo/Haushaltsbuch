@@ -1,6 +1,7 @@
-package server
+package web
 
 import (
+	"context"
 	"mime"
 	"net/http"
 	"strings"
@@ -17,7 +18,6 @@ import (
 
 	"github.com/daknoblo/Haushaltsbuch/internal/calc"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
-	"github.com/daknoblo/Haushaltsbuch/internal/web"
 )
 
 var pdfGrey = &props.Color{Red: 110, Green: 116, Blue: 130}
@@ -29,10 +29,10 @@ func newPDF() core.Maroto {
 	return maroto.New(cfg)
 }
 
-func pdfHeader(m core.Maroto, title, household, subtitle string) {
+func pdfHeader(ctx context.Context, m core.Maroto, title, household, subtitle string) {
 	m.AddRow(12, text.NewCol(12, title, props.Text{Size: 18, Style: fontstyle.Bold}))
 	m.AddRow(6, text.NewCol(12, household+"  ·  "+subtitle, props.Text{Size: 10, Color: pdfGrey}))
-	m.AddRow(6, text.NewCol(12, "Erstellt am "+time.Now().Format("02.01.2006 15:04"), props.Text{Size: 8, Color: pdfGrey}))
+	m.AddRow(6, text.NewCol(12, Tf(ctx, "pdf.createdAt", time.Now().Format("02.01.2006 15:04")), props.Text{Size: 8, Color: pdfGrey}))
 	m.AddRow(4)
 }
 
@@ -101,7 +101,7 @@ func (s *Server) exportHousehold(w http.ResponseWriter, r *http.Request) (store.
 		return store.Household{}, false
 	}
 	if active == 0 {
-		http.Error(w, "Kein aktiver Haushalt", http.StatusBadRequest)
+		s.clientError(w, r, http.StatusBadRequest, "error.noHousehold")
 		return store.Household{}, false
 	}
 	hh, err := s.store.GetHousehold(r.Context(), active)
@@ -113,11 +113,12 @@ func (s *Server) exportHousehold(w http.ResponseWriter, r *http.Request) (store.
 }
 
 func (s *Server) exportOverviewPDF(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	hh, ok := s.exportHousehold(w, r)
 	if !ok {
 		return
 	}
-	month := web.NormalizeMonth(r.URL.Query().Get("m"))
+	month := NormalizeMonth(r.URL.Query().Get("m"))
 	rep, err := s.buildMonthReport(r.Context(), hh.ID, month)
 	if err != nil {
 		s.serverError(w, r, err)
@@ -125,42 +126,43 @@ func (s *Server) exportOverviewPDF(w http.ResponseWriter, r *http.Request) {
 	}
 
 	m := newPDF()
-	pdfHeader(m, "Übersicht", hh.Name, web.MonthLabel(month))
+	pdfHeader(ctx, m, T(ctx, "pdf.overview"), hh.Name, MonthLabel(month))
 
-	pdfKV(m, "Einnahmen", web.FormatEUR(rep.IncomeCents))
-	pdfKV(m, "Ausgaben", web.FormatEUR(rep.ExpenseCents))
-	pdfKV(m, "Saldo", web.FormatEUR(rep.BalanceCents))
+	pdfKV(m, T(ctx, "overview.income"), FormatEUR(rep.IncomeCents))
+	pdfKV(m, T(ctx, "overview.expenses"), FormatEUR(rep.ExpenseCents))
+	pdfKV(m, T(ctx, "overview.balance"), FormatEUR(rep.BalanceCents))
 
-	pdfHeading(m, "Personen")
-	pdfRow4(m, "Person", "Einnahmen", "Ausgaben", "Saldo", true)
+	pdfHeading(m, T(ctx, "overview.people"))
+	pdfRow4(m, T(ctx, "overview.person"), T(ctx, "overview.income"), T(ctx, "overview.expenses"), T(ctx, "overview.balance"), true)
 	for _, mb := range rep.Members {
 		pdfRow4(m, mb.Member.Name,
-			web.FormatEUR(mb.IncomeCents),
-			web.FormatEUR(mb.ExpenseCents),
-			web.FormatEUR(mb.BalanceCents), false)
+			FormatEUR(mb.IncomeCents),
+			FormatEUR(mb.ExpenseCents),
+			FormatEUR(mb.BalanceCents), false)
 	}
 
 	if len(rep.Sections) > 0 {
-		pdfHeading(m, "Nach Sektion")
+		pdfHeading(m, T(ctx, "overview.bySection"))
 		for _, sec := range rep.Sections {
-			pdfKV(m, sec.Label, web.FormatEUR(sec.Cents))
+			pdfKV(m, sec.Label, FormatEUR(sec.Cents))
 		}
 	}
 
-	pdfHeading(m, "Bedarf / Wunsch / Sparen")
-	pdfKV(m, "Bedarf", web.FormatEUR(rep.ByBudgetClass[store.ClassNeed]))
-	pdfKV(m, "Wunsch", web.FormatEUR(rep.ByBudgetClass[store.ClassWant]))
-	pdfKV(m, "Sparen", web.FormatEUR(rep.ByBudgetClass[store.ClassSaving]))
+	pdfHeading(m, T(ctx, "overview.budgetClasses"))
+	pdfKV(m, T(ctx, "class.need"), FormatEUR(rep.ByBudgetClass[store.ClassNeed]))
+	pdfKV(m, T(ctx, "class.want"), FormatEUR(rep.ByBudgetClass[store.ClassWant]))
+	pdfKV(m, T(ctx, "class.saving"), FormatEUR(rep.ByBudgetClass[store.ClassSaving]))
 
 	s.writePDF(w, r, m, "uebersicht-"+month+".pdf")
 }
 
 func (s *Server) exportStatisticsPDF(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	hh, ok := s.exportHousehold(w, r)
 	if !ok {
 		return
 	}
-	month := web.NormalizeMonth(r.URL.Query().Get("m"))
+	month := NormalizeMonth(r.URL.Query().Get("m"))
 	vm, err := s.buildStatisticsVM(r.Context(), hh.ID, month)
 	if err != nil {
 		s.serverError(w, r, err)
@@ -168,25 +170,26 @@ func (s *Server) exportStatisticsPDF(w http.ResponseWriter, r *http.Request) {
 	}
 
 	m := newPDF()
-	pdfHeader(m, "Statistiken", hh.Name, "Zeitraum bis "+web.MonthLabel(month))
+	pdfHeader(ctx, m, T(ctx, "pdf.statistics"), hh.Name, Tf(ctx, "pdf.periodUntil", MonthLabel(month)))
 
-	pdfKV(m, "Ø Einnahmen / Monat", web.FormatEUR(vm.AvgIncome))
-	pdfKV(m, "Ø Ausgaben / Monat", web.FormatEUR(vm.AvgExpense))
-	pdfKV(m, "Ø Saldo / Monat", web.FormatEUR(vm.AvgIncome-vm.AvgExpense))
+	pdfKV(m, T(ctx, "pdf.avgIncome"), FormatEUR(vm.AvgIncome))
+	pdfKV(m, T(ctx, "pdf.avgExpenses"), FormatEUR(vm.AvgExpense))
+	pdfKV(m, T(ctx, "pdf.avgBalance"), FormatEUR(vm.AvgIncome-vm.AvgExpense))
 
-	pdfHeading(m, "Monatsverlauf")
-	pdfRow4(m, "Monat", "Einnahmen", "Ausgaben", "Saldo", true)
+	pdfHeading(m, T(ctx, "pdf.monthCourse"))
+	pdfRow4(m, T(ctx, "pdf.month"), T(ctx, "overview.income"), T(ctx, "overview.expenses"), T(ctx, "overview.balance"), true)
 	for _, sm := range vm.Months {
-		pdfRow4(m, web.MonthLabel(sm.Month),
-			web.FormatEUR(sm.IncomeCents),
-			web.FormatEUR(sm.ExpenseCents),
-			web.FormatEUR(sm.BalanceCents), false)
+		pdfRow4(m, MonthLabel(sm.Month),
+			FormatEUR(sm.IncomeCents),
+			FormatEUR(sm.ExpenseCents),
+			FormatEUR(sm.BalanceCents), false)
 	}
 
 	s.writePDF(w, r, m, "statistiken-"+month+".pdf")
 }
 
 func (s *Server) exportExpensesPDF(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	hh, ok := s.exportHousehold(w, r)
 	if !ok {
 		return
@@ -203,34 +206,34 @@ func (s *Server) exportExpensesPDF(w http.ResponseWriter, r *http.Request) {
 	}
 
 	m := newPDF()
-	pdfHeader(m, "Ausgabenliste", hh.Name, "Alle Ausgaben")
+	pdfHeader(ctx, m, T(ctx, "pdf.expenseList"), hh.Name, T(ctx, "pdf.allExpenses"))
 
 	var grand int64
 	for _, g := range vm.Groups {
 		if len(g.Expenses) == 0 {
 			continue
 		}
-		pdfHeading(m, g.Title()+"  ("+web.FormatEUR(g.TotalCents)+" / Monat)")
-		pdfRow4(m, "Bezeichnung", "Betrag", "Rhythmus", "Monatlich", true)
+		pdfHeading(m, g.Title()+"  ("+FormatEUR(g.TotalCents)+" / Monat)")
+		pdfRow4(m, T(ctx, "pdf.label"), T(ctx, "pdf.amount"), T(ctx, "pdf.rhythm"), T(ctx, "pdf.monthly"), true)
 		for _, row := range g.Expenses {
 			pdfRow4(m,
-				row.Expense.Name+"  ["+splitNames(row, memberName)+"]",
-				web.FormatEUR(row.Expense.AmountCents),
-				web.FrequencyLabel(row.Expense.Frequency),
-				web.FormatEUR(calc.MonthlyCents(row.Expense)), false)
+				row.Expense.Name+"  ["+splitNames(ctx, row, memberName)+"]",
+				FormatEUR(row.Expense.AmountCents),
+				FrequencyLabel(ctx, row.Expense.Frequency),
+				FormatEUR(calc.MonthlyCents(row.Expense)), false)
 		}
 		grand += g.TotalCents
 	}
 
 	m.AddRow(4)
-	pdfKV(m, "Gesamt (monatlich normalisiert)", web.FormatEUR(grand))
+	pdfKV(m, T(ctx, "pdf.total"), FormatEUR(grand))
 
 	s.writePDF(w, r, m, "ausgaben-"+pdfSlug(hh.Name)+".pdf")
 }
 
-func splitNames(row web.ExpenseRow, names map[int64]string) string {
+func splitNames(ctx context.Context, row ExpenseRow, names map[int64]string) string {
 	if len(row.Splits) == 0 {
-		return "alle"
+		return T(ctx, "pdf.everyone")
 	}
 	parts := make([]string, 0, len(row.Splits))
 	for _, sp := range row.Splits {

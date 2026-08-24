@@ -1,4 +1,4 @@
-package server
+package web
 
 import (
 	"errors"
@@ -6,19 +6,20 @@ import (
 	"strconv"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
-	"github.com/daknoblo/Haushaltsbuch/internal/web"
 )
 
 // amountOrKeep parses a submitted amount. A syntactically incomplete value
 // (the auto-save fires on every keystroke, so "12," is normal) keeps the stored
 // amount, while an out-of-range value is reported to the caller.
 func amountOrKeep(submitted string, current int64) (int64, error) {
-	cents, err := web.ParseCents(submitted)
-	if errors.Is(err, web.ErrAmountRange) {
+	cents, err := ParseCents(submitted)
+	if errors.Is(err, ErrAmountRange) {
 		return current, err
 	}
 	if err != nil {
-		return current, nil
+		// Half-typed input is expected while the auto-save fires, so the stored
+		// amount is kept instead of reporting an error.
+		return current, nil //nolint:nilerr
 	}
 	return cents, nil
 }
@@ -37,7 +38,7 @@ func (s *Server) handleExpenseCreate(w http.ResponseWriter, r *http.Request) {
 		CostNature:  store.CostFix,
 		BudgetClass: store.ClassNeed,
 		SplitMode:   store.SplitEqual,
-		ActiveFrom:  web.CurrentMonth(),
+		ActiveFrom:  CurrentMonth(),
 	}
 	if sectionID := parseID(r.URL.Query().Get("section_id")); sectionID != 0 {
 		e.SectionID = &sectionID
@@ -70,7 +71,7 @@ func (s *Server) handleExpenseCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// A freshly created row opens straight into the editor.
-	s.render(w, r, web.ExpenseRowView(web.ExpenseRow{Expense: created, Splits: stored, Expanded: true}, vmCtx))
+	s.render(w, r, ExpenseRowView(ExpenseRow{Expense: created, Splits: stored, Expanded: true}, vmCtx))
 }
 
 func (s *Server) handleExpenseUpdate(w http.ResponseWriter, r *http.Request) {
@@ -97,7 +98,7 @@ func (s *Server) handleExpenseUpdate(w http.ResponseWriter, r *http.Request) {
 	e.Name = cleanName(r.FormValue("name"))
 	amount, err := amountOrKeep(r.FormValue("amount"), e.AmountCents)
 	if err != nil {
-		http.Error(w, "Betrag außerhalb des zulässigen Bereichs", http.StatusBadRequest)
+		s.clientError(w, r, http.StatusBadRequest, "error.amountRange")
 		return
 	}
 	e.AmountCents = amount
@@ -137,7 +138,7 @@ func (s *Server) handleExpenseUpdate(w http.ResponseWriter, r *http.Request) {
 
 	splits, err := s.splitsFromForm(r, e)
 	if err != nil {
-		http.Error(w, "Ungültiger Anteil", http.StatusBadRequest)
+		s.clientError(w, r, http.StatusBadRequest, "error.invalidShare")
 		return
 	}
 	if err := s.store.SaveExpense(ctx, e, splits); err != nil {
@@ -160,8 +161,8 @@ func (s *Server) handleExpenseUpdate(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	row := web.ExpenseRow{Expense: updated, Splits: stored, Expanded: r.FormValue("expanded") == "1"}
-	s.render(w, r, web.ExpenseRowView(row, vmCtx))
+	row := ExpenseRow{Expense: updated, Splits: stored, Expanded: r.FormValue("expanded") == "1"}
+	s.render(w, r, ExpenseRowView(row, vmCtx))
 }
 
 // splitsFromForm rebuilds the split list from the submitted participation
@@ -190,11 +191,11 @@ func (s *Server) splitsFromForm(r *http.Request, e store.Expense) ([]store.Split
 		val := stored[m.ID]
 		switch e.SplitMode {
 		case store.SplitPercent:
-			if v, err := web.ParseFloatLoose(r.FormValue("v_" + key)); err == nil {
+			if v, err := ParseFloatLoose(r.FormValue("v_" + key)); err == nil {
 				val = clampPercent(v)
 			}
 		case store.SplitFixed:
-			if cents, err := web.ParseCents(r.FormValue("v_" + key)); err == nil {
+			if cents, err := ParseCents(r.FormValue("v_" + key)); err == nil {
 				val = float64(cents)
 			}
 		default: // equal splits ignore the value
@@ -239,7 +240,7 @@ func (s *Server) handleExpenseMove(w http.ResponseWriter, r *http.Request) {
 	}
 	delta, ok := parseDelta(r.FormValue("dir"))
 	if !ok {
-		http.Error(w, "Ungültige Richtung", http.StatusBadRequest)
+		s.clientError(w, r, http.StatusBadRequest, "error.invalidDir")
 		return
 	}
 	ctx := r.Context()

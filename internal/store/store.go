@@ -61,7 +61,7 @@ func Open(path string) (*Store, error) {
 	// SQLITE_BUSY errors in this low-traffic personal application.
 	db.SetMaxOpenConns(1)
 
-	if err := db.Ping(); err != nil {
+	if err := db.PingContext(context.Background()); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("ping db: %w", err)
 	}

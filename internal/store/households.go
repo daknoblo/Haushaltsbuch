@@ -89,7 +89,8 @@ func (s *Store) ActiveHouseholdID(ctx context.Context) (int64, error) {
 	}
 	id, err := strconv.ParseInt(v, 10, 64)
 	if err != nil {
-		return 0, nil
+		// A corrupted state value means "nothing selected", not a failure.
+		return 0, nil //nolint:nilerr
 	}
 	// Verify it still exists.
 	if _, err := s.GetHousehold(ctx, id); errors.Is(err, ErrNotFound) {

@@ -29,3 +29,8 @@ node_modules/
 .DS_Store
 .idea/
 .vscode/
+
+# Required by REPO-STANDARD.md
+data/
+*.log
+coverage.out

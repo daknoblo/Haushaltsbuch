@@ -8,11 +8,11 @@ import (
 
 templ SettingsPage(nav Nav, vm SettingsVM) {
 	@Layout(nav) {
-		@pageHeading("Einstellungen", "Haushalte, Personen, Sektionen und Kategorien verwalten.") {
+		@pageHeading(T(ctx, "settings.title"), T(ctx, "settings.subtitle")) {
 		}
 		<div class="grid gap-4 lg:grid-cols-2">
 			<div class="card-tight" id="haushalte">
-				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">Haushalte</h2></div>
+				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "settings.households") }</h2></div>
 				<div class="card-body">
 					<div id="household-list" class="grid gap-2">
 						for _, h := range vm.Households {
@@ -26,13 +26,13 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 						hx-swap="beforeend"
 						data-reset-on-success
 					>
-						<input class="input flex-1" type="text" name="name" placeholder="Neuer Haushalt" required/>
-						<button class="btn-primary shrink-0" type="submit">Hinzufügen</button>
+						<input class="input flex-1" type="text" name="name" placeholder={ T(ctx, "settings.newHousehold") } required/>
+						<button class="btn-primary shrink-0" type="submit">{ T(ctx, "action.add") }</button>
 					</form>
 				</div>
 			</div>
 			<div class="card-tight" id="personen">
-				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">Personen</h2></div>
+				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "overview.people") }</h2></div>
 				<div class="card-body">
 					<div id="member-list" class="grid gap-2">
 						for _, m := range vm.Members {
@@ -46,13 +46,13 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 						hx-swap="beforeend"
 						data-reset-on-success
 					>
-						<input class="input flex-1" type="text" name="name" placeholder="Name" required/>
-						<button class="btn-primary shrink-0" type="submit">Hinzufügen</button>
+						<input class="input flex-1" type="text" name="name" placeholder={ T(ctx, "settings.name") } required/>
+						<button class="btn-primary shrink-0" type="submit">{ T(ctx, "action.add") }</button>
 					</form>
 				</div>
 			</div>
 			<div class="card-tight" id="sektionen">
-				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">Sektionen</h2></div>
+				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "settings.sections") }</h2></div>
 				<div class="card-body">
 					<div id="section-list" class="grid gap-2">
 						for _, s := range vm.Sections {
@@ -66,13 +66,13 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 						hx-swap="beforeend"
 						data-reset-on-success
 					>
-						<input class="input flex-1" type="text" name="name" placeholder="Neue Sektion" required/>
-						<button class="btn-primary shrink-0" type="submit">Hinzufügen</button>
+						<input class="input flex-1" type="text" name="name" placeholder={ T(ctx, "settings.newSection") } required/>
+						<button class="btn-primary shrink-0" type="submit">{ T(ctx, "action.add") }</button>
 					</form>
 				</div>
 			</div>
 			<div class="card-tight" id="kategorien">
-				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">Kategorien</h2></div>
+				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "settings.categories") }</h2></div>
 				<div class="card-body">
 					<div id="category-list" class="grid gap-2">
 						for _, c := range vm.Categories {
@@ -86,8 +86,8 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 						hx-swap="beforeend"
 						data-reset-on-success
 					>
-						<input class="input flex-1" type="text" name="name" placeholder="Neue Kategorie" required/>
-						<button class="btn-primary shrink-0" type="submit">Hinzufügen</button>
+						<input class="input flex-1" type="text" name="name" placeholder={ T(ctx, "settings.newCategory") } required/>
+						<button class="btn-primary shrink-0" type="submit">{ T(ctx, "action.add") }</button>
 					</form>
 				</div>
 			</div>
@@ -107,20 +107,20 @@ templ HouseholdRowView(h store.Household, activeID int64) {
 			<input class="input" type="text" name="name" value={ h.Name }/>
 		</form>
 		if h.ID == activeID {
-			<span class="badge badge-ok shrink-0">Aktiv</span>
+			<span class="badge badge-ok shrink-0">{ T(ctx, "settings.active") }</span>
 		} else {
 			<button
 				class="btn-ghost shrink-0"
 				hx-post={ "/households/activate?id=" + strconv.FormatInt(h.ID, 10) }
 				hx-swap="none"
-			>aktivieren</button>
+			>{ T(ctx, "settings.activate") }</button>
 		}
 		@moveButtons("/households/" + strconv.FormatInt(h.ID, 10))
 		<button
 			class="btn-icon shrink-0 no-print"
 			hx-post={ "/households/" + strconv.FormatInt(h.ID, 10) + "/delete" }
 			hx-swap="none"
-			hx-confirm="Haushalt inkl. aller Daten löschen?"
+			hx-confirm={ T(ctx, "settings.confirmHousehold") }
 			aria-label="Löschen"
 		>✕</button>
 	</div>
@@ -135,8 +135,8 @@ templ MemberRowView(m store.Member) {
 			hx-target="this"
 			hx-swap="none"
 		>
-			<input class="h-9 w-10 shrink-0 cursor-pointer rounded-md border border-slate-300 bg-transparent p-0.5 dark:border-slate-700" type="color" name="color" value={ ColorOr(m.Color) } aria-label="Farbe"/>
-			<input class="input" type="text" name="name" value={ m.Name } aria-label="Name"/>
+			<input class="h-9 w-10 shrink-0 cursor-pointer rounded-md border border-slate-300 bg-transparent p-0.5 dark:border-slate-700" type="color" name="color" value={ ColorOr(m.Color) } aria-label={ T(ctx, "settings.color") }/>
+			<input class="input" type="text" name="name" value={ m.Name } aria-label={ T(ctx, "settings.name") }/>
 		</form>
 		@moveButtons("/members/" + strconv.FormatInt(m.ID, 10))
 		<button
@@ -144,7 +144,7 @@ templ MemberRowView(m store.Member) {
 			hx-post={ "/members/" + strconv.FormatInt(m.ID, 10) + "/delete" }
 			hx-target={ "#mem-" + strconv.FormatInt(m.ID, 10) }
 			hx-swap="outerHTML"
-			hx-confirm="Person löschen?"
+			hx-confirm={ T(ctx, "settings.confirmMember") }
 			aria-label="Löschen"
 		>✕</button>
 	</div>
@@ -167,7 +167,7 @@ templ SectionRowView(s store.Section) {
 			hx-post={ "/sections/" + strconv.FormatInt(s.ID, 10) + "/delete" }
 			hx-target={ "#sec-" + strconv.FormatInt(s.ID, 10) }
 			hx-swap="outerHTML"
-			hx-confirm="Sektion löschen? Ausgaben bleiben erhalten."
+			hx-confirm={ T(ctx, "settings.confirmSection") }
 			aria-label="Löschen"
 		>✕</button>
 	</div>
@@ -189,7 +189,7 @@ templ CategoryRowView(c store.Category) {
 			hx-post={ "/categories/" + strconv.FormatInt(c.ID, 10) + "/delete" }
 			hx-target={ "#cat-" + strconv.FormatInt(c.ID, 10) }
 			hx-swap="outerHTML"
-			hx-confirm="Kategorie löschen?"
+			hx-confirm={ T(ctx, "settings.confirmCategory") }
 			aria-label="Löschen"
 		>✕</button>
 	</div>

@@ -1,28 +1,31 @@
-// Package server wires the HTTP routing and handlers for Haushaltsbuch.
-package server
+// Package web wires the HTTP routing, middleware and handlers for
+// Haushaltsbuch and renders the templ views.
+package web
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/a-h/templ"
 
+	"github.com/daknoblo/Haushaltsbuch/internal/i18n"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 	"github.com/daknoblo/Haushaltsbuch/internal/version"
-	"github.com/daknoblo/Haushaltsbuch/internal/web"
 )
 
 // Server holds the dependencies shared by all handlers.
 type Server struct {
-	store  *store.Store
-	logger *slog.Logger
+	store   *store.Store
+	logger  *slog.Logger
+	limiter *rateLimiter
 }
 
 // New creates a Server.
 func New(st *store.Store, logger *slog.Logger) *Server {
-	return &Server{store: st, logger: logger}
+	return &Server{store: st, logger: logger, limiter: newRateLimiter()}
 }
 
 // Handler builds the HTTP handler with all routes and middleware.
@@ -30,11 +33,13 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
 	// Static assets.
-	assets := http.StripPrefix("/static/", cacheControl(http.FileServer(http.FS(web.AssetsFS()))))
+	assets := http.StripPrefix("/static/", cacheControl(http.FileServer(http.FS(AssetsFS()))))
 	mux.Handle("GET /static/", assets)
 
-	// Health.
+	// Health, readiness and build metadata.
 	mux.HandleFunc("GET /healthz", s.handleHealth)
+	mux.HandleFunc("GET /readyz", s.handleReady)
+	mux.HandleFunc("GET /version", s.handleVersion)
 
 	// Pages.
 	mux.HandleFunc("GET /{$}", s.handleOverview)
@@ -86,24 +91,43 @@ func (s *Server) Handler() http.Handler {
 
 	// Outermost middleware first: a panic anywhere below is still recovered and
 	// still logged with the resulting status code.
-	return s.recoverer(s.logRequests(securityHeaders(s.sameOrigin(limitBody(compressResponses(mux))))))
+	return s.recoverer(s.logRequests(withLang(securityHeaders(s.rateLimit(s.sameOrigin(limitBody(compressResponses(mux))))))))
 }
 
-// handleHealth reports readiness. It touches the database so that the container
-// health check fails when the data volume becomes unavailable.
-func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+// handleHealth is the liveness probe. It answers without touching the database
+// so that a stalled query cannot make the container be restarted.
+func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("ok"))
+}
+
+// handleReady is the readiness probe and reports whether the store is usable.
+func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 	if err := s.store.Ping(ctx); err != nil {
-		s.logger.Error("health check failed", "err", err)
+		s.logger.Error("readiness check failed", "err", err)
 		http.Error(w, "database unavailable", http.StatusServiceUnavailable)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
+}
+
+// handleVersion reports the injected build metadata.
+func (s *Server) handleVersion(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"version": version.Version,
+		"commit":  version.Commit,
+		"date":    version.Date,
+	})
 }
 
 // render writes a templ component as an HTML response. Responses contain
@@ -118,7 +142,13 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, c templ.Componen
 
 func (s *Server) serverError(w http.ResponseWriter, r *http.Request, err error) {
 	s.logger.Error("request failed", "err", err, "path", r.URL.Path, "method", r.Method)
-	http.Error(w, "Interner Serverfehler", http.StatusInternalServerError)
+	s.clientError(w, r, http.StatusInternalServerError, "error.internal")
+}
+
+// clientError writes a translated plain-text error. Internal details stay in
+// the log so that responses never leak paths or SQL.
+func (s *Server) clientError(w http.ResponseWriter, r *http.Request, code int, key i18n.Key) {
+	http.Error(w, i18n.C(r.Context(), key), code)
 }
 
 // cacheControl marks the embedded static assets as immutable. Templates link

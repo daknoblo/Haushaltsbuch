@@ -2,36 +2,27 @@ name: Release
 
 on:
   push:
-    branches: [main, develop]
-    tags: ["v*"]
+    tags: ["v*.*.*"]
 
 permissions:
   contents: read
   packages: write
-  security-events: write
   id-token: write
+  security-events: write
 
 jobs:
   release:
+    name: Build, Sign & Publish
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Lowercase image name
         id: img
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-
-      - name: Determine channel
-        id: channel
-        run: |
-          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
-            echo "channel=stable" >> "$GITHUB_OUTPUT"
-          elif [ "${GITHUB_REF}" = "refs/heads/develop" ]; then
-            echo "channel=dev" >> "$GITHUB_OUTPUT"
-          else
-            echo "channel=stable" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -52,11 +43,11 @@ jobs:
         with:
           images: ${{ steps.img.outputs.name }}
           tags: |
-            type=raw,value=stable,enable=${{ github.ref == 'refs/heads/main' }}
-            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/develop' }}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha
+            type=semver,pattern={{major}}
+            type=sha,format=short
+            type=raw,value=latest
 
       - name: Build and push
         id: build
@@ -72,22 +63,23 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            VERSION=${{ steps.meta.outputs.version }}
-            CHANNEL=${{ steps.channel.outputs.channel }}
+            VERSION=${{ github.ref_name }}
             COMMIT=${{ github.sha }}
             DATE=${{ github.event.repository.updated_at }}
 
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
 
-      - name: Sign image (keyless)
-        run: cosign sign --yes "${{ steps.img.outputs.name }}@${{ steps.build.outputs.digest }}"
+      - name: Sign the image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE: ${{ steps.img.outputs.name }}
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
 
-      - name: Trivy vulnerability scan
+      - name: Scan image with Trivy
         uses: aquasecurity/trivy-action@v0.36.0
         continue-on-error: true
         env:
-          # Authenticate the Trivy binary download to avoid GitHub rate limits.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           image-ref: ${{ steps.img.outputs.name }}@${{ steps.build.outputs.digest }}
@@ -96,8 +88,20 @@ jobs:
           severity: CRITICAL,HIGH
           ignore-unfixed: true
 
-      - name: Upload SARIF to Security tab
-        if: ${{ always() && hashFiles('trivy-results.sarif') != '' }}
+      - name: Upload Trivy results
+        if: always() && hashFiles('trivy-results.sarif') != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-results.sarif
+
+  github-release:
+    name: GitHub release
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true

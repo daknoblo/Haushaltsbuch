@@ -8,18 +8,18 @@ import (
 
 templ IncomePage(nav Nav, vm IncomeVM) {
 	@Layout(nav) {
-		@pageHeading("Einnahmen", "Trage je Person das Einkommen dieses Monats ein.") {
+		@pageHeading(T(ctx, "income.title"), T(ctx, "income.subtitle")) {
 			<div class="ml-auto flex flex-wrap items-center gap-3 no-print">
 				<div class="text-right">
-					<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Summe</div>
+					<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "income.total") }</div>
 					<div class="tnum text-lg font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(vm.TotalCents) }</div>
 				</div>
 				<button
 					class="btn-ghost"
 					hx-post={ "/income/copy?from=" + nav.PrevMonth() + "&to=" + nav.Month }
 					hx-swap="none"
-					hx-confirm={ "Einnahmen aus " + MonthLabel(nav.PrevMonth()) + " übernehmen?" }
-				>Aus Vormonat übernehmen</button>
+					hx-confirm={ Tf(ctx, "income.confirmCopy", MonthLabel(nav.PrevMonth())) }
+				>{ T(ctx, "income.copyPrevious") }</button>
 			</div>
 		}
 		if nav.ActiveHousehold.ID == 0 {
@@ -54,7 +54,7 @@ templ incomeMemberCard(nav Nav, mv IncomeMemberVM) {
 				hx-post={ "/income/new?member=" + strconv.FormatInt(mv.Member.ID, 10) + "&m=" + nav.Month }
 				hx-target={ "#inclines-" + strconv.FormatInt(mv.Member.ID, 10) }
 				hx-swap="beforeend"
-			>+ Zeile</button>
+			>{ T(ctx, "income.addLine") }</button>
 		</div>
 	</div>
 }
@@ -68,15 +68,15 @@ templ IncomeLineView(in store.Income) {
 		hx-target="this"
 		hx-swap="outerHTML"
 	>
-		<input class="input flex-1" type="text" name="name" value={ in.Name } placeholder="z. B. Gehalt" aria-label="Bezeichnung"/>
-		<input class="input tnum w-32 shrink-0" type="number" step="0.01" name="amount" value={ CentsToInput(in.AmountCents) } aria-label="Betrag"/>
+		<input class="input flex-1" type="text" name="name" value={ in.Name } placeholder={ T(ctx, "income.namePlaceholder") } aria-label={ T(ctx, "income.name") }/>
+		<input class="input tnum w-32 shrink-0" type="number" step="0.01" name="amount" value={ CentsToInput(in.AmountCents) } aria-label={ T(ctx, "income.amount") }/>
 		<button
 			type="button"
 			class="btn-icon shrink-0 no-print"
 			hx-post={ "/income/" + strconv.FormatInt(in.ID, 10) + "/delete" }
 			hx-target={ "#inc-" + strconv.FormatInt(in.ID, 10) }
 			hx-swap="outerHTML"
-			aria-label="Zeile löschen"
+			aria-label={ T(ctx, "income.deleteLine") }
 		>✕</button>
 	</form>
 }

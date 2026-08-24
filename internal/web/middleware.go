@@ -1,12 +1,15 @@
-package server
+package web
 
 import (
 	"compress/gzip"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/daknoblo/Haushaltsbuch/internal/i18n"
 )
 
 // maxRequestBody caps the size of request bodies. The application only accepts
@@ -55,7 +58,7 @@ func (s *Server) sameOrigin(next http.Handler) http.Handler {
 		if !requestIsSameOrigin(r) {
 			s.logger.Warn("cross-origin request rejected",
 				"path", r.URL.Path, "origin", r.Header.Get("Origin"))
-			http.Error(w, "Cross-Origin-Anfrage abgelehnt", http.StatusForbidden)
+			s.clientError(w, r, http.StatusForbidden, "error.crossOrigin")
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -89,11 +92,112 @@ func requestIsSameOrigin(r *http.Request) bool {
 	return origin == r.Host
 }
 
+// withLang resolves the request language once and stores it in the context so
+// that handlers and templ components can translate without re-parsing headers.
+func withLang(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := i18n.WithLang(r.Context(), i18n.FromRequest(r))
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 // limitBody caps the request body size of state-changing requests.
 func limitBody(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Body != nil && !isSafeMethod(r.Method) {
 			r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// ---- rate limiting ----
+
+const (
+	// rateBurst is the number of requests a client may send back to back. The
+	// UI saves on every keystroke, so this has to stay generous.
+	rateBurst = 120
+	// rateRefill is how quickly a client regains budget.
+	rateRefill = 4 * time.Second / 4 // one token per second
+	// rateIdleTTL bounds how long an inactive client is remembered.
+	rateIdleTTL = 10 * time.Minute
+)
+
+type rateBucket struct {
+	tokens float64
+	seen   time.Time
+}
+
+// rateLimiter is a per-client-IP token bucket. The app serves a single
+// household on a private network, so a small in-memory map is enough.
+type rateLimiter struct {
+	mu      sync.Mutex
+	buckets map[string]*rateBucket
+}
+
+func newRateLimiter() *rateLimiter {
+	return &rateLimiter{buckets: make(map[string]*rateBucket)}
+}
+
+// allow reports whether the client may proceed and refills its bucket.
+func (l *rateLimiter) allow(key string, now time.Time) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	b, ok := l.buckets[key]
+	if !ok {
+		l.evictLocked(now)
+		l.buckets[key] = &rateBucket{tokens: rateBurst - 1, seen: now}
+		return true
+	}
+
+	b.tokens += now.Sub(b.seen).Seconds() * (1 / rateRefill.Seconds())
+	if b.tokens > rateBurst {
+		b.tokens = rateBurst
+	}
+	b.seen = now
+
+	if b.tokens < 1 {
+		return false
+	}
+	b.tokens--
+	return true
+}
+
+func (l *rateLimiter) evictLocked(now time.Time) {
+	for k, b := range l.buckets {
+		if now.Sub(b.seen) > rateIdleTTL {
+			delete(l.buckets, k)
+		}
+	}
+}
+
+// clientIP returns the peer address. The app is meant to run behind a trusted
+// reverse proxy on a private network, so forwarded headers are ignored: they
+// are attacker-controlled and would let a client dodge the limit.
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+// rateLimit throttles requests per client IP. Health, readiness and static
+// assets are exempt so that probes and page loads are never rejected.
+func (s *Server) rateLimit(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/healthz", r.URL.Path == "/readyz",
+			strings.HasPrefix(r.URL.Path, "/static/"):
+			next.ServeHTTP(w, r)
+			return
+		}
+		if !s.limiter.allow(clientIP(r), time.Now()) {
+			s.logger.Warn("rate limit exceeded", "path", r.URL.Path, "client", clientIP(r))
+			w.Header().Set("Retry-After", "1")
+			s.clientError(w, r, http.StatusTooManyRequests, "error.rateLimited")
+			return
 		}
 		next.ServeHTTP(w, r)
 	})
@@ -138,7 +242,7 @@ func (s *Server) recoverer(next http.Handler) http.Handler {
 		defer func() {
 			if rec := recover(); rec != nil {
 				s.logger.Error("panic recovered", "err", rec, "path", r.URL.Path)
-				http.Error(w, "Interner Serverfehler", http.StatusInternalServerError)
+				s.clientError(w, r, http.StatusInternalServerError, "error.internal")
 			}
 		}()
 		next.ServeHTTP(w, r)

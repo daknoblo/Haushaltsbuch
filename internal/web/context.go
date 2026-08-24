@@ -1,4 +1,4 @@
-package server
+package web
 
 import (
 	"context"
@@ -12,7 +12,6 @@ import (
 	"github.com/daknoblo/Haushaltsbuch/internal/calc"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 	"github.com/daknoblo/Haushaltsbuch/internal/version"
-	"github.com/daknoblo/Haushaltsbuch/internal/web"
 )
 
 // activeHousehold returns the currently active household, or a zero value when
@@ -42,7 +41,7 @@ func (s *Server) requireActiveHousehold(w http.ResponseWriter, r *http.Request) 
 		return 0, false
 	}
 	if active == 0 {
-		http.Error(w, "Kein aktiver Haushalt", http.StatusBadRequest)
+		s.clientError(w, r, http.StatusBadRequest, "error.noHousehold")
 		return 0, false
 	}
 	return active, true
@@ -64,29 +63,29 @@ func (s *Server) writeStoreError(w http.ResponseWriter, r *http.Request, err err
 func (s *Server) parseForm(w http.ResponseWriter, r *http.Request) bool {
 	if err := r.ParseForm(); err != nil {
 		s.logger.Warn("invalid form", "err", err, "path", r.URL.Path)
-		http.Error(w, "Ungültige Eingabe", http.StatusBadRequest)
+		s.clientError(w, r, http.StatusBadRequest, "error.invalidInput")
 		return false
 	}
 	return true
 }
 
 // buildNav assembles the shared page chrome data.
-func (s *Server) buildNav(r *http.Request, active, path string, showMonth bool) (web.Nav, error) {
+func (s *Server) buildNav(r *http.Request, active, path string, showMonth bool) (Nav, error) {
 	ctx := r.Context()
 	households, err := s.store.ListHouseholds(ctx)
 	if err != nil {
-		return web.Nav{}, err
+		return Nav{}, err
 	}
 	ah, err := s.activeHousehold(ctx)
 	if err != nil {
-		return web.Nav{}, err
+		return Nav{}, err
 	}
-	return web.Nav{
+	return Nav{
 		Active:          active,
 		Path:            path,
 		Households:      households,
 		ActiveHousehold: ah,
-		Month:           web.NormalizeMonth(r.URL.Query().Get("m")),
+		Month:           NormalizeMonth(r.URL.Query().Get("m")),
 		ShowMonthNav:    showMonth,
 		Version:         version.Version,
 	}, nil
@@ -147,20 +146,20 @@ func (s *Server) buildMonthReport(ctx context.Context, householdID int64, month 
 
 // expenseContext returns the members, sections and categories needed to render
 // an expense row.
-func (s *Server) expenseContext(ctx context.Context, householdID int64) (web.ExpensesVM, error) {
+func (s *Server) expenseContext(ctx context.Context, householdID int64) (ExpensesVM, error) {
 	members, err := s.store.ListMembers(ctx, householdID)
 	if err != nil {
-		return web.ExpensesVM{}, err
+		return ExpensesVM{}, err
 	}
 	sections, err := s.store.ListSections(ctx, householdID)
 	if err != nil {
-		return web.ExpensesVM{}, err
+		return ExpensesVM{}, err
 	}
 	categories, err := s.store.ListCategories(ctx, householdID)
 	if err != nil {
-		return web.ExpensesVM{}, err
+		return ExpensesVM{}, err
 	}
-	return web.ExpensesVM{Members: members, Sections: sections, Categories: categories}, nil
+	return ExpensesVM{Members: members, Sections: sections, Categories: categories}, nil
 }
 
 // parseID parses a decimal id, returning 0 on failure.
@@ -223,7 +222,7 @@ func parseDelta(dir string) (int, bool) {
 // Empty means "no bound" for the active_from/active_until fields.
 func cleanMonth(ym string) string {
 	ym = strings.TrimSpace(ym)
-	if ym == "" || !web.ValidMonth(ym) {
+	if ym == "" || !ValidMonth(ym) {
 		return ""
 	}
 	return ym

@@ -4,30 +4,30 @@ import "github.com/daknoblo/Haushaltsbuch/internal/store"
 
 templ OverviewPage(nav Nav, vm OverviewVM) {
 	@Layout(nav) {
-		@pageHeading("Übersicht", nav.CurrentMonthLabel()) {
-			<a class="btn-ghost ml-auto no-print" href={ templ.SafeURL("/export/overview.pdf?m=" + nav.Month) }>PDF exportieren</a>
+		@pageHeading(T(ctx, "overview.title"), nav.CurrentMonthLabel()) {
+			<a class="btn-ghost ml-auto no-print" href={ templ.SafeURL("/export/overview.pdf?m=" + nav.Month) }>{ T(ctx, "action.exportPDF") }</a>
 		}
 		if nav.ActiveHousehold.ID == 0 {
 			@noHousehold()
 		} else {
 			<div class="grid gap-4 sm:grid-cols-3">
-				@statTile("Einnahmen", FormatEUR(vm.Report.IncomeCents), nav.CurrentMonthLabel(), "text-emerald-600 dark:text-emerald-400")
-				@statTile("Ausgaben", FormatEUR(vm.Report.ExpenseCents), "monatlich normalisiert", "text-rose-600 dark:text-rose-400")
-				@statTile("Saldo", FormatEUR(vm.Report.BalanceCents), "Einnahmen − Ausgaben", balanceTone(vm.Report.BalanceCents))
+				@statTile(T(ctx, "overview.income"), FormatEUR(vm.Report.IncomeCents), nav.CurrentMonthLabel(), "text-emerald-600 dark:text-emerald-400")
+				@statTile(T(ctx, "overview.expenses"), FormatEUR(vm.Report.ExpenseCents), T(ctx, "overview.normalized"), "text-rose-600 dark:text-rose-400")
+				@statTile(T(ctx, "overview.balance"), FormatEUR(vm.Report.BalanceCents), T(ctx, "overview.balanceHint"), balanceTone(vm.Report.BalanceCents))
 			</div>
 			<div class="mt-4 grid gap-4 lg:grid-cols-2">
 				<div class="card-tight">
 					<div class="card-head">
-						<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">Personen</h2>
+						<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "overview.people") }</h2>
 					</div>
 					<div class="overflow-x-auto">
 						<table class="w-full">
 							<thead>
 								<tr>
-									<th class="table-head">Person</th>
-									<th class="table-head text-right">Einnahmen</th>
-									<th class="table-head text-right">Ausgaben</th>
-									<th class="table-head text-right">Saldo</th>
+									<th class="table-head">{ T(ctx, "overview.person") }</th>
+									<th class="table-head text-right">{ T(ctx, "nav.income") }</th>
+									<th class="table-head text-right">{ T(ctx, "nav.expenses") }</th>
+									<th class="table-head text-right">{ T(ctx, "overview.balance") }</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -48,7 +48,7 @@ templ OverviewPage(nav Nav, vm OverviewVM) {
 								}
 								if vm.Report.UnassignedCents != 0 {
 									<tr>
-										<td class="table-cell text-slate-500 dark:text-slate-400">Nicht zugeordnet</td>
+										<td class="table-cell text-slate-500 dark:text-slate-400">{ T(ctx, "overview.unassigned") }</td>
 										<td class="table-cell text-right text-slate-400">—</td>
 										<td class="table-cell tnum text-right text-slate-500 dark:text-slate-400">{ FormatEUR(vm.Report.UnassignedCents) }</td>
 										<td class="table-cell text-right text-slate-400">—</td>
@@ -59,9 +59,9 @@ templ OverviewPage(nav Nav, vm OverviewVM) {
 					</div>
 				</div>
 				<div class="card">
-					<h2 class="mb-3 text-base font-semibold text-slate-900 dark:text-slate-100">Nach Sektion</h2>
+					<h2 class="mb-3 text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "overview.bySection") }</h2>
 					if len(vm.Report.Sections) == 0 {
-						<p class="alert-info">Noch keine Ausgaben erfasst.</p>
+						<p class="alert-info">{ T(ctx, "overview.noExpenses") }</p>
 					} else {
 						for _, s := range vm.Report.Sections {
 							@hbar(s.Label, s.Cents, MaxLabeled(vm.Report.Sections))
@@ -71,9 +71,9 @@ templ OverviewPage(nav Nav, vm OverviewVM) {
 			</div>
 			<div class="mt-4 grid gap-4 lg:grid-cols-3">
 				<div class="card">
-					<h3 class="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Nach Kategorie</h3>
+					<h3 class="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "overview.byCategory") }</h3>
 					if len(vm.Report.Categories) == 0 {
-						<p class="alert-info">Keine Kategorien.</p>
+						<p class="alert-info">{ T(ctx, "overview.noCategories") }</p>
 					} else {
 						for _, c := range vm.Report.Categories {
 							@hbar(c.Label, c.Cents, MaxLabeled(vm.Report.Categories))
@@ -81,15 +81,15 @@ templ OverviewPage(nav Nav, vm OverviewVM) {
 					}
 				</div>
 				<div class="card">
-					<h3 class="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Fix / Variabel</h3>
-					@breakdownRow("Fix", "badge-info", vm.Report.ByCostNature[store.CostFix])
-					@breakdownRow("Variabel", "badge-warn", vm.Report.ByCostNature[store.CostVariable])
+					<h3 class="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "overview.costNature") }</h3>
+					@breakdownRow(T(ctx, "cost.fix"), "badge-info", vm.Report.ByCostNature[store.CostFix])
+					@breakdownRow(T(ctx, "cost.variable"), "badge-warn", vm.Report.ByCostNature[store.CostVariable])
 				</div>
 				<div class="card">
-					<h3 class="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Bedarf / Wunsch / Sparen</h3>
-					@breakdownRow("Bedarf", "badge-muted", vm.Report.ByBudgetClass[store.ClassNeed])
-					@breakdownRow("Wunsch", "badge-warn", vm.Report.ByBudgetClass[store.ClassWant])
-					@breakdownRow("Sparen", "badge-ok", vm.Report.ByBudgetClass[store.ClassSaving])
+					<h3 class="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "overview.budgetClasses") }</h3>
+					@breakdownRow(T(ctx, "class.need"), "badge-muted", vm.Report.ByBudgetClass[store.ClassNeed])
+					@breakdownRow(T(ctx, "class.want"), "badge-warn", vm.Report.ByBudgetClass[store.ClassWant])
+					@breakdownRow(T(ctx, "class.saving"), "badge-ok", vm.Report.ByBudgetClass[store.ClassSaving])
 				</div>
 			</div>
 		}

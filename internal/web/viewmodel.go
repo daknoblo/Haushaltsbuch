@@ -15,12 +15,12 @@ type Option struct {
 }
 
 // BarWidth returns a CSS width percentage string for a bar of size part
-// relative to max.
-func BarWidth(part, max int64) string {
-	if max <= 0 {
+// relative to total.
+func BarWidth(part, total int64) string {
+	if total <= 0 {
 		return "0%"
 	}
-	p := float64(part) / float64(max) * 100
+	p := float64(part) / float64(total) * 100
 	if p < 0 {
 		p = 0
 	}
@@ -62,22 +62,6 @@ type Nav struct {
 
 // IsActive reports whether the given nav item is the active page.
 func (n Nav) IsActive(name string) bool { return n.Active == name }
-
-// Title returns the page title used in the document title.
-func (n Nav) Title() string {
-	switch n.Active {
-	case "expenses":
-		return "Ausgaben"
-	case "income":
-		return "Einnahmen"
-	case "statistics":
-		return "Statistiken"
-	case "settings":
-		return "Einstellungen"
-	default:
-		return "Übersicht"
-	}
-}
 
 // balanceTone returns the text color classes for a balance figure.
 func balanceTone(cents int64) string {
@@ -125,85 +109,6 @@ func (n Nav) AssetURL(name string) string {
 	return "/static/" + name + "?v=" + url.QueryEscape(v)
 }
 
-// FrequencyLabel returns the German label for a frequency.
-func FrequencyLabel(f store.Frequency) string {
-	switch f {
-	case store.FreqWeekly:
-		return "Wöchentlich"
-	case store.FreqYearly:
-		return "Jährlich"
-	default:
-		return "Monatlich"
-	}
-}
-
-// CostNatureLabel returns the German label for a cost nature.
-func CostNatureLabel(c store.CostNature) string {
-	if c == store.CostVariable {
-		return "Variabel"
-	}
-	return "Fix"
-}
-
-// BudgetClassLabel returns the German label for a budget class.
-func BudgetClassLabel(b store.BudgetClass) string {
-	switch b {
-	case store.ClassWant:
-		return "Wunsch"
-	case store.ClassSaving:
-		return "Sparen"
-	default:
-		return "Bedarf"
-	}
-}
-
-// SplitModeLabel returns the German label for a split mode.
-func SplitModeLabel(m store.SplitMode) string {
-	switch m {
-	case store.SplitPercent:
-		return "Prozentual"
-	case store.SplitFixed:
-		return "Feste Beträge"
-	default:
-		return "Gleichmäßig"
-	}
-}
-
-// FrequencyOptions returns the selectable frequencies.
-func FrequencyOptions() []Option {
-	return []Option{
-		{string(store.FreqMonthly), "Monatlich"},
-		{string(store.FreqWeekly), "Wöchentlich"},
-		{string(store.FreqYearly), "Jährlich"},
-	}
-}
-
-// CostNatureOptions returns the selectable cost natures.
-func CostNatureOptions() []Option {
-	return []Option{
-		{string(store.CostFix), "Fix"},
-		{string(store.CostVariable), "Variabel"},
-	}
-}
-
-// BudgetClassOptions returns the selectable budget classes.
-func BudgetClassOptions() []Option {
-	return []Option{
-		{string(store.ClassNeed), "Bedarf"},
-		{string(store.ClassWant), "Wunsch"},
-		{string(store.ClassSaving), "Sparen"},
-	}
-}
-
-// SplitModeOptions returns the selectable split modes.
-func SplitModeOptions() []Option {
-	return []Option{
-		{string(store.SplitEqual), "Gleichmäßig"},
-		{string(store.SplitPercent), "Prozentual"},
-		{string(store.SplitFixed), "Feste Beträge"},
-	}
-}
-
 // CentsToInput formats cents as a plain decimal string for a number input
 // (e.g. 123456 -> "1234.56").
 func CentsToInput(c int64) string {
@@ -229,14 +134,6 @@ func (r ExpenseRow) ExpandedValue() string {
 		return "1"
 	}
 	return "0"
-}
-
-// RhythmLabel describes how often the expense occurs, for the collapsed row.
-func (r ExpenseRow) RhythmLabel() string {
-	if r.Expense.IsOneOff {
-		return "Einmalig"
-	}
-	return FrequencyLabel(r.Expense.Frequency)
 }
 
 // BudgetClassBadge returns the badge modifier class for the budget class.

@@ -1,6 +1,7 @@
-package server
+package web
 
 import (
+	"encoding/json"
 	"io"
 	"log/slog"
 	"mime"
@@ -68,17 +69,88 @@ func TestPagesRender(t *testing.T) {
 	}
 }
 
-func TestHealthzChecksDatabase(t *testing.T) {
+func TestHealthzIgnoresDatabase(t *testing.T) {
 	srv, h, _ := newTestServer(t)
 	if got := get(t, h, "/healthz").Code; got != http.StatusOK {
 		t.Fatalf("GET /healthz = %d, want 200", got)
 	}
 
+	// Liveness must not depend on the store, otherwise a stalled database
+	// would make the container be restarted instead of just reported unready.
 	if err := srv.store.Close(); err != nil {
 		t.Fatalf("close store: %v", err)
 	}
-	if got := get(t, h, "/healthz").Code; got != http.StatusServiceUnavailable {
-		t.Errorf("GET /healthz after close = %d, want 503", got)
+	if got := get(t, h, "/healthz").Code; got != http.StatusOK {
+		t.Errorf("GET /healthz after close = %d, want 200", got)
+	}
+}
+
+func TestReadyzChecksDatabase(t *testing.T) {
+	srv, h, _ := newTestServer(t)
+	if got := get(t, h, "/readyz").Code; got != http.StatusOK {
+		t.Fatalf("GET /readyz = %d, want 200", got)
+	}
+
+	if err := srv.store.Close(); err != nil {
+		t.Fatalf("close store: %v", err)
+	}
+	if got := get(t, h, "/readyz").Code; got != http.StatusServiceUnavailable {
+		t.Errorf("GET /readyz after close = %d, want 503", got)
+	}
+}
+
+func TestVersionEndpoint(t *testing.T) {
+	_, h, _ := newTestServer(t)
+	w := get(t, h, "/version")
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /version = %d, want 200", w.Code)
+	}
+
+	var payload map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	for _, key := range []string{"version", "commit", "date"} {
+		if payload[key] == "" {
+			t.Errorf("field %q is empty", key)
+		}
+	}
+}
+
+func TestRateLimitRejectsFloods(t *testing.T) {
+	_, h, _ := newTestServer(t)
+
+	var last int
+	for i := 0; i < rateBurst+5; i++ {
+		last = get(t, h, "/").Code
+	}
+	if last != http.StatusTooManyRequests {
+		t.Errorf("after %d requests = %d, want 429", rateBurst+5, last)
+	}
+
+	// Probes and assets stay reachable even once the bucket is empty.
+	if got := get(t, h, "/healthz").Code; got != http.StatusOK {
+		t.Errorf("/healthz while limited = %d, want 200", got)
+	}
+	if got := get(t, h, "/static/app.css").Code; got != http.StatusOK {
+		t.Errorf("/static while limited = %d, want 200", got)
+	}
+}
+
+func TestLanguageFollowsAcceptLanguage(t *testing.T) {
+	_, h, _ := newTestServer(t)
+
+	r := httptest.NewRequest(http.MethodGet, "/expenses", nil)
+	r.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+
+	body := w.Body.String()
+	if !strings.Contains(body, "Changes are saved automatically.") {
+		t.Error("English page did not use the English catalog")
+	}
+	if strings.Contains(body, "Änderungen werden automatisch gespeichert.") {
+		t.Error("English page still contains German text")
 	}
 }
 

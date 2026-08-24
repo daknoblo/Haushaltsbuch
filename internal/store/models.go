@@ -3,6 +3,7 @@ package store
 // Frequency describes how often a recurring expense occurs.
 type Frequency string
 
+// Frequencies of a recurring expense.
 const (
 	FreqWeekly  Frequency = "weekly"
 	FreqMonthly Frequency = "monthly"
@@ -35,6 +36,7 @@ func (f Frequency) MonthlyFactor() float64 {
 // CostNature classifies an expense as fixed or variable.
 type CostNature string
 
+// Cost natures of an expense.
 const (
 	CostFix      CostNature = "fix"
 	CostVariable CostNature = "variable"
@@ -48,6 +50,7 @@ func (c CostNature) Valid() bool {
 // BudgetClass is the 50/30/20 classification of an expense.
 type BudgetClass string
 
+// Budget classes of the 50/30/20 rule.
 const (
 	ClassNeed   BudgetClass = "need"
 	ClassWant   BudgetClass = "want"
@@ -67,6 +70,7 @@ func (b BudgetClass) Valid() bool {
 // SplitMode describes how an expense is split between members.
 type SplitMode string
 
+// Split modes of an expense.
 const (
 	SplitEqual   SplitMode = "equal"
 	SplitPercent SplitMode = "percent"

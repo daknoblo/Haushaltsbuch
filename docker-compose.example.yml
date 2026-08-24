@@ -1,24 +1,22 @@
 services:
   haushaltsbuch:
-    # Published image (see .github/workflows/release.yml). Pick the tag that
-    # matches your channel: "stable" (main), "dev" (develop) or a version tag.
-    image: ghcr.io/daknoblo/haushaltsbuch:stable
+    image: ghcr.io/daknoblo/haushaltsbuch:latest
     container_name: haushaltsbuch
     restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
       # Listen address inside the container.
-      HB_ADDR: ":8080"
-      # SQLite database path (kept on the mounted volume).
-      HB_DB_PATH: "/app/appdata/haushaltsbuch.db"
+      HB_HTTP_ADDR: ":8080"
+      # Directory holding the SQLite database. Must match the volume below.
+      HB_DATA_DIR: "/appdata"
       # Log level: debug | info | warn | error.
       HB_LOG_LEVEL: "info"
       # IANA time zone used for date handling.
       TZ: "Europe/Berlin"
     volumes:
-      - haushaltsbuch-data:/app/appdata
-    # Run with a read-only root filesystem; only the data volume is writable.
+      - haushaltsbuch-data:/appdata
+    # Only the data volume needs to be writable.
     read_only: true
     security_opt:
       - no-new-privileges:true

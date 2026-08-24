@@ -1,9 +1,7 @@
-package server
+package web
 
 import (
 	"net/http"
-
-	"github.com/daknoblo/Haushaltsbuch/internal/web"
 )
 
 var memberColors = []string{"#2563eb", "#db2777", "#059669", "#d97706", "#7c3aed", "#0891b2"}
@@ -16,7 +14,7 @@ func (s *Server) handleHouseholdCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	name := cleanName(r.FormValue("name"))
 	if name == "" {
-		http.Error(w, "Name fehlt", http.StatusBadRequest)
+		s.clientError(w, r, http.StatusBadRequest, "error.nameMissing")
 		return
 	}
 	ctx := r.Context()
@@ -30,7 +28,7 @@ func (s *Server) handleHouseholdCreate(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.render(w, r, web.HouseholdRowView(h, activeID))
+	s.render(w, r, HouseholdRowView(h, activeID))
 }
 
 func (s *Server) handleHouseholdRename(w http.ResponseWriter, r *http.Request) {
@@ -104,7 +102,7 @@ func (s *Server) handleHouseholdMove(w http.ResponseWriter, r *http.Request) {
 	}
 	delta, ok := parseDelta(r.FormValue("dir"))
 	if !ok {
-		http.Error(w, "Ungültige Richtung", http.StatusBadRequest)
+		s.clientError(w, r, http.StatusBadRequest, "error.invalidDir")
 		return
 	}
 	if err := s.store.MoveHousehold(r.Context(), parseID(r.PathValue("id")), delta); err != nil {
@@ -126,7 +124,7 @@ func (s *Server) handleMemberCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	name := cleanName(r.FormValue("name"))
 	if name == "" {
-		http.Error(w, "Name fehlt", http.StatusBadRequest)
+		s.clientError(w, r, http.StatusBadRequest, "error.nameMissing")
 		return
 	}
 	ctx := r.Context()
@@ -141,7 +139,7 @@ func (s *Server) handleMemberCreate(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.render(w, r, web.MemberRowView(m))
+	s.render(w, r, MemberRowView(m))
 }
 
 func (s *Server) handleMemberUpdate(w http.ResponseWriter, r *http.Request) {
@@ -193,7 +191,7 @@ func (s *Server) handleMemberMove(w http.ResponseWriter, r *http.Request) {
 	}
 	delta, ok := parseDelta(r.FormValue("dir"))
 	if !ok {
-		http.Error(w, "Ungültige Richtung", http.StatusBadRequest)
+		s.clientError(w, r, http.StatusBadRequest, "error.invalidDir")
 		return
 	}
 	if err := s.store.MoveMember(r.Context(), active, parseID(r.PathValue("id")), delta); err != nil {
@@ -215,7 +213,7 @@ func (s *Server) handleSectionCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	name := cleanName(r.FormValue("name"))
 	if name == "" {
-		http.Error(w, "Name fehlt", http.StatusBadRequest)
+		s.clientError(w, r, http.StatusBadRequest, "error.nameMissing")
 		return
 	}
 	sec, err := s.store.CreateSection(r.Context(), active, name)
@@ -223,7 +221,7 @@ func (s *Server) handleSectionCreate(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.render(w, r, web.SectionRowView(sec))
+	s.render(w, r, SectionRowView(sec))
 }
 
 func (s *Server) handleSectionRename(w http.ResponseWriter, r *http.Request) {
@@ -269,7 +267,7 @@ func (s *Server) handleSectionMove(w http.ResponseWriter, r *http.Request) {
 	}
 	delta, ok := parseDelta(r.FormValue("dir"))
 	if !ok {
-		http.Error(w, "Ungültige Richtung", http.StatusBadRequest)
+		s.clientError(w, r, http.StatusBadRequest, "error.invalidDir")
 		return
 	}
 	if err := s.store.MoveSection(r.Context(), active, parseID(r.PathValue("id")), delta); err != nil {
@@ -291,7 +289,7 @@ func (s *Server) handleCategoryCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	name := cleanName(r.FormValue("name"))
 	if name == "" {
-		http.Error(w, "Name fehlt", http.StatusBadRequest)
+		s.clientError(w, r, http.StatusBadRequest, "error.nameMissing")
 		return
 	}
 	c, err := s.store.CreateCategory(r.Context(), active, name)
@@ -299,7 +297,7 @@ func (s *Server) handleCategoryCreate(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.render(w, r, web.CategoryRowView(c))
+	s.render(w, r, CategoryRowView(c))
 }
 
 func (s *Server) handleCategoryRename(w http.ResponseWriter, r *http.Request) {
