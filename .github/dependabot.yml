@@ -7,12 +7,20 @@ updates:
     open-pull-requests-limit: 10
     commit-message:
       prefix: "gomod"
+    groups:
+      go-dependencies:
+        patterns: ["*"]
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     commit-message:
       prefix: "ci"
+    groups:
+      gha:
+        patterns: ["*"]
+
   - package-ecosystem: "docker"
     directory: "/"
     schedule:

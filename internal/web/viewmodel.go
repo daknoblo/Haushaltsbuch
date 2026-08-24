@@ -41,12 +41,14 @@ func MaxLabeled(items []calc.LabeledTotal) int64 {
 	return m
 }
 
-// ColorOr returns c or a neutral fallback color when c is empty.
+// ColorOr returns c when it is a valid hex color and a neutral fallback
+// otherwise. Values are validated on write, so this only guards against rows
+// edited outside the application.
 func ColorOr(c string) string {
-	if c == "" {
-		return "#94a3b8"
+	if hexColorRe.MatchString(c) {
+		return c
 	}
-	return c
+	return "#94a3b8"
 }
 
 // Nav holds the data shared by the page chrome (header, navigation, month bar).

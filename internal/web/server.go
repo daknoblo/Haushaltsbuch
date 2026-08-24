@@ -89,9 +89,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /export/statistics.pdf", s.handleExportStatistics)
 	mux.HandleFunc("GET /export/expenses.pdf", s.handleExportExpenses)
 
-	// Outermost middleware first: a panic anywhere below is still recovered and
-	// still logged with the resulting status code.
-	return s.recoverer(s.logRequests(withLang(securityHeaders(s.rateLimit(s.sameOrigin(limitBody(compressResponses(mux))))))))
+	// Order follows the repository standard: recover, log, cap the body, set
+	// security headers, reject cross-origin writes, then throttle. Language
+	// resolution sits near the top so that rejections are translated too.
+	return s.recoverer(s.logRequests(withLang(limitBody(securityHeaders(s.sameOrigin(s.rateLimit(compressResponses(mux))))))))
 }
 
 // handleHealth is the liveness probe. It answers without touching the database

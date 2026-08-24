@@ -89,7 +89,9 @@ func requestIsSameOrigin(r *http.Request) bool {
 	if i := strings.Index(origin, "://"); i >= 0 {
 		origin = origin[i+3:]
 	}
-	return origin == r.Host
+	// Host names are case-insensitive, so a differently cased Origin is still
+	// the same site.
+	return strings.EqualFold(origin, r.Host)
 }
 
 // withLang resolves the request language once and stores it in the context so
@@ -117,10 +119,13 @@ const (
 	// rateBurst is the number of requests a client may send back to back. The
 	// UI saves on every keystroke, so this has to stay generous.
 	rateBurst = 120
-	// rateRefill is how quickly a client regains budget.
-	rateRefill = 4 * time.Second / 4 // one token per second
+	// rateRefill is how long a client needs to regain one request.
+	rateRefill = time.Second
 	// rateIdleTTL bounds how long an inactive client is remembered.
 	rateIdleTTL = 10 * time.Minute
+	// rateMaxBuckets caps the tracked clients. Reaching it means something is
+	// wrong upstream, and the limiter must not become the memory leak itself.
+	rateMaxBuckets = 4096
 )
 
 type rateBucket struct {
@@ -147,11 +152,16 @@ func (l *rateLimiter) allow(key string, now time.Time) bool {
 	b, ok := l.buckets[key]
 	if !ok {
 		l.evictLocked(now)
+		if len(l.buckets) >= rateMaxBuckets {
+			// Every slot is held by a recently active client. Rather than grow
+			// without bound, throttle the newcomer.
+			return false
+		}
 		l.buckets[key] = &rateBucket{tokens: rateBurst - 1, seen: now}
 		return true
 	}
 
-	b.tokens += now.Sub(b.seen).Seconds() * (1 / rateRefill.Seconds())
+	b.tokens += now.Sub(b.seen).Seconds() / rateRefill.Seconds()
 	if b.tokens > rateBurst {
 		b.tokens = rateBurst
 	}
@@ -320,6 +330,8 @@ func (g *gzipResponseWriter) close() {
 	if g.gz == nil {
 		return
 	}
+	// The response has already been written, so a failing Close cannot be
+	// reported to the client; Reset clears the state before reuse.
 	_ = g.gz.Close()
 	g.gz.Reset(io.Discard)
 	gzipPool.Put(g.gz)

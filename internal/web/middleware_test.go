@@ -2,11 +2,13 @@ package web
 
 import (
 	"compress/gzip"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func testServer(t *testing.T) *Server {
@@ -156,4 +158,77 @@ func TestCompressResponses(t *testing.T) {
 			t.Errorf("Content-Encoding = %q, want empty", got)
 		}
 	})
+}
+
+func TestRateLimiterRefills(t *testing.T) {
+	l := newRateLimiter()
+	base := time.Now()
+
+	for i := 0; i < rateBurst; i++ {
+		if !l.allow("10.0.0.1", base) {
+			t.Fatalf("request %d was rejected while the bucket should still hold tokens", i)
+		}
+	}
+	if l.allow("10.0.0.1", base) {
+		t.Error("bucket was not exhausted after the full burst")
+	}
+
+	// One token is regained per rateRefill.
+	if !l.allow("10.0.0.1", base.Add(rateRefill)) {
+		t.Error("bucket did not refill")
+	}
+
+	// Clients are tracked independently.
+	if !l.allow("10.0.0.2", base) {
+		t.Error("a second client was throttled by the first one's budget")
+	}
+}
+
+func TestRateLimiterEvictsAndIsBounded(t *testing.T) {
+	l := newRateLimiter()
+	base := time.Now()
+
+	l.allow("10.0.0.1", base)
+	// A later request from a different client evicts the idle bucket.
+	l.allow("10.0.0.2", base.Add(rateIdleTTL+time.Minute))
+
+	l.mu.Lock()
+	_, stillThere := l.buckets["10.0.0.1"]
+	l.mu.Unlock()
+	if stillThere {
+		t.Error("idle bucket was not evicted")
+	}
+
+	// The map must not grow without bound when every client stays active.
+	for i := 0; i < rateMaxBuckets+50; i++ {
+		l.allow(fmt.Sprintf("10.1.%d.%d", i/256, i%256), base)
+	}
+	l.mu.Lock()
+	size := len(l.buckets)
+	l.mu.Unlock()
+	if size > rateMaxBuckets {
+		t.Errorf("limiter holds %d buckets, want at most %d", size, rateMaxBuckets)
+	}
+}
+
+func TestOriginComparisonIgnoresCase(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "/", nil)
+	r.Host = "budget.example.test"
+	r.Header.Set("Origin", "http://Budget.Example.Test")
+
+	if !requestIsSameOrigin(r) {
+		t.Error("a differently cased origin was treated as cross-site")
+	}
+}
+
+func TestColorOrRejectsInvalidValues(t *testing.T) {
+	const fallback = "#94a3b8"
+	for _, in := range []string{"", "red", "javascript:alert(1)", "#12345", "#gggggg"} {
+		if got := ColorOr(in); got != fallback {
+			t.Errorf("ColorOr(%q) = %q, want the fallback", in, got)
+		}
+	}
+	if got := ColorOr("#2563eb"); got != "#2563eb" {
+		t.Errorf("ColorOr kept a valid color as %q", got)
+	}
 }

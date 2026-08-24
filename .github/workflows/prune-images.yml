@@ -1,0 +1,83 @@
+# Every release publishes an immutable sha-<commit> image for rollbacks. Those
+# accumulate forever, so this prunes the superseded ones. Version tags (1.2.3,
+# 1.2) and :latest are never touched.
+name: Prune Old Images (ghcr.io)
+
+on:
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      keep:
+        description: "How many sha- images to keep"
+        default: "20"
+      dry-run:
+        description: "Only list what would be deleted"
+        type: boolean
+        default: true
+
+permissions:
+  packages: write
+
+concurrency:
+  group: prune-images
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    name: Prune superseded sha- images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete superseded sha- images
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+          PACKAGE: haushaltsbuch
+          KEEP: ${{ inputs.keep || '20' }}
+          DRY_RUN: ${{ inputs.dry-run || 'false' }}
+        run: |
+          set -euo pipefail
+          api="/users/$OWNER/packages/container/$PACKAGE/versions"
+
+          case "$KEEP" in
+            ''|*[!0-9]*) echo "::error::keep must be a number, got '$KEEP'"; exit 1 ;;
+          esac
+          if [ "$KEEP" -lt 5 ]; then
+            echo "::error::refusing to keep fewer than 5 rollback images"
+            exit 1
+          fi
+
+          # Only versions whose tags are *all* sha- qualify. A version sharing a
+          # digest with a release tag therefore stays, and untagged versions are
+          # left alone because deleting them breaks multi-arch manifest lists.
+          gh api --paginate "$api" \
+            --jq '.[]
+                  | select((.metadata.container.tags | length) > 0)
+                  | select(.metadata.container.tags | all(startswith("sha-")))
+                  | [.id, (.metadata.container.tags | join(","))]
+                  | @tsv' > candidates.tsv
+
+          total=$(wc -l < candidates.tsv | tr -d ' ')
+          echo "found $total sha- images, keeping the newest $KEEP"
+
+          tail -n +"$((KEEP + 1))" candidates.tsv > doomed.tsv || true
+          doomed=$(wc -l < doomed.tsv | tr -d ' ')
+          if [ "$doomed" -eq 0 ]; then
+            echo "nothing to prune"
+            exit 0
+          fi
+
+          while IFS=$'\t' read -r id tags; do
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "would delete $tags"
+            else
+              echo "deleting $tags"
+              gh api -X DELETE "$api/$id" --silent
+            fi
+          done < doomed.tsv
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "::notice::dry run — $doomed image(s) would have been deleted"
+          else
+            echo "::notice::pruned $doomed image(s)"
+          fi
