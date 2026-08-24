@@ -304,7 +304,7 @@ func TestReorderSectionViaHTTP(t *testing.T) {
 
 func TestAssetsCacheHeader(t *testing.T) {
 	_, h, _ := newTestServer(t)
-	w := get(t, h, "/assets/app.css?v=test")
+	w := get(t, h, "/static/app.css?v=test")
 	if w.Code != http.StatusOK {
 		t.Fatalf("GET asset = %d, want 200", w.Code)
 	}

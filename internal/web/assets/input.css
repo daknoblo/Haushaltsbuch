@@ -1,0 +1,177 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* The [hidden] attribute must win over display utilities like .flex (author
+   styles otherwise beat the user-agent rule). */
+[hidden] {
+  display: none !important;
+}
+
+@layer base {
+  button,
+  select,
+  [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Amounts line up in columns without a monospace font. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .card {
+    @apply min-w-0 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/50 dark:shadow-lg dark:shadow-black/20;
+  }
+  .card-tight {
+    @apply min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/50 dark:shadow-lg dark:shadow-black/20;
+  }
+  .card-head {
+    @apply flex flex-wrap items-center gap-3 border-b border-slate-200 px-5 py-3 dark:border-slate-800;
+  }
+  .card-body {
+    @apply p-5;
+  }
+
+  .nav-link {
+    @apply flex items-center rounded-md px-3 py-2.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 md:py-1.5 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100;
+  }
+  .nav-link-active {
+    @apply bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100;
+  }
+
+  /* Mobile menu: full-width rows with comfortable touch targets. */
+  .nav-panel {
+    @apply grid gap-1 border-t border-slate-200 py-3 text-sm md:hidden dark:border-slate-800;
+  }
+  .nav-panel .nav-link {
+    @apply min-h-[2.75rem] text-base;
+  }
+  .nav-toggle {
+    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 md:hidden dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100;
+  }
+
+  .btn-primary {
+    @apply inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0;
+  }
+  .btn-ghost {
+    @apply inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 transition hover:border-slate-400 hover:text-slate-900 sm:min-h-0 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-white;
+  }
+  .btn-danger {
+    @apply inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-lg border border-rose-300 px-3 py-1.5 text-sm text-rose-700 transition hover:bg-rose-500 hover:text-white sm:min-h-0 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500 dark:hover:text-white;
+  }
+  .btn-icon {
+    @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-300 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100;
+  }
+
+  /* text-base below sm: iOS zooms into any control with a font under 16px. */
+  .input {
+    @apply min-h-[2.75rem] w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:min-h-0 sm:text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100 dark:placeholder:text-slate-500;
+  }
+  .input-inline {
+    @apply min-h-0 w-auto rounded-md px-2 py-1 text-sm;
+  }
+  .select-filter {
+    @apply min-h-[2.75rem] rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-base text-slate-700 outline-none transition hover:border-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:min-h-0 sm:text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-300 dark:hover:border-slate-500;
+  }
+  .checkbox {
+    @apply h-4 w-4 rounded border-slate-400 bg-white text-indigo-500 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-900;
+  }
+  .field-label {
+    @apply mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300;
+  }
+  .badge-ok {
+    @apply bg-emerald-500/15 text-emerald-700 ring-1 ring-inset ring-emerald-500/30 dark:text-emerald-300;
+  }
+  .badge-warn {
+    @apply bg-amber-500/15 text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-300;
+  }
+  .badge-error {
+    @apply bg-rose-500/15 text-rose-700 ring-1 ring-inset ring-rose-500/30 dark:text-rose-300;
+  }
+  .badge-info {
+    @apply bg-indigo-500/15 text-indigo-700 ring-1 ring-inset ring-indigo-500/30 dark:text-indigo-300;
+  }
+  .badge-muted {
+    @apply bg-slate-500/10 text-slate-500 ring-1 ring-inset ring-slate-500/20 dark:text-slate-400;
+  }
+
+  .table-head {
+    @apply border-b border-slate-200 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400;
+  }
+  .table-cell {
+    @apply border-b border-slate-200/70 px-3 py-2 align-middle text-sm text-slate-700 dark:border-slate-800/60 dark:text-slate-300;
+  }
+
+  .alert-info {
+    @apply rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-600 ring-1 ring-inset ring-slate-200 dark:bg-slate-800/60 dark:text-slate-300 dark:ring-slate-700;
+  }
+
+  .dot {
+    @apply inline-block h-2.5 w-2.5 shrink-0 rounded-full;
+  }
+
+  /* Horizontal bar used for the section and category breakdowns. */
+  .bar-track {
+    @apply h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800;
+  }
+  .bar-fill {
+    @apply h-full rounded-full bg-indigo-500;
+  }
+
+  /* Vertical bars of the twelve month chart. */
+  .vbar-track {
+    @apply flex w-full flex-col justify-end;
+  }
+  .vbar-income {
+    @apply w-full rounded-t-sm bg-emerald-500/80;
+  }
+  .vbar-expense {
+    @apply w-full rounded-t-sm bg-rose-500/70;
+  }
+
+  /* Collapsed expense row: one line, expands into the editor on demand. */
+  .exp {
+    @apply overflow-hidden rounded-lg border border-slate-200 bg-white transition dark:border-slate-800 dark:bg-slate-900/40;
+  }
+  .exp[open] {
+    @apply border-slate-300 bg-slate-50 shadow-sm dark:border-slate-700 dark:bg-slate-900/80;
+  }
+  .exp-summary {
+    @apply flex cursor-pointer list-none items-center gap-3 px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50;
+  }
+  .exp-summary::-webkit-details-marker {
+    display: none;
+  }
+  .exp[open] .exp-summary {
+    @apply border-b border-slate-200 dark:border-slate-800;
+  }
+  .exp-caret {
+    @apply shrink-0 text-xs text-slate-400 transition-transform dark:text-slate-500;
+  }
+  .exp[open] .exp-caret {
+    @apply rotate-90;
+  }
+
+  .save-indicator {
+    @apply pointer-events-none fixed bottom-5 right-5 z-50 flex translate-y-2 items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white opacity-0 shadow-lg transition dark:bg-slate-100 dark:text-slate-900;
+  }
+  .save-indicator.show {
+    @apply translate-y-0 opacity-100;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .exp-body {
+    display: block !important;
+  }
+}

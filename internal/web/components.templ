@@ -3,50 +3,54 @@ package web
 import "github.com/daknoblo/Haushaltsbuch/internal/store"
 
 templ money(cents int64) {
-	<span class="mono">{ FormatEUR(cents) }</span>
+	<span class="tnum">{ FormatEUR(cents) }</span>
 }
 
 templ signedMoney(cents int64) {
 	if cents < 0 {
-		<span class="neg mono">{ FormatEUR(cents) }</span>
+		<span class="tnum font-medium text-rose-600 dark:text-rose-400">{ FormatEUR(cents) }</span>
 	} else {
-		<span class="pos mono">{ FormatEUR(cents) }</span>
+		<span class="tnum font-medium text-emerald-600 dark:text-emerald-400">{ FormatEUR(cents) }</span>
 	}
 }
 
 templ costBadge(c store.CostNature) {
 	if c == store.CostVariable {
-		<span class="badge badge-variable">Variabel</span>
+		<span class="badge badge-warn">Variabel</span>
 	} else {
-		<span class="badge badge-fix">Fix</span>
+		<span class="badge badge-info">Fix</span>
 	}
 }
 
 templ classBadge(b store.BudgetClass) {
 	switch b {
 		case store.ClassWant:
-			<span class="badge badge-want">Wunsch</span>
+			<span class="badge badge-warn">Wunsch</span>
 		case store.ClassSaving:
-			<span class="badge badge-saving">Sparen</span>
+			<span class="badge badge-ok">Sparen</span>
 		default:
-			<span class="badge badge-need">Bedarf</span>
+			<span class="badge badge-muted">Bedarf</span>
 	}
 }
 
 templ memberDot(color string) {
-	if color != "" {
-		<span class="dot" style={ "background-color:" + color }></span>
-	} else {
-		<span class="dot" style="background-color:#94a3b8"></span>
-	}
+	<span class="dot" style={ "background-color:" + ColorOr(color) }></span>
 }
 
 templ hbar(label string, cents, max int64) {
-	<div class="hbar-row">
-		<div class="small nowrap">{ label }</div>
-		<div class="hbar-track">
-			<div class="hbar-fill" style={ "width:" + BarWidth(cents, max) }></div>
+	<div class="grid grid-cols-[minmax(0,9rem)_1fr_auto] items-center gap-3 py-1.5">
+		<div class="truncate text-sm text-slate-600 dark:text-slate-400">{ label }</div>
+		<div class="bar-track">
+			<div class="bar-fill" style={ "width:" + BarWidth(cents, max) }></div>
 		</div>
-		<div class="small mono right">{ FormatEUR(cents) }</div>
+		<div class="tnum text-right text-sm text-slate-700 dark:text-slate-300">{ FormatEUR(cents) }</div>
+	</div>
+}
+
+// noHousehold is shown when no household is selected yet.
+templ noHousehold() {
+	<div class="card text-center">
+		<p class="text-slate-600 dark:text-slate-400">Noch kein Haushalt angelegt.</p>
+		<a href="/settings#haushalte" class="btn-primary mt-4">Haushalt anlegen</a>
 	</div>
 }

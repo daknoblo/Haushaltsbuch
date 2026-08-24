@@ -20,21 +20,30 @@
   });
 
   // Theme toggle. The initial value is applied by theme.js in <head>.
-  function currentTheme() {
-    var set = document.documentElement.getAttribute("data-theme");
-    if (set) return set;
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  }
-
   document.addEventListener("click", function (e) {
     var toggle = e.target.closest("[data-theme-toggle]");
-    if (!toggle) return;
-    var next = currentTheme() === "dark" ? "light" : "dark";
-    document.documentElement.setAttribute("data-theme", next);
-    try {
-      localStorage.setItem("hb-theme", next);
-    } catch (err) {
-      // Ignore storage failures; the choice then lasts for this page only.
+    if (toggle) {
+      var root = document.documentElement;
+      var nowDark = root.classList.toggle("dark");
+      try {
+        localStorage.setItem("hb-theme", nowDark ? "dark" : "light");
+      } catch (err) {
+        // Ignore storage failures; the choice then lasts for this page only.
+      }
+      return;
+    }
+
+    var navToggle = e.target.closest("[data-nav-toggle]");
+    if (navToggle) {
+      var panel = document.querySelector("[data-nav-panel]");
+      if (!panel) return;
+      var open = panel.hasAttribute("hidden");
+      if (open) {
+        panel.removeAttribute("hidden");
+      } else {
+        panel.setAttribute("hidden", "");
+      }
+      navToggle.setAttribute("aria-expanded", open ? "true" : "false");
     }
   });
 

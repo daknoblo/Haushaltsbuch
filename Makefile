@@ -4,6 +4,11 @@ BINARY  := haushaltsbuch
 PKG     := github.com/daknoblo/Haushaltsbuch
 CMD     := ./cmd/haushaltsbuch
 
+TAILWIND         := ./bin/tailwindcss
+TAILWIND_VERSION := v3.4.17
+CSS_INPUT        := internal/web/assets/input.css
+CSS_OUTPUT       := internal/web/assets/static/app.css
+
 VERSION ?= $(shell date -u +v%Y%m%d-%H%M)
 CHANNEL ?= local
 COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -16,7 +21,10 @@ LDFLAGS := -s -w \
 	-X $(PKG)/internal/version.Commit=$(COMMIT) \
 	-X $(PKG)/internal/version.Date=$(DATE)
 
-.PHONY: build run test vet lint tidy generate tools docker clean help
+.PHONY: all build run test vet lint tidy generate css tailwind tools docker clean help
+
+## all: regenerate templates, compile CSS and build the binary
+all: generate css build
 
 ## build: compile a static, CGO-free binary into bin/
 build:
@@ -45,6 +53,25 @@ tidy:
 ## generate: generate templ templates (*_templ.go)
 generate:
 	go tool templ generate
+
+## css: compile the Tailwind CSS into the embedded static output
+css:
+	$(TAILWIND) -c tailwind.config.js -i $(CSS_INPUT) -o $(CSS_OUTPUT) --minify
+
+## tailwind: download the standalone Tailwind CLI for this platform (run once)
+tailwind:
+	@mkdir -p bin
+	@os=$$(uname -s | tr '[:upper:]' '[:lower:]'); \
+	arch=$$(uname -m); \
+	case "$$os-$$arch" in \
+	  darwin-arm64) asset=tailwindcss-macos-arm64 ;; \
+	  darwin-x86_64) asset=tailwindcss-macos-x64 ;; \
+	  linux-aarch64|linux-arm64) asset=tailwindcss-linux-arm64 ;; \
+	  linux-x86_64) asset=tailwindcss-linux-x64 ;; \
+	  *) echo "unsupported platform $$os-$$arch"; exit 1 ;; \
+	esac; \
+	curl -fsSL "https://github.com/tailwindlabs/tailwindcss/releases/download/$(TAILWIND_VERSION)/$$asset" -o $(TAILWIND); \
+	chmod +x $(TAILWIND)
 
 ## tools: install the templ tool dependency
 tools:

@@ -67,10 +67,10 @@ func TestFormatCentsHandlesExtremes(t *testing.T) {
 
 func TestAssetURLCarriesVersion(t *testing.T) {
 	n := Nav{Version: "v20260816-1200"}
-	if got := n.AssetURL("app.css"); got != "/assets/app.css?v=v20260816-1200" {
+	if got := n.AssetURL("app.css"); got != "/static/app.css?v=v20260816-1200" {
 		t.Errorf("AssetURL = %q", got)
 	}
-	if got := (Nav{}).AssetURL("app.js"); got != "/assets/app.js?v=dev" {
+	if got := (Nav{}).AssetURL("app.js"); got != "/static/app.js?v=dev" {
 		t.Errorf("AssetURL without version = %q", got)
 	}
 }

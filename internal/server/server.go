@@ -30,8 +30,8 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
 	// Static assets.
-	assets := http.StripPrefix("/assets/", cacheControl(http.FileServer(http.FS(web.AssetsFS()))))
-	mux.Handle("GET /assets/", assets)
+	assets := http.StripPrefix("/static/", cacheControl(http.FileServer(http.FS(web.AssetsFS()))))
+	mux.Handle("GET /static/", assets)
 
 	// Health.
 	mux.HandleFunc("GET /healthz", s.handleHealth)
