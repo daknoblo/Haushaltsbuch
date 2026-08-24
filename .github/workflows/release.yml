@@ -101,7 +101,26 @@ jobs:
     permissions:
       contents: write
     steps:
+      # The generated notes only list merged pull requests, so work pushed
+      # straight to main would go unmentioned. The tag annotation is used as
+      # the body and carries the migration notes.
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Read tag annotation
+        id: tag
+        run: |
+          {
+            echo 'body<<HB_RELEASE_BODY_EOF'
+            git tag -l --format='%(contents)' "$GITHUB_REF_NAME"
+            echo 'HB_RELEASE_BODY_EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
+          body: ${{ steps.tag.outputs.body }}
           generate_release_notes: true
