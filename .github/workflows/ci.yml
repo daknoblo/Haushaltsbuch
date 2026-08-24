@@ -77,6 +77,8 @@ jobs:
           persist-credentials: false
 
       - name: Dependency review
-        uses: actions/dependency-review-action@v5
+        # The project stopped publishing a moving major tag after v3, so the
+        # patch version is pinned.
+        uses: actions/dependency-review-action@v5.0.0
         with:
           fail-on-severity: high
