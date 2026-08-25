@@ -18,6 +18,12 @@ func Tf(ctx context.Context, key string, args ...any) string {
 	return i18n.Cf(ctx, i18n.Key(key), args...)
 }
 
+// LangCode returns the BCP 47 tag of the request language for the lang
+// attribute of the document.
+func LangCode(ctx context.Context) string {
+	return string(i18n.LangFrom(ctx))
+}
+
 // FrequencyLabel returns the localized label for a frequency.
 func FrequencyLabel(ctx context.Context, f store.Frequency) string {
 	switch f {

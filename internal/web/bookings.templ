@@ -10,7 +10,7 @@ templ BookingsPage(nav Nav, vm BookingsVM) {
 	@Layout(nav) {
 		@pageHeading(T(ctx, "bookings.title"), T(ctx, "bookings.subtitle")) {
 			<div class="ml-auto flex flex-wrap items-center gap-2 no-print">
-				<a class="btn-ghost" href="/settings#bereiche">{ T(ctx, "bookings.manageSections") }</a>
+				<a class="btn-ghost" href="/settings#areas">{ T(ctx, "bookings.manageSections") }</a>
 				<a class="btn-ghost" href={ templ.SafeURL("/export/expenses.pdf") }>{ T(ctx, "action.exportPDF") }</a>
 			</div>
 		}
@@ -81,7 +81,7 @@ templ incomeSection(vm BookingsVM) {
 templ bookingSection(g SectionGroup, vm BookingsVM) {
 	<div class="card-tight">
 		<div class="card-head">
-			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ g.Title() }</h2>
+			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ g.Title(ctx) }</h2>
 			<span class="badge ml-auto">{ FormatEUR(g.TotalCents) } { T(ctx, "bookings.perMonth") }</span>
 		</div>
 		<div class="card-body">

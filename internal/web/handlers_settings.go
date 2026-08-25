@@ -160,7 +160,7 @@ func (s *Server) handleMemberUpdate(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	m, err := s.store.GetMember(ctx, id)
+	m, err := s.store.GetMember(ctx, active, id)
 	if err != nil {
 		s.writeStoreError(w, r, err)
 		return

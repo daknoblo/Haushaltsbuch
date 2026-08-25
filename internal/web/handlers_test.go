@@ -146,6 +146,9 @@ func TestLanguageFollowsAcceptLanguage(t *testing.T) {
 	h.ServeHTTP(w, r)
 
 	body := w.Body.String()
+	if !strings.Contains(body, `lang="en"`) {
+		t.Error("the document language was not switched")
+	}
 	if !strings.Contains(body, "Changes are saved automatically.") {
 		t.Error("English page did not use the English catalog")
 	}
@@ -391,7 +394,7 @@ func TestMemberUpdateKeepsColorOnInvalidInput(t *testing.T) {
 		t.Fatalf("update = %d, want 204", w.Code)
 	}
 
-	after, err := srv.store.GetMember(ctx, before.ID)
+	after, err := srv.store.GetMember(ctx, active.ID, before.ID)
 	if err != nil {
 		t.Fatalf("get member: %v", err)
 	}

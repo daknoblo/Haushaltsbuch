@@ -32,7 +32,7 @@ func newPDF() core.Maroto {
 func pdfHeader(ctx context.Context, m core.Maroto, title, household, subtitle string) {
 	m.AddRow(12, text.NewCol(12, title, props.Text{Size: 18, Style: fontstyle.Bold}))
 	m.AddRow(6, text.NewCol(12, household+"  ·  "+subtitle, props.Text{Size: 10, Color: pdfGrey}))
-	m.AddRow(6, text.NewCol(12, Tf(ctx, "pdf.createdAt", time.Now().Format("02.01.2006 15:04")), props.Text{Size: 8, Color: pdfGrey}))
+	m.AddRow(6, text.NewCol(12, Tf(ctx, "pdf.createdAt", time.Now().Format(T(ctx, "pdf.timeLayout"))), props.Text{Size: 8, Color: pdfGrey}))
 	m.AddRow(4)
 }
 
@@ -112,7 +112,7 @@ func (s *Server) exportHousehold(w http.ResponseWriter, r *http.Request) (store.
 	return hh, true
 }
 
-func (s *Server) exportOverviewPDF(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleExportOverview(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	hh, ok := s.exportHousehold(w, r)
 	if !ok {
@@ -126,7 +126,7 @@ func (s *Server) exportOverviewPDF(w http.ResponseWriter, r *http.Request) {
 	}
 
 	m := newPDF()
-	pdfHeader(ctx, m, T(ctx, "pdf.overview"), hh.Name, MonthLabel(month))
+	pdfHeader(ctx, m, T(ctx, "pdf.overview"), hh.Name, MonthLabel(ctx, month))
 
 	pdfKV(m, T(ctx, "overview.income"), FormatEUR(rep.IncomeCents))
 	pdfKV(m, T(ctx, "overview.expenses"), FormatEUR(rep.ExpenseCents))
@@ -153,10 +153,10 @@ func (s *Server) exportOverviewPDF(w http.ResponseWriter, r *http.Request) {
 	pdfKV(m, T(ctx, "class.want"), FormatEUR(rep.ByBudgetClass[store.ClassWant]))
 	pdfKV(m, T(ctx, "class.saving"), FormatEUR(rep.ByBudgetClass[store.ClassSaving]))
 
-	s.writePDF(w, r, m, "uebersicht-"+month+".pdf")
+	s.writePDF(w, r, m, T(ctx, "pdf.fileOverview")+"-"+month+".pdf")
 }
 
-func (s *Server) exportStatisticsPDF(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleExportStatistics(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	hh, ok := s.exportHousehold(w, r)
 	if !ok {
@@ -170,25 +170,25 @@ func (s *Server) exportStatisticsPDF(w http.ResponseWriter, r *http.Request) {
 	}
 
 	m := newPDF()
-	pdfHeader(ctx, m, T(ctx, "pdf.statistics"), hh.Name, Tf(ctx, "pdf.periodUntil", MonthLabel(month)))
+	pdfHeader(ctx, m, T(ctx, "pdf.statistics"), hh.Name, Tf(ctx, "pdf.periodUntil", MonthLabel(ctx, month)))
 
-	pdfKV(m, T(ctx, "pdf.avgIncome"), FormatEUR(vm.AvgIncome))
-	pdfKV(m, T(ctx, "pdf.avgExpenses"), FormatEUR(vm.AvgExpense))
-	pdfKV(m, T(ctx, "pdf.avgBalance"), FormatEUR(vm.AvgIncome-vm.AvgExpense))
+	pdfKV(m, T(ctx, "pdf.avgIncome"), FormatEUR(vm.Report.IncomeCents))
+	pdfKV(m, T(ctx, "pdf.avgExpenses"), FormatEUR(vm.Report.ExpenseCents))
+	pdfKV(m, T(ctx, "pdf.avgBalance"), FormatEUR(vm.Report.BalanceCents))
 
 	pdfHeading(m, T(ctx, "pdf.monthCourse"))
 	pdfRow4(m, T(ctx, "pdf.month"), T(ctx, "overview.income"), T(ctx, "overview.expenses"), T(ctx, "overview.balance"), true)
 	for _, sm := range vm.Months {
-		pdfRow4(m, MonthLabel(sm.Month),
+		pdfRow4(m, MonthLabel(ctx, sm.Month),
 			FormatEUR(sm.IncomeCents),
 			FormatEUR(sm.ExpenseCents),
 			FormatEUR(sm.BalanceCents), false)
 	}
 
-	s.writePDF(w, r, m, "statistiken-"+month+".pdf")
+	s.writePDF(w, r, m, T(ctx, "pdf.fileStatistics")+"-"+month+".pdf")
 }
 
-func (s *Server) exportExpensesPDF(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleExportExpenses(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	hh, ok := s.exportHousehold(w, r)
 	if !ok {
@@ -213,7 +213,7 @@ func (s *Server) exportExpensesPDF(w http.ResponseWriter, r *http.Request) {
 		if len(g.Bookings) == 0 {
 			continue
 		}
-		pdfHeading(m, g.Title()+"  ("+FormatEUR(g.TotalCents)+" / Monat)")
+		pdfHeading(m, g.Title(ctx)+"  ("+FormatEUR(g.TotalCents)+" "+T(ctx, "bookings.perMonth")+")")
 		pdfRow4(m, T(ctx, "pdf.label"), T(ctx, "pdf.amount"), T(ctx, "pdf.rhythm"), T(ctx, "pdf.monthly"), true)
 		for _, row := range g.Bookings {
 			pdfRow4(m,
@@ -228,7 +228,7 @@ func (s *Server) exportExpensesPDF(w http.ResponseWriter, r *http.Request) {
 	m.AddRow(4)
 	pdfKV(m, T(ctx, "pdf.total"), FormatEUR(grand))
 
-	s.writePDF(w, r, m, "ausgaben-"+pdfSlug(hh.Name)+".pdf")
+	s.writePDF(w, r, m, T(ctx, "pdf.fileBookingList")+"-"+pdfSlug(hh.Name)+".pdf")
 }
 
 func splitNames(ctx context.Context, row BookingRow, names map[int64]string) string {

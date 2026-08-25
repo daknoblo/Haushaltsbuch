@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"net/url"
 	"strconv"
 
@@ -53,8 +54,8 @@ func ColorOr(c string) string {
 
 // Nav holds the data shared by the page chrome (header, navigation, month bar).
 type Nav struct {
-	Active          string // overview|expenses|income|statistics|settings
-	Path            string // base path of the current page, e.g. "/income"
+	Active          string // overview|bookings|dashboard|settings
+	Path            string // base path of the current page, e.g. "/bookings"
 	Households      []store.Household
 	ActiveHousehold store.Household
 	Month           string
@@ -89,7 +90,7 @@ func (n Nav) PrevMonth() string { return ShiftMonth(n.Month, -1) }
 func (n Nav) NextMonth() string { return ShiftMonth(n.Month, 1) }
 
 // CurrentMonthLabel returns the human-readable label for the active month.
-func (n Nav) CurrentMonthLabel() string { return MonthLabel(n.Month) }
+func (n Nav) CurrentMonthLabel(ctx context.Context) string { return MonthLabel(ctx, n.Month) }
 
 // MonthURL returns the URL for the current page with the given month selected.
 func (n Nav) MonthURL(m string) string {
@@ -258,9 +259,9 @@ type SectionGroup struct {
 }
 
 // Title returns the section name or a placeholder for the ungrouped rows.
-func (g SectionGroup) Title() string {
+func (g SectionGroup) Title(ctx context.Context) string {
 	if g.Section == nil {
-		return "Ohne Bereich"
+		return T(ctx, "bookings.noSection")
 	}
 	return g.Section.Name
 }
@@ -329,8 +330,8 @@ func SharePercent(part, total int64) string {
 }
 
 // TargetLabel renders the 50/30/20 target next to the actual share.
-func TargetLabel(target int) string {
-	return "Ziel " + strconv.Itoa(target) + " %"
+func TargetLabel(ctx context.Context, target int) string {
+	return Tf(ctx, "dash.target", target)
 }
 
 // SankeyViewBox returns the SVG viewBox of a laid-out diagram.
@@ -353,7 +354,7 @@ type StatMonth struct {
 }
 
 // Label returns the short month label.
-func (s StatMonth) Label() string { return MonthShort(s.Month) }
+func (s StatMonth) Label(ctx context.Context) string { return MonthShort(ctx, s.Month) }
 
 // RangeOption is one entry of the period selector.
 type RangeOption struct {
@@ -364,12 +365,12 @@ type RangeOption struct {
 
 // DashboardVM is the view model of the dashboard page: the headline figures,
 // the breakdowns, the trend and the flow diagram for the selected period.
+// Report describes a typical month of that period, so every card answers for
+// the whole range rather than only its last month.
 type DashboardVM struct {
 	Report     calc.MonthReport
 	Months     []StatMonth
 	MaxCents   int64
-	AvgIncome  int64
-	AvgExpense int64
 	Sankey     calc.Sankey
 	Ranges     []RangeOption
 	RangeKey   string

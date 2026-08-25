@@ -1,23 +1,16 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/daknoblo/Haushaltsbuch/internal/i18n"
 )
-
-var deMonths = []string{
-	"Januar", "Februar", "März", "April", "Mai", "Juni",
-	"Juli", "August", "September", "Oktober", "November", "Dezember",
-}
-
-var deMonthsShort = []string{
-	"Jan", "Feb", "Mär", "Apr", "Mai", "Jun",
-	"Jul", "Aug", "Sep", "Okt", "Nov", "Dez",
-}
 
 // FormatCents formats an integer amount of cents using German conventions
 // (e.g. 123456 -> "1.234,56").
@@ -104,23 +97,23 @@ func NormalizeMonth(ym string) string {
 	return CurrentMonth()
 }
 
-// MonthLabel returns a human-readable German label for a "YYYY-MM" string
-// (e.g. "Juli 2026").
-func MonthLabel(ym string) string {
+// MonthLabel returns a human-readable label for a "YYYY-MM" string in the
+// language of ctx (e.g. "Juli 2026").
+func MonthLabel(ctx context.Context, ym string) string {
 	t, err := time.Parse("2006-01", ym)
 	if err != nil {
 		return ym
 	}
-	return fmt.Sprintf("%s %d", deMonths[int(t.Month())-1], t.Year())
+	return fmt.Sprintf("%s %d", i18n.MonthName(i18n.LangFrom(ctx), int(t.Month())), t.Year())
 }
 
 // MonthShort returns a short label (e.g. "Jul 26").
-func MonthShort(ym string) string {
+func MonthShort(ctx context.Context, ym string) string {
 	t, err := time.Parse("2006-01", ym)
 	if err != nil {
 		return ym
 	}
-	return fmt.Sprintf("%s %02d", deMonthsShort[int(t.Month())-1], t.Year()%100)
+	return fmt.Sprintf("%s %02d", i18n.MonthAbbr(i18n.LangFrom(ctx), int(t.Month())), t.Year()%100)
 }
 
 // formatDecimal formats cents as a plain decimal (dot separator, no grouping),

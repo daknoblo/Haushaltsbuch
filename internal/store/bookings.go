@@ -188,6 +188,30 @@ func (s *Store) replaceSplits(ctx context.Context, bookingID, householdID int64,
 	return nil
 }
 
+// ListSplits returns the splits of a single booking of a household.
+func (s *Store) ListSplits(ctx context.Context, householdID, bookingID int64) ([]BookingSplit, error) {
+	rows, err := s.q.QueryContext(ctx,
+		`SELECT sp.booking_id, sp.member_id, sp.value
+		 FROM booking_splits sp
+		 JOIN bookings b ON b.id = sp.booking_id
+		 WHERE b.id = ? AND b.household_id = ?
+		 ORDER BY sp.member_id`, bookingID, householdID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []BookingSplit
+	for rows.Next() {
+		var sp BookingSplit
+		if err := rows.Scan(&sp.BookingID, &sp.MemberID, &sp.Value); err != nil {
+			return nil, err
+		}
+		out = append(out, sp)
+	}
+	return out, rows.Err()
+}
+
 // ListSplitsForHousehold returns all booking splits of a household keyed by
 // booking id.
 func (s *Store) ListSplitsForHousehold(ctx context.Context, householdID int64) (map[int64][]BookingSplit, error) {

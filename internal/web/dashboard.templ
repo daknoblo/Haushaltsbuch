@@ -1,6 +1,9 @@
 package web
 
-import "github.com/daknoblo/Haushaltsbuch/internal/calc"
+import (
+	"github.com/daknoblo/Haushaltsbuch/internal/calc"
+	"github.com/daknoblo/Haushaltsbuch/internal/store"
+)
 
 templ DashboardPage(nav Nav, vm DashboardVM) {
 	@Layout(nav) {
@@ -105,14 +108,14 @@ templ savingsCard(vm DashboardVM) {
 // targets than three separate figures.
 templ budgetClassBar(rep calc.MonthReport) {
 	<div class="flex h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-		<div class="bg-indigo-500" style={ "width:" + BarWidth(rep.ByBudgetClass["need"], rep.ExpenseCents) }></div>
-		<div class="bg-amber-500" style={ "width:" + BarWidth(rep.ByBudgetClass["want"], rep.ExpenseCents) }></div>
-		<div class="bg-sky-500" style={ "width:" + BarWidth(rep.ByBudgetClass["saving"], rep.ExpenseCents) }></div>
+		<div class="bg-indigo-500" style={ "width:" + BarWidth(rep.ByBudgetClass[store.ClassNeed], rep.ExpenseCents) }></div>
+		<div class="bg-amber-500" style={ "width:" + BarWidth(rep.ByBudgetClass[store.ClassWant], rep.ExpenseCents) }></div>
+		<div class="bg-sky-500" style={ "width:" + BarWidth(rep.ByBudgetClass[store.ClassSaving], rep.ExpenseCents) }></div>
 	</div>
 	<div class="mt-2 grid grid-cols-3 gap-2 text-xs">
-		@classLegend("bg-indigo-500", T(ctx, "class.need"), rep.ByBudgetClass["need"], rep.ExpenseCents, 50)
-		@classLegend("bg-amber-500", T(ctx, "class.want"), rep.ByBudgetClass["want"], rep.ExpenseCents, 30)
-		@classLegend("bg-sky-500", T(ctx, "class.saving"), rep.ByBudgetClass["saving"], rep.ExpenseCents, 20)
+		@classLegend("bg-indigo-500", T(ctx, "class.need"), rep.ByBudgetClass[store.ClassNeed], rep.ExpenseCents, 50)
+		@classLegend("bg-amber-500", T(ctx, "class.want"), rep.ByBudgetClass[store.ClassWant], rep.ExpenseCents, 30)
+		@classLegend("bg-sky-500", T(ctx, "class.saving"), rep.ByBudgetClass[store.ClassSaving], rep.ExpenseCents, 20)
 	</div>
 }
 
@@ -123,7 +126,7 @@ templ classLegend(dot, label string, cents, total int64, target int) {
 			<span class="text-slate-600 dark:text-slate-400">{ label }</span>
 		</div>
 		<div class="tnum mt-0.5 font-medium text-slate-900 dark:text-slate-100">{ SharePercent(cents, total) }</div>
-		<div class="tnum text-slate-400 dark:text-slate-500">{ TargetLabel(target) }</div>
+		<div class="tnum text-slate-400 dark:text-slate-500">{ TargetLabel(ctx, target) }</div>
 	</div>
 }
 
@@ -178,7 +181,7 @@ templ sankeySVG(s calc.Sankey) {
 				<text
 					x={ Coord(n.LabelX()) }
 					y={ Coord(n.LabelY()) }
-					text-anchor={ n.LabelAnchor() }
+					text-anchor="start"
 					dominant-baseline="middle"
 					class="fill-slate-600 text-[11px] dark:fill-slate-300"
 				>{ n.Label }</text>
@@ -227,11 +230,11 @@ templ trendCard(vm DashboardVM) {
 		<div class="mb-4 grid grid-cols-2 gap-3">
 			<div>
 				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "dash.avgIncome") }</div>
-				<div class="tnum mt-1 font-semibold text-emerald-600 dark:text-emerald-400">{ FormatEUR(vm.AvgIncome) }</div>
+				<div class="tnum mt-1 font-semibold text-emerald-600 dark:text-emerald-400">{ FormatEUR(vm.Report.IncomeCents) }</div>
 			</div>
 			<div>
 				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "dash.avgExpenses") }</div>
-				<div class="tnum mt-1 font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(vm.AvgExpense) }</div>
+				<div class="tnum mt-1 font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(vm.Report.ExpenseCents) }</div>
 			</div>
 		</div>
 		if len(vm.Months) == 0 {
@@ -252,7 +255,7 @@ templ trendColumn(m StatMonth, max int64) {
 			<div class="w-1/2 rounded-t bg-emerald-500/70" style={ "height:" + BarWidth(m.IncomeCents, max) } title={ FormatEUR(m.IncomeCents) }></div>
 			<div class="w-1/2 rounded-t bg-indigo-500/70" style={ "height:" + BarWidth(m.ExpenseCents, max) } title={ FormatEUR(m.ExpenseCents) }></div>
 		</div>
-		<span class="text-[10px] text-slate-400 dark:text-slate-500">{ m.Label() }</span>
+		<span class="text-[10px] text-slate-400 dark:text-slate-500">{ m.Label(ctx) }</span>
 	</div>
 }
 

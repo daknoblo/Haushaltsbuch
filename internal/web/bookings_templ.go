@@ -59,14 +59,14 @@ func BookingsPage(nav Nav, vm BookingsVM) templ.Component {
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"ml-auto flex flex-wrap items-center gap-2 no-print\"><a class=\"btn-ghost\" href=\"/settings#bereiche\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"ml-auto flex flex-wrap items-center gap-2 no-print\"><a class=\"btn-ghost\" href=\"/settings#areas\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.manageSections"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/bookings.templ`, Line: 13, Col: 86}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/bookings.templ`, Line: 13, Col: 83}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -411,9 +411,9 @@ func bookingSection(g SectionGroup, vm BookingsVM) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var21 string
-		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(g.Title())
+		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(g.Title(ctx))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/bookings.templ`, Line: 84, Col: 85}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/bookings.templ`, Line: 84, Col: 88}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {

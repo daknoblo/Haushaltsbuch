@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"strings"
+	"slices"
 	"testing"
 )
 
@@ -41,11 +41,44 @@ func TestCatalogsAgreeOnFormatVerbs(t *testing.T) {
 			if !ok {
 				continue
 			}
-			if strings.Count(want, "%s") != strings.Count(got, "%s") {
-				t.Errorf("key %q: %q has %d %%s, %q has %d",
-					k, Default, strings.Count(want, "%s"), lang, strings.Count(got, "%s"))
+			if !slices.Equal(formatVerbs(want), formatVerbs(got)) {
+				t.Errorf("key %q: %q uses %v, %q uses %v",
+					k, Default, formatVerbs(want), lang, formatVerbs(got))
 			}
 		}
+	}
+}
+
+// formatVerbs lists the fmt verbs of s in order, skipping escaped percent signs.
+func formatVerbs(s string) []string {
+	var out []string
+	for i := 0; i < len(s)-1; i++ {
+		if s[i] != '%' {
+			continue
+		}
+		i++
+		if s[i] != '%' {
+			out = append(out, s[i-1:i+1])
+		}
+	}
+	return out
+}
+
+func TestEveryLanguageHasMonthNames(t *testing.T) {
+	for _, lang := range Langs() {
+		for m := 1; m <= 12; m++ {
+			if MonthName(lang, m) == "" || MonthAbbr(lang, m) == "" {
+				t.Errorf("%s has no name for month %d", lang, m)
+			}
+		}
+		for _, m := range []int{0, 13, -1} {
+			if got := MonthName(lang, m); got != "" {
+				t.Errorf("MonthName(%s, %d) = %q, want empty", lang, m, got)
+			}
+		}
+	}
+	if got := MonthName(Lang("fr"), 3); got != MonthName(Default, 3) {
+		t.Errorf("unknown language did not fall back: %q", got)
 	}
 }
 

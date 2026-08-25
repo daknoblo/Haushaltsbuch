@@ -1,5 +1,16 @@
 package i18n
 
+var englishMonths = monthNames{
+	long: [12]string{
+		"January", "February", "March", "April", "May", "June",
+		"July", "August", "September", "October", "November", "December",
+	},
+	short: [12]string{
+		"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+		"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+	},
+}
+
 // english mirrors the German catalog key by key.
 var english = Catalog{
 	// Chrome
@@ -75,6 +86,8 @@ var english = Catalog{
 	"bookings.confirmDelete":   "Really delete this booking?",
 	"bookings.shareOf":         "Share of %s",
 	"bookings.amountOf":        "Amount for %s",
+	"bookings.newExpense":      "New expense",
+	"bookings.newIncome":       "New income",
 
 	// Dashboard
 	"dash.title":          "Insights",
@@ -86,8 +99,8 @@ var english = Catalog{
 	"dash.range12":        "Last 12 months",
 	"dash.avgIncome":      "Avg. income",
 	"dash.avgExpenses":    "Avg. expenses",
-	"dash.avgBalance":     "Avg. balance",
 	"dash.perMonth":       "per month",
+	"dash.target":         "Target %d%%",
 	"dash.chartTitle":     "Income & expenses",
 	"dash.noData":         "No data yet.",
 	"dash.rule503020":     "50 / 30 / 20",
@@ -107,11 +120,14 @@ var english = Catalog{
 	"dash.byTag":          "By tag",
 	"dash.noTagData":      "No tagged bookings in this period.",
 
+	// Sankey nodes that have no counterpart elsewhere in the UI
+	"sankey.withdrawal": "Withdrawal",
+	"sankey.other":      "Other",
+
 	// Settings
 	"settings.title":            "Settings",
 	"settings.subtitle":         "Manage households, people, areas, categories and tags.",
 	"settings.households":       "Households",
-	"settings.members":          "People",
 	"settings.sections":         "Areas",
 	"settings.categories":       "Categories",
 	"settings.tags":             "Tags",
@@ -148,15 +164,12 @@ var english = Catalog{
 	"split.equal":      "Equal",
 	"split.percent":    "Percentage",
 	"split.fixed":      "Fixed amounts",
-	"label.noSection":  "No area",
 	"label.noCategory": "No category",
 
 	// Errors shown to the user
 	"error.internal":       "Internal server error",
 	"error.noHousehold":    "No active household",
 	"error.nameMissing":    "Name is missing",
-	"error.memberMissing":  "Person is missing",
-	"error.memberUnknown":  "Unknown person",
 	"error.invalidInput":   "Invalid input",
 	"error.invalidDir":     "Invalid direction",
 	"error.amountRange":    "Amount is out of range",
@@ -184,4 +197,9 @@ var english = Catalog{
 	"pdf.avgExpenses": "Avg. expenses / month",
 	"pdf.avgBalance":  "Avg. balance / month",
 	"pdf.periodUntil": "Period up to %s",
+	// Go reference layout, so the export carries a locally readable timestamp.
+	"pdf.timeLayout":      "2006-01-02 15:04",
+	"pdf.fileOverview":    "overview",
+	"pdf.fileStatistics":  "statistics",
+	"pdf.fileBookingList": "expenses",
 }

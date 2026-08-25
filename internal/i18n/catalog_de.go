@@ -1,5 +1,16 @@
 package i18n
 
+var germanMonths = monthNames{
+	long: [12]string{
+		"Januar", "Februar", "März", "April", "Mai", "Juni",
+		"Juli", "August", "September", "Oktober", "November", "Dezember",
+	},
+	short: [12]string{
+		"Jan", "Feb", "Mär", "Apr", "Mai", "Jun",
+		"Jul", "Aug", "Sep", "Okt", "Nov", "Dez",
+	},
+}
+
 // german is the default catalog. Keys are grouped by the page they appear on.
 var german = Catalog{
 	// Chrome
@@ -75,6 +86,8 @@ var german = Catalog{
 	"bookings.confirmDelete":   "Diese Buchung wirklich löschen?",
 	"bookings.shareOf":         "Anteil %s",
 	"bookings.amountOf":        "Betrag %s",
+	"bookings.newExpense":      "Neue Ausgabe",
+	"bookings.newIncome":       "Neue Einnahme",
 
 	// Dashboard
 	"dash.title":          "Auswertung",
@@ -86,8 +99,8 @@ var german = Catalog{
 	"dash.range12":        "Letzte 12 Monate",
 	"dash.avgIncome":      "Ø Einnahmen",
 	"dash.avgExpenses":    "Ø Ausgaben",
-	"dash.avgBalance":     "Ø Saldo",
 	"dash.perMonth":       "pro Monat",
+	"dash.target":         "Ziel %d %%",
 	"dash.chartTitle":     "Einnahmen & Ausgaben",
 	"dash.noData":         "Noch keine Daten.",
 	"dash.rule503020":     "50 / 30 / 20",
@@ -107,11 +120,14 @@ var german = Catalog{
 	"dash.byTag":          "Nach Tag",
 	"dash.noTagData":      "Keine getaggten Buchungen im Zeitraum.",
 
+	// Sankey nodes that have no counterpart elsewhere in the UI
+	"sankey.withdrawal": "Entnahme",
+	"sankey.other":      "Sonstige",
+
 	// Settings
 	"settings.title":            "Einstellungen",
 	"settings.subtitle":         "Haushalte, Personen, Bereiche, Kategorien und Tags verwalten.",
 	"settings.households":       "Haushalte",
-	"settings.members":          "Personen",
 	"settings.sections":         "Bereiche",
 	"settings.categories":       "Kategorien",
 	"settings.tags":             "Tags",
@@ -148,15 +164,12 @@ var german = Catalog{
 	"split.equal":      "Gleichmäßig",
 	"split.percent":    "Prozentual",
 	"split.fixed":      "Feste Beträge",
-	"label.noSection":  "Ohne Bereich",
 	"label.noCategory": "Ohne Kategorie",
 
 	// Errors shown to the user
 	"error.internal":       "Interner Serverfehler",
 	"error.noHousehold":    "Kein aktiver Haushalt",
 	"error.nameMissing":    "Name fehlt",
-	"error.memberMissing":  "Person fehlt",
-	"error.memberUnknown":  "Unbekannte Person",
 	"error.invalidInput":   "Ungültige Eingabe",
 	"error.invalidDir":     "Ungültige Richtung",
 	"error.amountRange":    "Betrag außerhalb des zulässigen Bereichs",
@@ -184,4 +197,9 @@ var german = Catalog{
 	"pdf.avgExpenses": "Ø Ausgaben / Monat",
 	"pdf.avgBalance":  "Ø Saldo / Monat",
 	"pdf.periodUntil": "Zeitraum bis %s",
+	// Go reference layout, so the export carries a locally readable timestamp.
+	"pdf.timeLayout":      "02.01.2006 15:04",
+	"pdf.fileOverview":    "uebersicht",
+	"pdf.fileStatistics":  "statistiken",
+	"pdf.fileBookingList": "ausgaben",
 }

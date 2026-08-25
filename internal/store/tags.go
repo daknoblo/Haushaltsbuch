@@ -61,6 +61,31 @@ func (s *Store) DeleteTag(ctx context.Context, householdID, id int64) error {
 		`DELETE FROM tags WHERE id = ? AND household_id = ?`, id, householdID))
 }
 
+// ListTagIDs returns the tag ids of a single booking of a household.
+func (s *Store) ListTagIDs(ctx context.Context, householdID, bookingID int64) ([]int64, error) {
+	rows, err := s.q.QueryContext(ctx,
+		`SELECT bt.tag_id
+		 FROM booking_tags bt
+		 JOIN bookings b ON b.id = bt.booking_id
+		 JOIN tags t ON t.id = bt.tag_id
+		 WHERE b.id = ? AND b.household_id = ?
+		 ORDER BY t.name COLLATE NOCASE`, bookingID, householdID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
 // ListBookingTags returns the tag ids of a household's bookings keyed by
 // booking id.
 func (s *Store) ListBookingTags(ctx context.Context, householdID int64) (map[int64][]int64, error) {

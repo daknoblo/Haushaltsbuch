@@ -41,7 +41,8 @@ _Not captured yet._
 - **Overview** per month: income, expenses and balance – in total and per
   person, broken down by area, category, cost nature and 50/30/20.
 - **Dashboard** with a selectable period (this month, last month, year to date,
-  last 12 months):
+  last 12 months). Every figure describes a *typical month* of that period, so
+  the cards stay comparable no matter how long the range is:
   - **fixed costs** with their share of income and the largest items,
   - **savings rate** — deliberate savings plus surplus against net income — and
     the 50/30/20 split against its targets,

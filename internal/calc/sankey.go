@@ -1,10 +1,12 @@
 package calc
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
 
+	"github.com/daknoblo/Haushaltsbuch/internal/i18n"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
 
@@ -35,10 +37,6 @@ type SankeyNode struct {
 	Width  float64
 	Height float64
 }
-
-// LabelAnchor returns the SVG text-anchor of a node's caption. Every caption
-// sits to the right of its node, which is why the layout reserves a margin.
-func (n SankeyNode) LabelAnchor() string { return "start" }
 
 // LabelX is where the caption of a node starts.
 func (n SankeyNode) LabelX() float64 { return n.X + n.Width + 6 }
@@ -128,25 +126,25 @@ func (b *sankeyBuilder) finish() {
 // budget class presentation, in the order they should stack.
 var sankeyClasses = []struct {
 	class store.BudgetClass
-	label string
+	label i18n.Key
 	color string
 }{
-	{store.ClassNeed, "Bedarf", "#6366f1"},
-	{store.ClassWant, "Wunsch", "#f59e0b"},
-	{store.ClassSaving, "Sparen", "#0ea5e9"},
+	{store.ClassNeed, "class.need", "#6366f1"},
+	{store.ClassWant, "class.want", "#f59e0b"},
+	{store.ClassSaving, "class.saving", "#0ea5e9"},
 }
 
 // BuildSankey turns a report into a laid-out flow diagram: income sources on
 // the left, the three budget classes in the middle and the categories on the
 // right, with anything unspent ending in an explicit surplus node so that every
-// euro is accounted for.
-func BuildSankey(d Data, rep MonthReport, width, height float64) Sankey {
+// euro is accounted for. months is the range rep was built from.
+func BuildSankey(ctx context.Context, d Data, rep MonthReport, months []string, width, height float64) Sankey {
 	if rep.IncomeCents <= 0 && rep.ExpenseCents <= 0 {
 		return Sankey{}
 	}
 
 	var b sankeyBuilder
-	b.node("trunk", "Einkommen", "#10b981", layerTrunk)
+	b.node("trunk", i18n.C(ctx, "overview.income"), "#10b981", layerTrunk)
 
 	for _, in := range rep.IncomeCategories {
 		id := fmt.Sprintf("in-%d", in.Key)
@@ -158,12 +156,12 @@ func BuildSankey(d Data, rep MonthReport, width, height float64) Sankey {
 	// ribbon cannot be negative, so the shortfall enters as its own source.
 	deficit := rep.ExpenseCents > rep.IncomeCents
 	if deficit {
-		b.node("withdrawal", "Entnahme", "#f43f5e", layerIncome)
+		b.node("withdrawal", i18n.C(ctx, "sankey.withdrawal"), "#f43f5e", layerIncome)
 		b.link("withdrawal", "trunk", rep.ExpenseCents-rep.IncomeCents, "#f43f5e")
 	}
 
 	// Categories are grouped under the budget class their bookings carry.
-	perClass := classCategoryTotals(d, rep)
+	perClass := classCategoryTotals(ctx, d, months)
 	threshold := int64(float64(max64(rep.IncomeCents, rep.ExpenseCents)) * sankeySmallShare)
 
 	for _, c := range sankeyClasses {
@@ -172,7 +170,7 @@ func BuildSankey(d Data, rep MonthReport, width, height float64) Sankey {
 			continue
 		}
 		classID := "class-" + string(c.class)
-		b.node(classID, c.label, c.color, layerClass)
+		b.node(classID, i18n.C(ctx, c.label), c.color, layerClass)
 		b.link("trunk", classID, total, c.color)
 
 		var rest int64
@@ -187,36 +185,44 @@ func BuildSankey(d Data, rep MonthReport, width, height float64) Sankey {
 		}
 		if rest > 0 {
 			id := "leaf-" + string(c.class) + "-rest"
-			b.node(id, "Sonstige", "#94a3b8", layerLeaf)
+			b.node(id, i18n.C(ctx, "sankey.other"), "#94a3b8", layerLeaf)
 			b.link(classID, id, rest, "#94a3b8")
 		}
 	}
 
 	if !deficit && rep.BalanceCents > 0 {
-		b.node("surplus", "Übrig", "#22c55e", layerClass)
+		b.node("surplus", i18n.C(ctx, "dash.surplus"), "#22c55e", layerClass)
 		b.link("trunk", "surplus", rep.BalanceCents, "#22c55e")
 	}
 	b.finish()
 
-	b.finish()
 	s := Sankey{Width: width, Height: height, Nodes: b.nodes, Links: b.links, Deficit: deficit}
 	layoutSankey(&s)
 	return s
 }
 
 // classCategoryTotals splits the per-category totals across budget classes,
-// because one category may carry bookings of more than one class.
-func classCategoryTotals(d Data, rep MonthReport) map[store.BudgetClass][]LabeledTotal {
+// because one category may carry bookings of more than one class. The result
+// is the monthly average over the period, matching PeriodReport.
+func classCategoryTotals(ctx context.Context, d Data, months []string) map[store.BudgetClass][]LabeledTotal {
+	active := activeMonths(d, months)
+	n := int64(len(active))
+	if n == 0 {
+		return nil
+	}
+
 	type key struct {
 		class store.BudgetClass
 		cat   int64
 	}
 	sums := make(map[key]int64)
-	for _, bk := range d.Bookings {
-		if bk.Direction != store.DirExpense || !ActiveIn(bk, rep.Month) {
-			continue
+	for _, m := range active {
+		for _, bk := range d.Bookings {
+			if bk.Direction != store.DirExpense || !ActiveIn(bk, m) {
+				continue
+			}
+			sums[key{bk.BudgetClass, bk.CategoryID}] += MonthlyCents(bk)
 		}
-		sums[key{bk.BudgetClass, bk.CategoryID}] += MonthlyCents(bk)
 	}
 
 	names := make(map[int64]store.Category, len(d.Categories))
@@ -226,13 +232,13 @@ func classCategoryTotals(d Data, rep MonthReport) map[store.BudgetClass][]Labele
 
 	out := make(map[store.BudgetClass][]LabeledTotal)
 	for k, v := range sums {
-		if v <= 0 {
+		if v /= n; v <= 0 {
 			continue
 		}
 		c := names[k.cat]
 		label := c.Name
 		if label == "" {
-			label = "Ohne Kategorie"
+			label = i18n.C(ctx, "label.noCategory")
 		}
 		out[k.class] = append(out[k.class], LabeledTotal{Key: k.cat, Label: label, Color: c.Color, Cents: v})
 	}

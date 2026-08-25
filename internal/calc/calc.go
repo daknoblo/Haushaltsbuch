@@ -287,6 +287,164 @@ func Trend(d Data, months []string) []MonthReport {
 	return out
 }
 
+// PeriodReport condenses a range of months into the figures of a typical
+// month, so every breakdown answers for the selected period instead of only
+// its last month. A single-month range yields exactly BuildMonthReport.
+func PeriodReport(d Data, months []string) MonthReport {
+	rep := average(Trend(d, activeMonths(d, months)))
+	if len(months) > 0 {
+		rep.Month = months[len(months)-1]
+	}
+	return rep
+}
+
+// activeMonths returns the months in which at least one booking contributes,
+// falling back to the full range when none does. A range reaching back before
+// the first booking would otherwise divide by empty months and understate
+// every average.
+func activeMonths(d Data, months []string) []string {
+	out := make([]string, 0, len(months))
+	for _, m := range months {
+		for _, b := range d.Bookings {
+			if b.AmountCents != 0 && ActiveIn(b, m) {
+				out = append(out, m)
+				break
+			}
+		}
+	}
+	if len(out) == 0 {
+		return months
+	}
+	return out
+}
+
+// average merges month reports into the figures of a typical month.
+func average(reps []MonthReport) MonthReport {
+	out := MonthReport{
+		ByCostNature:  make(map[store.CostNature]int64),
+		ByBudgetClass: make(map[store.BudgetClass]int64),
+	}
+	n := int64(len(reps))
+	if n == 0 {
+		return out
+	}
+
+	byMember := make(map[int64]int, len(reps[0].Members))
+	for _, r := range reps {
+		out.IncomeCents += r.IncomeCents
+		out.ExpenseCents += r.ExpenseCents
+		out.FixedCents += r.FixedCents
+		out.VariableCents += r.VariableCents
+		out.UnassignedCents += r.UnassignedCents
+		for k, v := range r.ByCostNature {
+			out.ByCostNature[k] += v
+		}
+		for k, v := range r.ByBudgetClass {
+			out.ByBudgetClass[k] += v
+		}
+		for _, mb := range r.Members {
+			i, ok := byMember[mb.Member.ID]
+			if !ok {
+				out.Members = append(out.Members, MemberBalance{Member: mb.Member})
+				i = len(out.Members) - 1
+				byMember[mb.Member.ID] = i
+			}
+			out.Members[i].IncomeCents += mb.IncomeCents
+			out.Members[i].ExpenseCents += mb.ExpenseCents
+		}
+	}
+
+	out.IncomeCents /= n
+	out.ExpenseCents /= n
+	out.FixedCents /= n
+	out.VariableCents /= n
+	out.UnassignedCents /= n
+	out.BalanceCents = out.IncomeCents - out.ExpenseCents
+	for k := range out.ByCostNature {
+		out.ByCostNature[k] /= n
+	}
+	for k := range out.ByBudgetClass {
+		out.ByBudgetClass[k] /= n
+	}
+	for i := range out.Members {
+		out.Members[i].IncomeCents /= n
+		out.Members[i].ExpenseCents /= n
+		out.Members[i].BalanceCents = out.Members[i].IncomeCents - out.Members[i].ExpenseCents
+	}
+
+	out.Sections = averageTotals(reps, n, func(r MonthReport) []LabeledTotal { return r.Sections })
+	out.Categories = averageTotals(reps, n, func(r MonthReport) []LabeledTotal { return r.Categories })
+	out.IncomeCategories = averageTotals(reps, n, func(r MonthReport) []LabeledTotal { return r.IncomeCategories })
+	out.Tags = averageTotals(reps, n, func(r MonthReport) []LabeledTotal { return r.Tags })
+	return out
+}
+
+// averageTotals merges one breakdown across months, keyed by the row id.
+func averageTotals(reps []MonthReport, n int64, pick func(MonthReport) []LabeledTotal) []LabeledTotal {
+	sums := make(map[int64]*LabeledTotal)
+	order := make([]int64, 0, len(pick(reps[0])))
+	for _, r := range reps {
+		for _, t := range pick(r) {
+			cur, ok := sums[t.Key]
+			if !ok {
+				merged := t
+				merged.Cents = 0
+				sums[t.Key] = &merged
+				order = append(order, t.Key)
+				cur = &merged
+			}
+			cur.Cents += t.Cents
+		}
+	}
+
+	out := make([]LabeledTotal, 0, len(order))
+	for _, k := range order {
+		t := *sums[k]
+		if t.Cents /= n; t.Cents != 0 {
+			out = append(out, t)
+		}
+	}
+	sortByCentsDesc(out)
+	return out
+}
+
+// FixedCosts lists the fixed-cost bookings of a period as monthly averages,
+// largest first, because that is the list worth renegotiating. A limit of 0
+// keeps all of them.
+func FixedCosts(d Data, months []string, limit int) []LabeledTotal {
+	active := activeMonths(d, months)
+	n := int64(len(active))
+	if n == 0 {
+		return nil
+	}
+
+	sums := make(map[int64]int64)
+	out := make([]LabeledTotal, 0, len(d.Bookings))
+	for _, m := range active {
+		for _, b := range d.Bookings {
+			if b.Direction != store.DirExpense || b.CostNature != store.CostFix || !ActiveIn(b, m) {
+				continue
+			}
+			if _, ok := sums[b.ID]; !ok {
+				out = append(out, LabeledTotal{Key: b.ID, Label: b.Name})
+			}
+			sums[b.ID] += MonthlyCents(b)
+		}
+	}
+
+	kept := out[:0]
+	for _, t := range out {
+		if t.Cents = sums[t.Key] / n; t.Cents != 0 {
+			kept = append(kept, t)
+		}
+	}
+	sortByCentsDesc(kept)
+	if limit > 0 && len(kept) > limit {
+		kept = kept[:limit]
+	}
+	return kept
+}
+
 func sortByCentsDesc(t []LabeledTotal) {
 	sort.SliceStable(t, func(i, j int) bool { return t[i].Cents > t[j].Cents })
 }

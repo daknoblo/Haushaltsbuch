@@ -4,7 +4,7 @@ import "strconv"
 
 templ Layout(nav Nav) {
 	<!DOCTYPE html>
-	<html lang="de" class="h-full dark">
+	<html lang={ LangCode(ctx) } class="h-full dark">
 		<head>
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -21,7 +21,7 @@ templ Layout(nav Nav) {
 				{ children... }
 			</main>
 			<div id="save-indicator" class="save-indicator">
-				<span class="dot bg-emerald-400"></span> Gespeichert
+				<span class="dot bg-emerald-400"></span> { T(ctx, "status.saved") }
 			</div>
 			<script src={ nav.AssetURL("htmx.min.js") } defer></script>
 			<script src={ nav.AssetURL("app.js") } defer></script>
@@ -34,7 +34,7 @@ templ topbar(nav Nav) {
 		<div class="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3">
 			<a href="/" class="flex items-center gap-2 text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">
 				<span class="grid h-7 w-7 place-items-center rounded-lg bg-indigo-500 text-sm font-bold text-white">H</span>
-				Haushaltsbuch
+				{ T(ctx, "app.name") }
 			</a>
 			if len(nav.Households) > 0 {
 				<select
@@ -94,7 +94,7 @@ templ navLink(nav Nav, name string, href string, label string) {
 templ monthNav(nav Nav) {
 	<div class="flex items-center gap-1 no-print">
 		<a class="btn-icon" href={ templ.SafeURL(nav.MonthURL(nav.PrevMonth())) } aria-label={ T(ctx, "nav.prevMonth") }>‹</a>
-		<span class="min-w-[8rem] text-center text-sm font-medium text-slate-700 dark:text-slate-300">{ nav.CurrentMonthLabel() }</span>
+		<span class="min-w-[8rem] text-center text-sm font-medium text-slate-700 dark:text-slate-300">{ nav.CurrentMonthLabel(ctx) }</span>
 		<a class="btn-icon" href={ templ.SafeURL(nav.MonthURL(nav.NextMonth())) } aria-label={ T(ctx, "nav.nextMonth") }>›</a>
 	</div>
 }

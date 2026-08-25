@@ -91,9 +91,6 @@ func (s *Server) buildNav(r *http.Request, active, path string, showMonth bool) 
 	}, nil
 }
 
-// householdData bundles the household-scoped data that every month report
-// needs. Loading it once allows several months to be aggregated without
-// re-querying the same rows.
 // loadHouseholdData reads everything the reports are built from in one go, so
 // several months can be aggregated without re-querying the same rows.
 func (s *Server) loadHouseholdData(ctx context.Context, householdID int64) (calc.Data, error) {

@@ -28,11 +28,12 @@ func (s *Store) ListMembers(ctx context.Context, householdID int64) ([]Member, e
 	return out, rows.Err()
 }
 
-// GetMember returns a single member by id.
-func (s *Store) GetMember(ctx context.Context, id int64) (Member, error) {
+// GetMember returns a single member of a household.
+func (s *Store) GetMember(ctx context.Context, householdID, id int64) (Member, error) {
 	var m Member
 	err := s.q.QueryRowContext(ctx,
-		`SELECT id, household_id, name, color, sort_order FROM members WHERE id = ?`, id,
+		`SELECT id, household_id, name, color, sort_order FROM members
+		 WHERE id = ? AND household_id = ?`, id, householdID,
 	).Scan(&m.ID, &m.HouseholdID, &m.Name, &m.Color, &m.SortOrder)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Member{}, ErrNotFound
@@ -54,7 +55,7 @@ func (s *Store) CreateMember(ctx context.Context, householdID int64, name, color
 	if err != nil {
 		return Member{}, err
 	}
-	return s.GetMember(ctx, id)
+	return s.GetMember(ctx, householdID, id)
 }
 
 // UpdateMember updates a member's name and color within a household.

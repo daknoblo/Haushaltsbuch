@@ -1,10 +1,32 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"math"
 	"testing"
+
+	"github.com/daknoblo/Haushaltsbuch/internal/i18n"
 )
+
+func TestMonthLabelFollowsLanguage(t *testing.T) {
+	de := i18n.WithLang(context.Background(), i18n.German)
+	en := i18n.WithLang(context.Background(), i18n.English)
+
+	cases := map[string]string{
+		MonthLabel(de, "2026-07"): "Juli 2026",
+		MonthLabel(en, "2026-07"): "July 2026",
+		MonthShort(de, "2026-03"): "Mär 26",
+		MonthShort(en, "2026-03"): "Mar 26",
+		// An unparseable value is echoed back rather than mislabeled.
+		MonthLabel(de, "kaputt"): "kaputt",
+	}
+	for got, want := range cases {
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	}
+}
 
 func TestParseCents(t *testing.T) {
 	cases := []struct {

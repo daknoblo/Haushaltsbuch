@@ -1,35 +1,10 @@
 package web
 
-import "github.com/daknoblo/Haushaltsbuch/internal/store"
-
-templ money(cents int64) {
-	<span class="tnum">{ FormatEUR(cents) }</span>
-}
-
 templ signedMoney(cents int64) {
 	if cents < 0 {
 		<span class="tnum font-medium text-rose-600 dark:text-rose-400">{ FormatEUR(cents) }</span>
 	} else {
 		<span class="tnum font-medium text-emerald-600 dark:text-emerald-400">{ FormatEUR(cents) }</span>
-	}
-}
-
-templ costBadge(c store.CostNature) {
-	if c == store.CostVariable {
-		<span class="badge badge-warn">{ T(ctx, "cost.variable") }</span>
-	} else {
-		<span class="badge badge-info">{ T(ctx, "cost.fix") }</span>
-	}
-}
-
-templ classBadge(b store.BudgetClass) {
-	switch b {
-		case store.ClassWant:
-			<span class="badge badge-warn">{ T(ctx, "class.want") }</span>
-		case store.ClassSaving:
-			<span class="badge badge-ok">{ T(ctx, "class.saving") }</span>
-		default:
-			<span class="badge badge-muted">{ T(ctx, "class.need") }</span>
 	}
 }
 
@@ -51,6 +26,6 @@ templ hbar(label string, cents, max int64) {
 templ noHousehold() {
 	<div class="card text-center">
 		<p class="text-slate-600 dark:text-slate-400">{ T(ctx, "empty.noHousehold") }</p>
-		<a href="/settings#haushalte" class="btn-primary mt-4">{ T(ctx, "empty.createHousehold") }</a>
+		<a href="/settings#households" class="btn-primary mt-4">{ T(ctx, "empty.createHousehold") }</a>
 	</div>
 }

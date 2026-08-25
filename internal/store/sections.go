@@ -28,11 +28,12 @@ func (s *Store) ListSections(ctx context.Context, householdID int64) ([]Section,
 	return out, rows.Err()
 }
 
-// GetSection returns a single section by id.
-func (s *Store) GetSection(ctx context.Context, id int64) (Section, error) {
+// GetSection returns a single section of a household.
+func (s *Store) GetSection(ctx context.Context, householdID, id int64) (Section, error) {
 	var sec Section
 	err := s.q.QueryRowContext(ctx,
-		`SELECT id, household_id, name, sort_order FROM sections WHERE id = ?`, id,
+		`SELECT id, household_id, name, sort_order FROM sections
+		 WHERE id = ? AND household_id = ?`, id, householdID,
 	).Scan(&sec.ID, &sec.HouseholdID, &sec.Name, &sec.SortOrder)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Section{}, ErrNotFound
@@ -54,7 +55,7 @@ func (s *Store) CreateSection(ctx context.Context, householdID int64, name strin
 	if err != nil {
 		return Section{}, err
 	}
-	return s.GetSection(ctx, id)
+	return s.GetSection(ctx, householdID, id)
 }
 
 // RenameSection updates a section's name within a household.

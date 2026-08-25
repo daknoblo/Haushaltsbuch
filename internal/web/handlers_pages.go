@@ -3,7 +3,6 @@ package web
 import (
 	"context"
 	"net/http"
-	"sort"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/calc"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
@@ -168,6 +167,9 @@ const (
 	sankeyHeight = 460.0
 )
 
+// fixedCostTop bounds the fixed-cost list to the items worth acting on.
+const fixedCostTop = 8
+
 func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month, rangeKey string) (DashboardVM, error) {
 	switch rangeKey {
 	case "last", "ytd", "12m":
@@ -180,13 +182,11 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 		return DashboardVM{}, err
 	}
 
-	// The headline figures describe the month the range ends on, while the
-	// timeline below shows every month the range covers.
+	// Every card describes a typical month of the range; the timeline below
+	// shows the individual months it is made of.
 	months := rangeMonths(rangeKey, month)
-	focus := months[len(months)-1]
-
 	vm := DashboardVM{
-		Report:   calc.BuildMonthReport(data, focus),
+		Report:   calc.PeriodReport(data, months),
 		RangeKey: rangeKey,
 		Ranges:   rangeOptions(ctx, rangeKey),
 	}
@@ -196,7 +196,6 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 		}
 	}
 
-	var sumIncome, sumExpense, dataMonths int64
 	for _, rep := range calc.Trend(data, months) {
 		vm.Months = append(vm.Months, StatMonth{
 			Month:        rep.Month,
@@ -206,40 +205,11 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 			BalanceCents: rep.BalanceCents,
 		})
 		vm.MaxCents = max(vm.MaxCents, rep.IncomeCents, rep.ExpenseCents)
-		if rep.IncomeCents != 0 || rep.ExpenseCents != 0 {
-			sumIncome += rep.IncomeCents
-			sumExpense += rep.ExpenseCents
-			dataMonths++
-		}
-	}
-	if dataMonths > 0 {
-		vm.AvgIncome = sumIncome / dataMonths
-		vm.AvgExpense = sumExpense / dataMonths
 	}
 
-	vm.FixedTop = fixedCostBreakdown(data, focus)
-	vm.Sankey = calc.BuildSankey(data, vm.Report, sankeyWidth, sankeyHeight)
+	vm.FixedTop = calc.FixedCosts(data, months, fixedCostTop)
+	vm.Sankey = calc.BuildSankey(ctx, data, vm.Report, months, sankeyWidth, sankeyHeight)
 	return vm, nil
-}
-
-// fixedCostBreakdown lists the fixed-cost bookings of a month, largest first,
-// because that is the list worth renegotiating.
-func fixedCostBreakdown(d calc.Data, month string) []calc.LabeledTotal {
-	out := make([]calc.LabeledTotal, 0, 8)
-	for _, b := range d.Bookings {
-		if b.Direction != store.DirExpense || b.CostNature != store.CostFix {
-			continue
-		}
-		if !calc.ActiveIn(b, month) {
-			continue
-		}
-		out = append(out, calc.LabeledTotal{Key: b.ID, Label: b.Name, Cents: calc.MonthlyCents(b)})
-	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].Cents > out[j].Cents })
-	if len(out) > 8 {
-		out = out[:8]
-	}
-	return out
 }
 
 func (s *Server) buildSettingsVM(ctx context.Context) (SettingsVM, error) {

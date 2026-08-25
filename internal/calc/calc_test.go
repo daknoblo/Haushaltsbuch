@@ -1,11 +1,16 @@
 package calc
 
 import (
+	"context"
 	"math"
 	"testing"
 
+	"github.com/daknoblo/Haushaltsbuch/internal/i18n"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
+
+// month wraps a single month as the range the Sankey builder expects.
+func month(m string) []string { return []string{m} }
 
 func members() []store.Member {
 	return []store.Member{{ID: 1, Name: "Anna"}, {ID: 2, Name: "Ben"}}
@@ -178,7 +183,7 @@ func TestUnassignedExpenseIsReported(t *testing.T) {
 func TestBuildSankeyBalances(t *testing.T) {
 	d := planData()
 	rep := BuildMonthReport(d, "2026-05")
-	s := BuildSankey(d, rep, 900, 460)
+	s := BuildSankey(context.Background(), d, rep, month("2026-05"), 900, 460)
 
 	if s.Empty() {
 		t.Fatal("sankey is empty")
@@ -226,7 +231,7 @@ func TestBuildSankeyBalances(t *testing.T) {
 func TestSankeyNodeValueIsThroughputNotSum(t *testing.T) {
 	d := planData()
 	rep := BuildMonthReport(d, "2026-05")
-	s := BuildSankey(d, rep, 900, 460)
+	s := BuildSankey(context.Background(), d, rep, month("2026-05"), 900, 460)
 
 	byID := make(map[string]SankeyNode, len(s.Nodes))
 	for _, n := range s.Nodes {
@@ -264,7 +269,7 @@ func TestBuildSankeyDeficitGetsAWithdrawalNode(t *testing.T) {
 		},
 	}
 	rep := BuildMonthReport(d, "2026-05")
-	s := BuildSankey(d, rep, 900, 460)
+	s := BuildSankey(context.Background(), d, rep, month("2026-05"), 900, 460)
 
 	if !s.Deficit {
 		t.Fatal("overspending must be flagged as a deficit")
@@ -287,8 +292,100 @@ func TestBuildSankeyDeficitGetsAWithdrawalNode(t *testing.T) {
 }
 
 func TestBuildSankeyEmptyWithoutData(t *testing.T) {
-	if !BuildSankey(Data{}, MonthReport{}, 900, 460).Empty() {
+	if !BuildSankey(context.Background(), Data{}, MonthReport{}, nil, 900, 460).Empty() {
 		t.Error("sankey without figures must be empty")
+	}
+}
+
+func TestSankeyLabelsFollowTheLanguage(t *testing.T) {
+	d := planData()
+	rep := BuildMonthReport(d, "2026-05")
+	ctx := i18n.WithLang(context.Background(), i18n.English)
+	s := BuildSankey(ctx, d, rep, month("2026-05"), 900, 460)
+
+	labels := make(map[string]string, len(s.Nodes))
+	for _, n := range s.Nodes {
+		labels[n.ID] = n.Label
+	}
+	for id, want := range map[string]string{
+		"trunk":      "Income",
+		"class-need": "Need",
+		"surplus":    "Surplus",
+	} {
+		if labels[id] != want {
+			t.Errorf("node %s is labeled %q, want %q", id, labels[id], want)
+		}
+	}
+}
+
+func TestPeriodReportAveragesTheRange(t *testing.T) {
+	d := Data{
+		Members:    members(),
+		Categories: categories(),
+		Bookings: []store.Booking{
+			{ID: 1, CategoryID: 10, Direction: store.DirIncome, AmountCents: 300000,
+				Frequency: store.FreqMonthly, Interval: 1, SplitMode: store.SplitEqual},
+			{ID: 2, CategoryID: 20, Direction: store.DirExpense, AmountCents: 30000,
+				Frequency: store.FreqOnce, Interval: 1, StartsOn: "2026-05-14",
+				SplitMode: store.SplitEqual, CostNature: store.CostFix, BudgetClass: store.ClassNeed},
+		},
+	}
+	rep := PeriodReport(d, []string{"2026-04", "2026-05", "2026-06"})
+
+	if rep.Month != "2026-06" {
+		t.Errorf("month = %q, want the last month of the range", rep.Month)
+	}
+	if rep.IncomeCents != 300000 {
+		t.Errorf("income = %d, want 300000", rep.IncomeCents)
+	}
+	// The one-off falls into one month of three.
+	if rep.ExpenseCents != 10000 {
+		t.Errorf("expenses = %d, want 10000", rep.ExpenseCents)
+	}
+	if rep.BalanceCents != 290000 {
+		t.Errorf("balance = %d, want 290000", rep.BalanceCents)
+	}
+	if len(rep.Categories) != 1 || rep.Categories[0].Cents != 10000 {
+		t.Errorf("categories = %+v", rep.Categories)
+	}
+	if rep.ByBudgetClass[store.ClassNeed] != 10000 {
+		t.Errorf("need class = %d, want 10000", rep.ByBudgetClass[store.ClassNeed])
+	}
+
+	// A single month has to stay exactly BuildMonthReport.
+	if got, want := PeriodReport(d, month("2026-05")), BuildMonthReport(d, "2026-05"); got.ExpenseCents != want.ExpenseCents {
+		t.Errorf("single month = %d, want %d", got.ExpenseCents, want.ExpenseCents)
+	}
+}
+
+func TestPeriodReportSkipsMonthsWithoutFigures(t *testing.T) {
+	d := Data{
+		Members:    members(),
+		Categories: categories(),
+		Bookings: []store.Booking{{
+			ID: 1, CategoryID: 20, Direction: store.DirExpense, AmountCents: 60000,
+			Frequency: store.FreqMonthly, Interval: 1, StartsOn: "2026-05-01",
+			SplitMode: store.SplitEqual, CostNature: store.CostFix, BudgetClass: store.ClassNeed,
+		}},
+	}
+	// The booking only exists in the last two months of the range.
+	rep := PeriodReport(d, []string{"2026-03", "2026-04", "2026-05", "2026-06"})
+	if rep.ExpenseCents != 60000 {
+		t.Errorf("expenses = %d, want 60000 rather than a diluted average", rep.ExpenseCents)
+	}
+}
+
+func TestFixedCostsAverageAndLimit(t *testing.T) {
+	d := planData()
+	got := FixedCosts(d, []string{"2026-04", "2026-05"}, 0)
+	if len(got) != 2 {
+		t.Fatalf("got %d fixed bookings, want 2", len(got))
+	}
+	if got[0].Cents != 150000 || got[1].Cents != 50000 {
+		t.Errorf("fixed costs = %+v", got)
+	}
+	if limited := FixedCosts(d, month("2026-05"), 1); len(limited) != 1 {
+		t.Errorf("limit was ignored: %+v", limited)
 	}
 }
 

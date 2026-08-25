@@ -1,7 +1,6 @@
 package web
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -59,9 +58,9 @@ func (s *Server) handleBookingCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	name := "Neue Ausgabe"
+	name := T(ctx, "bookings.newExpense")
 	if dir == store.DirIncome {
-		name = "Neue Einnahme"
+		name = T(ctx, "bookings.newIncome")
 	}
 	b := store.Booking{
 		HouseholdID: active,
@@ -90,7 +89,7 @@ func (s *Server) handleBookingCreate(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, r, err)
 		return
 	}
-	stored, err := s.splitsOf(ctx, active, created.ID)
+	stored, err := s.store.ListSplits(ctx, active, created.ID)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -178,7 +177,7 @@ func (s *Server) handleBookingUpdate(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, r, err)
 		return
 	}
-	stored, err := s.splitsOf(ctx, active, id)
+	stored, err := s.store.ListSplits(ctx, active, id)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -188,7 +187,7 @@ func (s *Server) handleBookingUpdate(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	tagIDs, err := s.store.ListBookingTags(ctx, active)
+	tagIDs, err := s.store.ListTagIDs(ctx, active, id)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -196,19 +195,10 @@ func (s *Server) handleBookingUpdate(w http.ResponseWriter, r *http.Request) {
 	row := BookingRow{
 		Booking:  updated,
 		Splits:   stored,
-		TagIDs:   tagIDs[id],
+		TagIDs:   tagIDs,
 		Expanded: r.FormValue("expanded") == "1",
 	}
 	s.render(w, r, BookingRowView(row, vmCtx))
-}
-
-// splitsOf returns the stored splits of one booking of a household.
-func (s *Server) splitsOf(ctx context.Context, householdID, id int64) ([]store.BookingSplit, error) {
-	all, err := s.store.ListSplitsForHousehold(ctx, householdID)
-	if err != nil {
-		return nil, err
-	}
-	return all[id], nil
 }
 
 // clampInterval keeps a submitted recurrence interval sane.
@@ -252,7 +242,7 @@ func (s *Server) splitsFromForm(r *http.Request, b store.Booking) ([]store.Split
 	if err != nil {
 		return nil, err
 	}
-	current, err := s.splitsOf(ctx, b.HouseholdID, b.ID)
+	current, err := s.store.ListSplits(ctx, b.HouseholdID, b.ID)
 	if err != nil {
 		return nil, err
 	}

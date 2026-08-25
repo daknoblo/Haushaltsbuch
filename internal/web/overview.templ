@@ -4,14 +4,14 @@ import "github.com/daknoblo/Haushaltsbuch/internal/store"
 
 templ OverviewPage(nav Nav, vm OverviewVM) {
 	@Layout(nav) {
-		@pageHeading(T(ctx, "overview.title"), nav.CurrentMonthLabel()) {
+		@pageHeading(T(ctx, "overview.title"), nav.CurrentMonthLabel(ctx)) {
 			<a class="btn-ghost ml-auto no-print" href={ templ.SafeURL("/export/overview.pdf?m=" + nav.Month) }>{ T(ctx, "action.exportPDF") }</a>
 		}
 		if nav.ActiveHousehold.ID == 0 {
 			@noHousehold()
 		} else {
 			<div class="grid gap-4 sm:grid-cols-3">
-				@statTile(T(ctx, "overview.income"), FormatEUR(vm.Report.IncomeCents), nav.CurrentMonthLabel(), "text-emerald-600 dark:text-emerald-400")
+				@statTile(T(ctx, "overview.income"), FormatEUR(vm.Report.IncomeCents), nav.CurrentMonthLabel(ctx), "text-emerald-600 dark:text-emerald-400")
 				@statTile(T(ctx, "overview.expenses"), FormatEUR(vm.Report.ExpenseCents), T(ctx, "overview.normalized"), "text-rose-600 dark:text-rose-400")
 				@statTile(T(ctx, "overview.balance"), FormatEUR(vm.Report.BalanceCents), T(ctx, "overview.balanceHint"), balanceTone(vm.Report.BalanceCents))
 			</div>
@@ -25,8 +25,8 @@ templ OverviewPage(nav Nav, vm OverviewVM) {
 							<thead>
 								<tr>
 									<th class="table-head">{ T(ctx, "overview.person") }</th>
-									<th class="table-head text-right">{ T(ctx, "nav.income") }</th>
-									<th class="table-head text-right">{ T(ctx, "nav.expenses") }</th>
+									<th class="table-head text-right">{ T(ctx, "overview.income") }</th>
+									<th class="table-head text-right">{ T(ctx, "overview.expenses") }</th>
 									<th class="table-head text-right">{ T(ctx, "overview.balance") }</th>
 								</tr>
 							</thead>

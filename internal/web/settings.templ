@@ -11,7 +11,7 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 		@pageHeading(T(ctx, "settings.title"), T(ctx, "settings.subtitle")) {
 		}
 		<div class="grid gap-4 lg:grid-cols-2">
-			<div class="card-tight" id="haushalte">
+			<div class="card-tight" id="households">
 				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "settings.households") }</h2></div>
 				<div class="card-body">
 					<div id="household-list" class="grid gap-2">
@@ -31,7 +31,7 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 					</form>
 				</div>
 			</div>
-			<div class="card-tight" id="personen">
+			<div class="card-tight" id="people">
 				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "overview.people") }</h2></div>
 				<div class="card-body">
 					<div id="member-list" class="grid gap-2">
@@ -51,7 +51,7 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 					</form>
 				</div>
 			</div>
-			<div class="card-tight" id="bereiche">
+			<div class="card-tight" id="areas">
 				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "settings.sections") }</h2></div>
 				<div class="card-body">
 					<div id="section-list" class="grid gap-2">
@@ -71,7 +71,7 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 					</form>
 				</div>
 			</div>
-			<div class="card-tight" id="kategorien">
+			<div class="card-tight" id="categories">
 				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "settings.categories") }</h2></div>
 				<div class="card-body">
 					<div id="category-list" class="grid gap-2">
@@ -148,7 +148,7 @@ templ HouseholdRowView(h store.Household, activeID int64) {
 			hx-post={ "/households/" + strconv.FormatInt(h.ID, 10) + "/delete" }
 			hx-swap="none"
 			hx-confirm={ T(ctx, "settings.confirmHousehold") }
-			aria-label="Löschen"
+			aria-label={ T(ctx, "action.delete") }
 		>✕</button>
 	</div>
 }
@@ -172,7 +172,7 @@ templ MemberRowView(m store.Member) {
 			hx-target={ "#mem-" + strconv.FormatInt(m.ID, 10) }
 			hx-swap="outerHTML"
 			hx-confirm={ T(ctx, "settings.confirmMember") }
-			aria-label="Löschen"
+			aria-label={ T(ctx, "action.delete") }
 		>✕</button>
 	</div>
 }
@@ -195,7 +195,7 @@ templ SectionRowView(s store.Section) {
 			hx-target={ "#sec-" + strconv.FormatInt(s.ID, 10) }
 			hx-swap="outerHTML"
 			hx-confirm={ T(ctx, "settings.confirmSection") }
-			aria-label="Löschen"
+			aria-label={ T(ctx, "action.delete") }
 		>✕</button>
 	</div>
 }
