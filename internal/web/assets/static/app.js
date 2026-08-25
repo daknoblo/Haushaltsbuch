@@ -42,6 +42,15 @@
       return;
     }
 
+    // A freshly created booking carries a suggested name. Clicking into the
+    // field wipes it instead of making the user select and delete it first.
+    var suggested = e.target.closest("input[data-clear-on-focus]");
+    if (suggested) {
+      suggested.removeAttribute("data-clear-on-focus");
+      suggested.value = "";
+      return;
+    }
+
     var navToggle = e.target.closest("[data-nav-toggle]");
     if (navToggle) {
       var panel = document.querySelector("[data-nav-panel]");
@@ -64,8 +73,10 @@
     var dlg = currentDialog();
     if (!dlg) return;
     if (!dlg.open) dlg.showModal();
-    var first = dlg.querySelector("input[name='name']");
-    if (first) first.focus();
+    // A modal focuses its first field anyway, so a suggested name is selected
+    // rather than cleared: typing replaces it, clicking into the field wipes it.
+    var name = dlg.querySelector("input[data-clear-on-focus]");
+    if (name) name.select();
   });
 
   // Closing empties the container, otherwise a stale dialog would linger in
@@ -90,6 +101,15 @@
     var el = d.elt;
     if (el && el.tagName === "FORM" && el.hasAttribute("data-reset-on-success")) {
       el.reset();
+    }
+  });
+
+  // Amounts read as round figures: a trailing ",00" carries no information and
+  // only makes the column noisy. Anything the user actually typed is kept.
+  document.addEventListener("focusout", function (e) {
+    var el = e.target;
+    if (el && el.hasAttribute && el.hasAttribute("data-cents")) {
+      el.value = el.value.replace(/\.00$/, "");
     }
   });
 })();

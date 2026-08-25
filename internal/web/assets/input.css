@@ -212,7 +212,28 @@
   }
 
   .override-row {
-    @apply grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2;
+    @apply grid grid-cols-2 items-center gap-2 sm:grid-cols-[1fr_1fr_1fr_auto];
+  }
+  .override-add .btn-ghost {
+    @apply col-span-2 sm:col-span-1;
+  }
+
+  /* A selectable chip. The checked state is styled here rather than rendered,
+     because auto-save answers without markup and never repaints a class. */
+  .chip {
+    @apply inline-flex cursor-pointer select-none;
+  }
+  .chip input {
+    @apply sr-only;
+  }
+  .chip-body {
+    @apply inline-flex items-center gap-2 rounded-full border border-slate-300 px-3 py-1.5 text-sm text-slate-600 transition hover:border-slate-400 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-500;
+  }
+  .chip input:checked + .chip-body {
+    @apply border-indigo-400 bg-indigo-500/10 font-medium text-indigo-700 dark:border-indigo-500/60 dark:bg-indigo-500/15 dark:text-indigo-200;
+  }
+  .chip input:focus-visible + .chip-body {
+    @apply ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-slate-900;
   }
 
   .period-chip {

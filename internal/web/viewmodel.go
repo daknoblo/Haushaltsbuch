@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/calc"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
@@ -84,15 +85,6 @@ func balanceTone(cents int64) string {
 	return "text-slate-900 dark:text-slate-100"
 }
 
-// chipClass returns the classes of a selectable chip in the booking dialog.
-func chipClass(selected bool) string {
-	base := "inline-flex cursor-pointer select-none items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition "
-	if selected {
-		return base + "border-indigo-400 bg-indigo-500/10 text-indigo-700 dark:border-indigo-500/60 dark:text-indigo-200"
-	}
-	return base + "border-slate-300 text-slate-600 hover:border-slate-400 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-500"
-}
-
 // PrevMonth returns the month before the current one.
 func (n Nav) PrevMonth() string { return ShiftMonth(n.Month, -1) }
 
@@ -122,10 +114,14 @@ func (n Nav) AssetURL(name string) string {
 	return "/static/" + name + "?v=" + url.QueryEscape(v)
 }
 
-// CentsToInput formats cents as a plain decimal string for a number input
-// (e.g. 123456 -> "1234.56").
+// CentsToInput formats cents as a plain decimal string for a number input.
+// Zero renders empty and a trailing ",00" is dropped, so a fresh field invites
+// typing instead of having to clear a placeholder figure first.
 func CentsToInput(c int64) string {
-	return formatDecimal(c)
+	if c == 0 {
+		return ""
+	}
+	return strings.TrimSuffix(formatDecimal(c), ".00")
 }
 
 // OverviewVM is the view model of the overview page.
@@ -232,7 +228,14 @@ func (r BookingRow) FixedInput(id int64) string {
 	if !r.HasMember(id) {
 		return ""
 	}
-	return formatDecimal(int64(r.SplitValue(id)))
+	return CentsToInput(int64(r.SplitValue(id)))
+}
+
+// NameIsSuggested reports whether the name is still the one a fresh booking was
+// created with, which is what the dialog clears on first focus.
+func (r BookingRow) NameIsSuggested(ctx context.Context) bool {
+	return r.Booking.Name == T(ctx, "bookings.newExpense") ||
+		r.Booking.Name == T(ctx, "bookings.newIncome")
 }
 
 // IntervalInput returns the recurrence interval as an input string.

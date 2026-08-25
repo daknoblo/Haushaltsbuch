@@ -51,11 +51,20 @@ templ bookingBasics(f BookingFormVM) {
 	<div class="grid gap-3 sm:grid-cols-2">
 		<div class="sm:col-span-2">
 			<label class="field-label" for={ "name-" + f.Row.IDStr() }>{ T(ctx, "bookings.name") }</label>
-			<input id={ "name-" + f.Row.IDStr() } class="input" type="text" name="name" value={ f.Row.Booking.Name } placeholder={ T(ctx, "bookings.namePlaceholder") } autocomplete="off"/>
+			<input
+				id={ "name-" + f.Row.IDStr() }
+				class="input"
+				type="text"
+				name="name"
+				value={ f.Row.Booking.Name }
+				placeholder={ T(ctx, "bookings.namePlaceholder") }
+				autocomplete="off"
+				data-clear-on-focus?={ f.Row.NameIsSuggested(ctx) }
+			/>
 		</div>
 		<div>
 			<label class="field-label" for={ "amount-" + f.Row.IDStr() }>{ T(ctx, "bookings.amount") }</label>
-			<input id={ "amount-" + f.Row.IDStr() } class="input tnum" type="number" step="0.01" min="0" name="amount" value={ CentsToInput(f.Row.Booking.AmountCents) }/>
+			<input id={ "amount-" + f.Row.IDStr() } class="input tnum" type="number" step="0.01" min="0" name="amount" value={ CentsToInput(f.Row.Booking.AmountCents) } data-cents/>
 		</div>
 		<div>
 			<label class="field-label" for={ "cat-" + f.Row.IDStr() }>{ T(ctx, "bookings.category") }</label>
@@ -101,7 +110,7 @@ templ bookingRhythm(f BookingFormVM) {
 			</span>
 		</label>
 		if f.Row.Booking.Frequency.Recurring() {
-			<div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+			<div class="mt-3 grid gap-3 sm:grid-cols-3">
 				<div>
 					<label class="field-label" for={ "freq-" + f.Row.IDStr() }>{ T(ctx, "bookings.frequency") }</label>
 					<select id={ "freq-" + f.Row.IDStr() } class="input" name="frequency">
@@ -122,15 +131,15 @@ templ bookingRhythm(f BookingFormVM) {
 						}
 					</select>
 				</div>
-				<div class="grid grid-cols-2 gap-2 sm:col-span-2 lg:col-span-1">
-					<div>
-						<label class="field-label" for={ "from-" + f.Row.IDStr() }>{ T(ctx, "bookings.activeFrom") }</label>
-						<input id={ "from-" + f.Row.IDStr() } class="input" type="month" name="active_from" value={ f.Row.StartMonth() }/>
-					</div>
-					<div>
-						<label class="field-label" for={ "until-" + f.Row.IDStr() }>{ T(ctx, "bookings.activeUntil") }</label>
-						<input id={ "until-" + f.Row.IDStr() } class="input" type="month" name="active_until" value={ f.Row.EndMonth() }/>
-					</div>
+			</div>
+			<div class="mt-3 grid gap-3 sm:grid-cols-2">
+				<div>
+					<label class="field-label" for={ "from-" + f.Row.IDStr() }>{ T(ctx, "bookings.activeFrom") }</label>
+					<input id={ "from-" + f.Row.IDStr() } class="input" type="month" name="active_from" value={ f.Row.StartMonth() }/>
+				</div>
+				<div>
+					<label class="field-label" for={ "until-" + f.Row.IDStr() }>{ T(ctx, "bookings.activeUntil") }</label>
+					<input id={ "until-" + f.Row.IDStr() } class="input" type="month" name="active_until" value={ f.Row.EndMonth() }/>
 				</div>
 			</div>
 		} else {
@@ -173,10 +182,14 @@ templ bookingSplit(f BookingFormVM) {
 			</span>
 			<div class="flex flex-wrap items-center gap-2">
 				for _, m := range f.Members {
-					<label class={ chipClass(f.Row.HasMember(m.ID)) }>
-						<input class="sr-only" type="checkbox" name={ "m_" + strconv.FormatInt(m.ID, 10) } value="1" checked?={ f.Row.HasMember(m.ID) }/>
-						@memberDot(m.Color)
-						{ m.Name }
+					// The checked state is styled in CSS, because auto-save answers
+					// without markup and would never repaint a server-side class.
+					<label class="chip">
+						<input type="checkbox" name={ "m_" + strconv.FormatInt(m.ID, 10) } value="1" checked?={ f.Row.HasMember(m.ID) }/>
+						<span class="chip-body">
+							@memberDot(m.Color)
+							{ m.Name }
+						</span>
 					</label>
 					if f.Row.Booking.SplitMode == store.SplitPercent && f.Row.HasMember(m.ID) {
 						<input
@@ -199,6 +212,7 @@ templ bookingSplit(f BookingFormVM) {
 							name={ "v_" + strconv.FormatInt(m.ID, 10) }
 							value={ f.Row.FixedInput(m.ID) }
 							aria-label={ Tf(ctx, "bookings.amountOf", m.Name) }
+							data-cents
 						/>
 					}
 				}
@@ -222,10 +236,12 @@ templ bookingTags(f BookingFormVM) {
 		} else {
 			<div class="flex flex-wrap gap-2">
 				for _, t := range f.Tags {
-					<label class={ chipClass(f.Row.HasTag(t.ID)) }>
-						<input class="sr-only" type="checkbox" name="tag" value={ strconv.FormatInt(t.ID, 10) } checked?={ f.Row.HasTag(t.ID) }/>
-						@memberDot(t.Color)
-						{ t.Name }
+					<label class="chip">
+						<input type="checkbox" name="tag" value={ strconv.FormatInt(t.ID, 10) } checked?={ f.Row.HasTag(t.ID) }/>
+						<span class="chip-body">
+							@memberDot(t.Color)
+							{ t.Name }
+						</span>
 					</label>
 				}
 			</div>
@@ -265,7 +281,7 @@ templ overrideRow(f BookingFormVM, o store.BookingOverride) {
 			<label class="field-label sr-only" for={ "ovu-" + strconv.FormatInt(o.ID, 10) }>{ T(ctx, "bookings.overrideUntil") }</label>
 			<input id={ "ovu-" + strconv.FormatInt(o.ID, 10) } class="input" type="date" name="ends_on" value={ o.EndsOn }/>
 			<label class="field-label sr-only" for={ "ova-" + strconv.FormatInt(o.ID, 10) }>{ T(ctx, "bookings.amount") }</label>
-			<input id={ "ova-" + strconv.FormatInt(o.ID, 10) } class="input tnum" type="number" step="0.01" min="0" name="amount" value={ CentsToInput(o.AmountCents) }/>
+			<input id={ "ova-" + strconv.FormatInt(o.ID, 10) } class="input tnum" type="number" step="0.01" min="0" name="amount" value={ CentsToInput(o.AmountCents) } data-cents/>
 		</div>
 		<button
 			type="button"
@@ -280,7 +296,7 @@ templ overrideRow(f BookingFormVM, o store.BookingOverride) {
 }
 
 templ overrideAdd(f BookingFormVM) {
-	<div class="override-row mt-2">
+	<div class="override-row override-add mt-2">
 		<div
 			class="contents"
 			id={ "ov-new-" + f.Row.IDStr() }
@@ -291,7 +307,7 @@ templ overrideAdd(f BookingFormVM) {
 		>
 			<input class="input" type="date" name="starts_on" aria-label={ T(ctx, "bookings.overrideFrom") }/>
 			<input class="input" type="date" name="ends_on" aria-label={ T(ctx, "bookings.overrideUntil") }/>
-			<input class="input tnum" type="number" step="0.01" min="0" name="amount" aria-label={ T(ctx, "bookings.amount") }/>
+			<input class="input tnum" type="number" step="0.01" min="0" name="amount" aria-label={ T(ctx, "bookings.amount") } data-cents/>
 			<input type="hidden" name="m" value={ f.Row.Month }/>
 			<button type="button" class="btn-ghost" hx-post={ "/bookings/" + f.Row.IDStr() + "/overrides" } hx-include={ "#ov-new-" + f.Row.IDStr() } hx-target="#booking-dialog" hx-swap="innerHTML">
 				{ T(ctx, "bookings.addOverride") }
