@@ -10,7 +10,9 @@ GOLANGCI_VERSION := v2.12.2
 CSS_INPUT        := internal/web/assets/input.css
 CSS_OUTPUT       := internal/web/assets/static/app.css
 
-VERSION ?= dev
+# Mirrors how the release workflow resolves the version, so a local build is
+# labelled exactly like the CI build of the same commit.
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 IMAGE   ?= ghcr.io/daknoblo/haushaltsbuch
@@ -20,7 +22,7 @@ LDFLAGS := -s -w \
 	-X $(PKG)/internal/version.Commit=$(COMMIT) \
 	-X $(PKG)/internal/version.Date=$(DATE)
 
-.PHONY: help fmt fmt-check vet lint test build run generate css tailwind tools check docker clean
+.PHONY: help fmt fmt-check vet lint test build run generate css tailwind tools check docker release clean
 
 ## help: list available targets
 help:
@@ -99,6 +101,27 @@ docker:
 		--build-arg COMMIT=$(COMMIT) \
 		--build-arg DATE=$(DATE) \
 		-t $(IMAGE):$(VERSION) .
+
+## release: tag the next version (usage: make release BUMP=major|minor|patch)
+# The tag annotation becomes the body of the GitHub release, so the editor is
+# opened deliberately instead of writing a canned message.
+release:
+	@set -e; \
+	case "$(BUMP)" in \
+	  major|minor|patch) ;; \
+	  *) echo "usage: make release BUMP=major|minor|patch"; exit 1 ;; \
+	esac; \
+	[ -z "$$(git status --porcelain)" ] || { echo "working tree is dirty"; exit 1; }; \
+	last=$$(git tag --list 'v*' | sed 's/^v//' \
+	        | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$$' | sort -V | tail -n1); \
+	[ -n "$$last" ] || last=0.0.0; \
+	next=$$(echo "$$last" | awk -F. -v part="$(BUMP)" ' \
+		part=="major" { printf "%d.0.0", $$1+1 } \
+		part=="minor" { printf "%d.%d.0", $$1, $$2+1 } \
+		part=="patch" { printf "%d.%d.%d", $$1, $$2, $$3+1 }'); \
+	echo "v$$last -> v$$next"; \
+	if [ -n "$(NOTES)" ]; then git tag -a "v$$next" -F "$(NOTES)"; else git tag -a "v$$next"; fi; \
+	echo "tag v$$next created — publish it with: git push origin v$$next"
 
 ## clean: remove build artifacts
 clean:

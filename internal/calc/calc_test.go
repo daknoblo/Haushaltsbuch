@@ -1,81 +1,306 @@
 package calc
 
 import (
+	"math"
 	"testing"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
 
-func TestBuildMonthReport(t *testing.T) {
-	members := []store.Member{
-		{ID: 1, Name: "A"},
-		{ID: 2, Name: "B"},
-	}
-	sections := []store.Section{{ID: 10, Name: "Wohnen"}}
-	sid := int64(10)
+func members() []store.Member {
+	return []store.Member{{ID: 1, Name: "Anna"}, {ID: 2, Name: "Ben"}}
+}
 
-	expenses := []store.Expense{
-		{ID: 100, Name: "Miete", AmountCents: 120000, Frequency: store.FreqMonthly, SplitMode: store.SplitEqual, SectionID: &sid, CostNature: store.CostFix, BudgetClass: store.ClassNeed},
-		{ID: 101, Name: "Versicherung", AmountCents: 5000, Frequency: store.FreqMonthly, SplitMode: store.SplitPercent, CostNature: store.CostFix, BudgetClass: store.ClassNeed},
-		{ID: 102, Name: "Einkauf", AmountCents: 5000, Frequency: store.FreqWeekly, SplitMode: store.SplitEqual, CostNature: store.CostVariable, BudgetClass: store.ClassNeed},
-	}
-	splits := map[int64][]store.ExpenseSplit{
-		100: {{MemberID: 1}, {MemberID: 2}},
-		101: {{MemberID: 1, Value: 100}},
-		102: {{MemberID: 1}, {MemberID: 2}},
-	}
-	incomes := []store.Income{
-		{MemberID: 1, YearMonth: "2026-07", AmountCents: 300000},
-		{MemberID: 2, YearMonth: "2026-07", AmountCents: 250000},
-	}
-
-	rep := BuildMonthReport("2026-07", members, sections, nil, expenses, splits, incomes)
-
-	if rep.IncomeCents != 550000 {
-		t.Errorf("income = %d, want 550000", rep.IncomeCents)
-	}
-	// 120000 + 5000 + 5000*52/12 = 146666.67 -> 146667
-	if rep.ExpenseCents != 146667 {
-		t.Errorf("expense = %d, want 146667", rep.ExpenseCents)
-	}
-	if rep.BalanceCents != 403333 {
-		t.Errorf("balance = %d, want 403333", rep.BalanceCents)
-	}
-
-	// Member A: 60000 (Miete) + 5000 (Versicherung) + 10833 (Einkauf/2)
-	if got := rep.Members[0].ExpenseCents; got != 75833 {
-		t.Errorf("member A expense = %d, want 75833", got)
-	}
-	// Member B: 60000 + 10833
-	if got := rep.Members[1].ExpenseCents; got != 70833 {
-		t.Errorf("member B expense = %d, want 70833", got)
-	}
-	if got := rep.Members[0].BalanceCents; got != 300000-75833 {
-		t.Errorf("member A balance = %d, want %d", got, 300000-75833)
-	}
-
-	if len(rep.Sections) != 2 { // Wohnen + Ohne Sektion
-		t.Errorf("sections = %d, want 2", len(rep.Sections))
-	}
-	if rep.ByCostNature[store.CostFix] != 125000 {
-		t.Errorf("fix total = %d, want 125000", rep.ByCostNature[store.CostFix])
+func categories() []store.Category {
+	return []store.Category{
+		{ID: 10, Name: "Gehalt", Classification: store.DirIncome},
+		{ID: 20, Name: "Miete", Classification: store.DirExpense},
+		{ID: 21, Name: "Lebensmittel", Classification: store.DirExpense},
 	}
 }
 
-func TestExpenseActiveIn(t *testing.T) {
-	recurring := store.Expense{ActiveFrom: "2026-05", ActiveUntil: "2026-08"}
-	cases := map[string]bool{"2026-04": false, "2026-05": true, "2026-07": true, "2026-08": true, "2026-09": false}
-	for month, want := range cases {
-		if got := ExpenseActiveIn(recurring, month); got != want {
-			t.Errorf("recurring active in %s = %v, want %v", month, got, want)
+func TestActiveIn(t *testing.T) {
+	cases := []struct {
+		name  string
+		b     store.Booking
+		month string
+		want  bool
+	}{
+		{"one-off in its month", store.Booking{Frequency: store.FreqOnce, StartsOn: "2026-03-14"}, "2026-03", true},
+		{"one-off in another month", store.Booking{Frequency: store.FreqOnce, StartsOn: "2026-03-14"}, "2026-04", false},
+		{"recurring before start", store.Booking{Frequency: store.FreqMonthly, StartsOn: "2026-05-01"}, "2026-04", false},
+		{"recurring at start", store.Booking{Frequency: store.FreqMonthly, StartsOn: "2026-05-01"}, "2026-05", true},
+		{"recurring after end", store.Booking{Frequency: store.FreqMonthly, StartsOn: "2026-01-01", EndsOn: "2026-06-01"}, "2026-07", false},
+		{"recurring in the end month", store.Booking{Frequency: store.FreqMonthly, StartsOn: "2026-01-01", EndsOn: "2026-06-01"}, "2026-06", true},
+		{"open ended", store.Booking{Frequency: store.FreqYearly}, "2099-12", true},
+	}
+	for _, c := range cases {
+		if got := ActiveIn(c.b, c.month); got != c.want {
+			t.Errorf("%s: ActiveIn = %v, want %v", c.name, got, c.want)
 		}
 	}
+}
 
-	oneoff := store.Expense{IsOneOff: true, OccurredOn: "2026-07-15"}
-	if !ExpenseActiveIn(oneoff, "2026-07") {
-		t.Error("one-off should be active in its month")
+func TestMonthlyCentsSpreadsRecurringAmounts(t *testing.T) {
+	cases := []struct {
+		name string
+		b    store.Booking
+		want int64
+	}{
+		{"monthly", store.Booking{AmountCents: 100000, Frequency: store.FreqMonthly, Interval: 1}, 100000},
+		{"yearly is a twelfth", store.Booking{AmountCents: 120000, Frequency: store.FreqYearly, Interval: 1}, 10000},
+		{"quarterly is a third", store.Booking{AmountCents: 30000, Frequency: store.FreqQuarterly, Interval: 1}, 10000},
+		{"every second month", store.Booking{AmountCents: 10000, Frequency: store.FreqMonthly, Interval: 2}, 5000},
+		{"one-off counts fully", store.Booking{AmountCents: 59900, Frequency: store.FreqOnce, Interval: 1}, 59900},
+		{"interval is ignored for one-offs", store.Booking{AmountCents: 59900, Frequency: store.FreqOnce, Interval: 4}, 59900},
 	}
-	if ExpenseActiveIn(oneoff, "2026-08") {
-		t.Error("one-off should not be active in other months")
+	for _, c := range cases {
+		if got := MonthlyCents(c.b); got != c.want {
+			t.Errorf("%s: MonthlyCents = %d, want %d", c.name, got, c.want)
+		}
+	}
+}
+
+// planData is a small but complete household: two salaries, a shared rent split
+// 60/40, groceries split equally and a savings rate.
+func planData() Data {
+	return Data{
+		Members:    members(),
+		Categories: categories(),
+		Tags:       []store.Tag{{ID: 5, Name: "fix"}},
+		Bookings: []store.Booking{
+			{ID: 1, CategoryID: 10, Direction: store.DirIncome, AmountCents: 300000,
+				Frequency: store.FreqMonthly, Interval: 1, SplitMode: store.SplitPercent},
+			{ID: 2, CategoryID: 10, Direction: store.DirIncome, AmountCents: 200000,
+				Frequency: store.FreqMonthly, Interval: 1, SplitMode: store.SplitPercent},
+			{ID: 3, CategoryID: 20, Direction: store.DirExpense, AmountCents: 150000,
+				Frequency: store.FreqMonthly, Interval: 1, SplitMode: store.SplitPercent,
+				CostNature: store.CostFix, BudgetClass: store.ClassNeed},
+			{ID: 4, CategoryID: 21, Direction: store.DirExpense, AmountCents: 60000,
+				Frequency: store.FreqMonthly, Interval: 1, SplitMode: store.SplitEqual,
+				CostNature: store.CostVariable, BudgetClass: store.ClassNeed},
+			{ID: 5, CategoryID: 20, Direction: store.DirExpense, AmountCents: 50000,
+				Frequency: store.FreqMonthly, Interval: 1, SplitMode: store.SplitEqual,
+				CostNature: store.CostFix, BudgetClass: store.ClassSaving},
+		},
+		Splits: map[int64][]store.BookingSplit{
+			1: {{BookingID: 1, MemberID: 1, Value: 100}},
+			2: {{BookingID: 2, MemberID: 2, Value: 100}},
+			3: {{BookingID: 3, MemberID: 1, Value: 60}, {BookingID: 3, MemberID: 2, Value: 40}},
+		},
+		TagLinks: map[int64][]int64{3: {5}, 5: {5}},
+	}
+}
+
+func TestBuildMonthReport(t *testing.T) {
+	rep := BuildMonthReport(planData(), "2026-05")
+
+	if rep.IncomeCents != 500000 {
+		t.Errorf("income = %d, want 500000", rep.IncomeCents)
+	}
+	if rep.ExpenseCents != 260000 {
+		t.Errorf("expenses = %d, want 260000", rep.ExpenseCents)
+	}
+	if rep.BalanceCents != 240000 {
+		t.Errorf("balance = %d, want 240000", rep.BalanceCents)
+	}
+	if rep.FixedCents != 200000 {
+		t.Errorf("fixed = %d, want 200000", rep.FixedCents)
+	}
+	if rep.VariableCents != 60000 {
+		t.Errorf("variable = %d, want 60000", rep.VariableCents)
+	}
+	if rep.SavingCents() != 50000 {
+		t.Errorf("savings = %d, want 50000", rep.SavingCents())
+	}
+
+	// Anna: 300000 income, 60 % of rent (90000) + half of groceries (30000)
+	// + half of the savings rate (25000) = 145000.
+	anna := rep.Members[0]
+	if anna.IncomeCents != 300000 || anna.ExpenseCents != 145000 {
+		t.Errorf("Anna = %+v, want income 300000 / expenses 145000", anna)
+	}
+	ben := rep.Members[1]
+	if ben.IncomeCents != 200000 || ben.ExpenseCents != 115000 {
+		t.Errorf("Ben = %+v, want income 200000 / expenses 115000", ben)
+	}
+	if rep.UnassignedCents != 0 {
+		t.Errorf("unassigned = %d, want 0", rep.UnassignedCents)
+	}
+
+	// Categories are sorted by size: rent + savings share one category.
+	if len(rep.Categories) != 2 || rep.Categories[0].Label != "Miete" || rep.Categories[0].Cents != 200000 {
+		t.Errorf("categories = %+v", rep.Categories)
+	}
+	if len(rep.IncomeCategories) != 1 || rep.IncomeCategories[0].Cents != 500000 {
+		t.Errorf("income categories = %+v", rep.IncomeCategories)
+	}
+	if len(rep.Tags) != 1 || rep.Tags[0].Cents != 200000 {
+		t.Errorf("tags = %+v", rep.Tags)
+	}
+}
+
+func TestSavingsAndFixedCostRates(t *testing.T) {
+	rep := BuildMonthReport(planData(), "2026-05")
+
+	// (50000 saved + 240000 surplus) / 500000
+	if got := rep.SavingsRate(); math.Abs(got-58) > 0.01 {
+		t.Errorf("savings rate = %.2f, want 58", got)
+	}
+	if got := rep.FixedCostRate(); math.Abs(got-40) > 0.01 {
+		t.Errorf("fixed cost rate = %.2f, want 40", got)
+	}
+
+	empty := BuildMonthReport(Data{}, "2026-05")
+	if empty.SavingsRate() != 0 || empty.FixedCostRate() != 0 {
+		t.Error("rates without income must be 0, not NaN")
+	}
+}
+
+func TestUnassignedExpenseIsReported(t *testing.T) {
+	d := Data{
+		Members:    members(),
+		Categories: categories(),
+		Bookings: []store.Booking{{
+			ID: 1, CategoryID: 20, Direction: store.DirExpense, AmountCents: 10000,
+			Frequency: store.FreqMonthly, Interval: 1, SplitMode: store.SplitPercent,
+			CostNature: store.CostFix, BudgetClass: store.ClassNeed,
+		}},
+		// Only 30 % is attributed, so 70 % has no owner.
+		Splits: map[int64][]store.BookingSplit{1: {{BookingID: 1, MemberID: 1, Value: 30}}},
+	}
+	rep := BuildMonthReport(d, "2026-05")
+	if rep.UnassignedCents != 7000 {
+		t.Errorf("unassigned = %d, want 7000", rep.UnassignedCents)
+	}
+}
+
+func TestBuildSankeyBalances(t *testing.T) {
+	d := planData()
+	rep := BuildMonthReport(d, "2026-05")
+	s := BuildSankey(d, rep, 900, 460)
+
+	if s.Empty() {
+		t.Fatal("sankey is empty")
+	}
+	if s.Deficit {
+		t.Error("a plan with a surplus must not be flagged as a deficit")
+	}
+
+	// Everything entering the trunk has to leave it again, otherwise the
+	// diagram would silently lose money.
+	var in, out int64
+	for _, l := range s.Links {
+		if l.Target == "trunk" {
+			in += l.Cents
+		}
+		if l.Source == "trunk" {
+			out += l.Cents
+		}
+	}
+	if in != rep.IncomeCents {
+		t.Errorf("into the trunk = %d, want %d", in, rep.IncomeCents)
+	}
+	if in != out {
+		t.Errorf("trunk is unbalanced: in %d, out %d", in, out)
+	}
+
+	for _, n := range s.Nodes {
+		if n.Height < 0 || n.Y < 0 || n.Y+n.Height > s.Height+0.01 {
+			t.Errorf("node %s lies outside the canvas: y=%.2f h=%.2f", n.ID, n.Y, n.Height)
+		}
+		// A caption needs room to its right, otherwise it is cut off.
+		if n.LabelX() > s.Width-40 {
+			t.Errorf("caption of %s starts at %.2f and would be clipped (width %.0f)", n.ID, n.LabelX(), s.Width)
+		}
+	}
+	for _, l := range s.Links {
+		if l.Path == "" {
+			t.Errorf("link %s->%s has no path", l.Source, l.Target)
+		}
+	}
+}
+
+// A node passes its amount through, so counting inflow and outflow together
+// would double its value and draw it twice as tall as it belongs.
+func TestSankeyNodeValueIsThroughputNotSum(t *testing.T) {
+	d := planData()
+	rep := BuildMonthReport(d, "2026-05")
+	s := BuildSankey(d, rep, 900, 460)
+
+	byID := make(map[string]SankeyNode, len(s.Nodes))
+	for _, n := range s.Nodes {
+		byID[n.ID] = n
+	}
+
+	if got := byID["trunk"].Cents; got != rep.IncomeCents {
+		t.Errorf("trunk = %d, want %d", got, rep.IncomeCents)
+	}
+	if got := byID["class-need"].Cents; got != rep.ByBudgetClass[store.ClassNeed] {
+		t.Errorf("need class = %d, want %d", got, rep.ByBudgetClass[store.ClassNeed])
+	}
+	if got := byID["surplus"].Cents; got != rep.BalanceCents {
+		t.Errorf("surplus = %d, want %d", got, rep.BalanceCents)
+	}
+
+	// The trunk is the busiest node, so nothing may be drawn taller than it.
+	for _, n := range s.Nodes {
+		if n.Height > byID["trunk"].Height+0.01 {
+			t.Errorf("node %s is taller than the trunk", n.ID)
+		}
+	}
+}
+
+func TestBuildSankeyDeficitGetsAWithdrawalNode(t *testing.T) {
+	d := Data{
+		Members:    members(),
+		Categories: categories(),
+		Bookings: []store.Booking{
+			{ID: 1, CategoryID: 10, Direction: store.DirIncome, AmountCents: 100000,
+				Frequency: store.FreqMonthly, Interval: 1, SplitMode: store.SplitEqual},
+			{ID: 2, CategoryID: 20, Direction: store.DirExpense, AmountCents: 150000,
+				Frequency: store.FreqMonthly, Interval: 1, SplitMode: store.SplitEqual,
+				CostNature: store.CostFix, BudgetClass: store.ClassNeed},
+		},
+	}
+	rep := BuildMonthReport(d, "2026-05")
+	s := BuildSankey(d, rep, 900, 460)
+
+	if !s.Deficit {
+		t.Fatal("overspending must be flagged as a deficit")
+	}
+	var withdrawal int64
+	for _, l := range s.Links {
+		if l.Source == "withdrawal" {
+			withdrawal = l.Cents
+		}
+	}
+	if withdrawal != 50000 {
+		t.Errorf("withdrawal = %d, want 50000", withdrawal)
+	}
+	// A surplus node would be wrong when the plan is short.
+	for _, n := range s.Nodes {
+		if n.ID == "surplus" {
+			t.Error("a deficit must not produce a surplus node")
+		}
+	}
+}
+
+func TestBuildSankeyEmptyWithoutData(t *testing.T) {
+	if !BuildSankey(Data{}, MonthReport{}, 900, 460).Empty() {
+		t.Error("sankey without figures must be empty")
+	}
+}
+
+func TestTrendKeepsMonthOrder(t *testing.T) {
+	d := planData()
+	reps := Trend(d, []string{"2026-04", "2026-05", "2026-06"})
+	if len(reps) != 3 {
+		t.Fatalf("got %d reports, want 3", len(reps))
+	}
+	for i, want := range []string{"2026-04", "2026-05", "2026-06"} {
+		if reps[i].Month != want {
+			t.Errorf("report %d is for %s, want %s", i, reps[i].Month, want)
+		}
 	}
 }

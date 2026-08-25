@@ -122,25 +122,30 @@ type OverviewVM struct {
 	Report calc.MonthReport
 }
 
-// ExpenseRow couples an expense with its splits for display and editing.
-type ExpenseRow struct {
-	Expense store.Expense
-	Splits  []store.ExpenseSplit
+// BookingRow couples a booking with its splits and tags for display and
+// editing.
+type BookingRow struct {
+	Booking store.Booking
+	Splits  []store.BookingSplit
+	TagIDs  []int64
 	// Expanded keeps the inline editor open across an auto-save round trip.
 	Expanded bool
 }
 
 // ExpandedValue renders the open state for the hidden form field.
-func (r ExpenseRow) ExpandedValue() string {
+func (r BookingRow) ExpandedValue() string {
 	if r.Expanded {
 		return "1"
 	}
 	return "0"
 }
 
+// IsIncome reports whether the booking adds to the budget.
+func (r BookingRow) IsIncome() bool { return r.Booking.Direction == store.DirIncome }
+
 // BudgetClassBadge returns the badge modifier class for the budget class.
-func (r ExpenseRow) BudgetClassBadge() string {
-	switch r.Expense.BudgetClass {
+func (r BookingRow) BudgetClassBadge() string {
+	switch r.Booking.BudgetClass {
 	case store.ClassWant:
 		return "badge-want"
 	case store.ClassSaving:
@@ -151,7 +156,7 @@ func (r ExpenseRow) BudgetClassBadge() string {
 }
 
 // HasMember reports whether a member participates in the split.
-func (r ExpenseRow) HasMember(id int64) bool {
+func (r BookingRow) HasMember(id int64) bool {
 	for _, s := range r.Splits {
 		if s.MemberID == id {
 			return true
@@ -160,8 +165,18 @@ func (r ExpenseRow) HasMember(id int64) bool {
 	return false
 }
 
+// HasTag reports whether the booking carries the given tag.
+func (r BookingRow) HasTag(id int64) bool {
+	for _, t := range r.TagIDs {
+		if t == id {
+			return true
+		}
+	}
+	return false
+}
+
 // SplitValue returns the stored split value for a member (0 if not present).
-func (r ExpenseRow) SplitValue(id int64) float64 {
+func (r BookingRow) SplitValue(id int64) float64 {
 	for _, s := range r.Splits {
 		if s.MemberID == id {
 			return s.Value
@@ -170,25 +185,32 @@ func (r ExpenseRow) SplitValue(id int64) float64 {
 	return 0
 }
 
-// MonthlyCents returns the monthly-equivalent amount of the expense.
-func (r ExpenseRow) MonthlyCents() int64 {
-	return calc.MonthlyCents(r.Expense)
+// MonthlyCents returns the monthly-equivalent amount of the booking.
+func (r BookingRow) MonthlyCents() int64 { return calc.MonthlyCents(r.Booking) }
+
+// SignedMonthlyCents is the monthly amount, negative for an expense, so the
+// summary line reads like a ledger.
+func (r BookingRow) SignedMonthlyCents() int64 {
+	if r.IsIncome() {
+		return r.MonthlyCents()
+	}
+	return -r.MonthlyCents()
 }
 
-// IDStr returns the expense id as a string.
-func (r ExpenseRow) IDStr() string { return strconv.FormatInt(r.Expense.ID, 10) }
+// IDStr returns the booking id as a string.
+func (r BookingRow) IDStr() string { return strconv.FormatInt(r.Booking.ID, 10) }
 
-// DOMID returns the DOM element id for the expense row.
-func (r ExpenseRow) DOMID() string { return "exp-" + r.IDStr() }
+// DOMID returns the DOM element id for the booking row.
+func (r BookingRow) DOMID() string { return "bk-" + r.IDStr() }
 
-// PostURL returns the update endpoint for the expense.
-func (r ExpenseRow) PostURL() string { return "/expenses/" + r.IDStr() }
+// PostURL returns the update endpoint for the booking.
+func (r BookingRow) PostURL() string { return "/bookings/" + r.IDStr() }
 
-// DeleteURL returns the delete endpoint for the expense.
-func (r ExpenseRow) DeleteURL() string { return "/expenses/" + r.IDStr() + "/delete" }
+// DeleteURL returns the delete endpoint for the booking.
+func (r BookingRow) DeleteURL() string { return "/bookings/" + r.IDStr() + "/delete" }
 
 // PercentInput returns the percent split value for a member as an input string.
-func (r ExpenseRow) PercentInput(id int64) string {
+func (r BookingRow) PercentInput(id int64) string {
 	if !r.HasMember(id) {
 		return ""
 	}
@@ -197,29 +219,53 @@ func (r ExpenseRow) PercentInput(id int64) string {
 
 // FixedInput returns the fixed split value (cents) for a member as a Euro input
 // string.
-func (r ExpenseRow) FixedInput(id int64) string {
+func (r BookingRow) FixedInput(id int64) string {
 	if !r.HasMember(id) {
 		return ""
 	}
 	return formatDecimal(int64(r.SplitValue(id)))
 }
 
-// SectionGroup groups expense rows under a section (nil = no section).
+// IntervalInput returns the recurrence interval as an input string.
+func (r BookingRow) IntervalInput() string {
+	if r.Booking.Interval < 1 {
+		return "1"
+	}
+	return strconv.Itoa(r.Booking.Interval)
+}
+
+// StartMonth returns the start of the active range as YYYY-MM.
+func (r BookingRow) StartMonth() string {
+	if len(r.Booking.StartsOn) >= 7 {
+		return r.Booking.StartsOn[:7]
+	}
+	return ""
+}
+
+// EndMonth returns the end of the active range as YYYY-MM.
+func (r BookingRow) EndMonth() string {
+	if len(r.Booking.EndsOn) >= 7 {
+		return r.Booking.EndsOn[:7]
+	}
+	return ""
+}
+
+// SectionGroup groups booking rows under a section (nil = no section).
 type SectionGroup struct {
 	Section    *store.Section
-	Expenses   []ExpenseRow
+	Bookings   []BookingRow
 	TotalCents int64
 }
 
-// Title returns the section name or a placeholder for the unsectioned group.
+// Title returns the section name or a placeholder for the ungrouped rows.
 func (g SectionGroup) Title() string {
 	if g.Section == nil {
-		return "Ohne Sektion"
+		return "Ohne Bereich"
 	}
 	return g.Section.Name
 }
 
-// SectionID returns the section id or 0 for the unsectioned group.
+// SectionID returns the section id or 0 for the ungrouped rows.
 func (g SectionGroup) SectionID() int64 {
 	if g.Section == nil {
 		return 0
@@ -227,46 +273,108 @@ func (g SectionGroup) SectionID() int64 {
 	return g.Section.ID
 }
 
-// ExpensesVM is the view model of the expenses page.
-type ExpensesVM struct {
+// BookingsVM is the view model of the bookings page, the single place where
+// every planned figure is maintained.
+type BookingsVM struct {
 	Groups     []SectionGroup
+	Income     []BookingRow
 	Members    []store.Member
 	Sections   []store.Section
 	Categories []store.Category
+	Tags       []store.Tag
+	Report     calc.MonthReport
 }
 
-// IncomeMemberVM holds a member's income lines for a month.
-type IncomeMemberVM struct {
-	Member     store.Member
-	Lines      []store.Income
-	TotalCents int64
+// ExpenseCategories returns only the categories bookable as an expense.
+func (v BookingsVM) ExpenseCategories() []store.Category {
+	return filterCategories(v.Categories, store.DirExpense)
 }
 
-// IncomeVM is the view model of the income page.
-type IncomeVM struct {
-	Members    []IncomeMemberVM
-	TotalCents int64
-	PrevMonth  string
+// IncomeCategories returns only the categories bookable as income.
+func (v BookingsVM) IncomeCategories() []store.Category {
+	return filterCategories(v.Categories, store.DirIncome)
 }
 
-// StatMonth is one data point in the statistics timeline.
+func filterCategories(in []store.Category, d store.Direction) []store.Category {
+	out := make([]store.Category, 0, len(in))
+	for _, c := range in {
+		if c.Classification == d {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// categoriesFor returns the categories a row may pick from, which depends on
+// whether the booking brings money in or takes it out.
+func categoriesFor(vm BookingsVM, income bool) []store.Category {
+	if income {
+		return vm.IncomeCategories()
+	}
+	return vm.ExpenseCategories()
+}
+
+// tagStyle tints a tag badge with the tag's own color.
+func tagStyle(color string) string {
+	c := ColorOr(color)
+	return "border-color:" + c + ";color:" + c
+}
+
+// SharePercent formats part as a percentage of total.
+func SharePercent(part, total int64) string {
+	if total <= 0 {
+		return "–"
+	}
+	return FormatPercent(float64(part) / float64(total) * 100)
+}
+
+// TargetLabel renders the 50/30/20 target next to the actual share.
+func TargetLabel(target int) string {
+	return "Ziel " + strconv.Itoa(target) + " %"
+}
+
+// SankeyViewBox returns the SVG viewBox of a laid-out diagram.
+func SankeyViewBox(s calc.Sankey) string {
+	return "0 0 " + Coord(s.Width) + " " + Coord(s.Height)
+}
+
+// Coord formats a layout coordinate for an SVG attribute.
+func Coord(v float64) string {
+	return strconv.FormatFloat(v, 'f', 2, 64)
+}
+
+// StatMonth is one data point in the trend timeline.
 type StatMonth struct {
 	Month        string
 	IncomeCents  int64
 	ExpenseCents int64
+	FixedCents   int64
 	BalanceCents int64
 }
 
 // Label returns the short month label.
 func (s StatMonth) Label() string { return MonthShort(s.Month) }
 
-// StatisticsVM is the view model of the statistics page.
-type StatisticsVM struct {
+// RangeOption is one entry of the period selector.
+type RangeOption struct {
+	Key    string
+	Label  string
+	Active bool
+}
+
+// DashboardVM is the view model of the dashboard page: the headline figures,
+// the breakdowns, the trend and the flow diagram for the selected period.
+type DashboardVM struct {
+	Report     calc.MonthReport
 	Months     []StatMonth
 	MaxCents   int64
-	Current    calc.MonthReport
 	AvgIncome  int64
 	AvgExpense int64
+	Sankey     calc.Sankey
+	Ranges     []RangeOption
+	RangeKey   string
+	RangeLabel string
+	FixedTop   []calc.LabeledTotal
 }
 
 // SettingsVM is the view model of the settings page.
@@ -276,4 +384,9 @@ type SettingsVM struct {
 	Members    []store.Member
 	Sections   []store.Section
 	Categories []store.Category
+	Tags       []store.Tag
+	CatUsage   map[int64]int
 }
+
+// UsageOf returns how many bookings still reference a category.
+func (v SettingsVM) UsageOf(id int64) int { return v.CatUsage[id] }

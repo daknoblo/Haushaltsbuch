@@ -1,8 +1,16 @@
 name: Release
 
+# Every push to main publishes a moving :latest image, a semver tag publishes a
+# pinned one. Both go through the identical build, so a release can never differ
+# from what main was already producing.
 on:
   push:
+    branches: [main]
     tags: ["v*.*.*"]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
 
 permissions:
   contents: read
@@ -10,19 +18,35 @@ permissions:
   id-token: write
   security-events: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  release:
+  publish:
     name: Build, Sign & Publish
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          # git describe needs the full history to find the latest tag.
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Lowercase image name
-        id: img
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+        id: image
+        run: echo "name=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            value="$GITHUB_REF_NAME"
+          else
+            value="$(git describe --tags --always)"
+          fi
+          echo "value=${value}" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -33,7 +57,7 @@ jobs:
       - name: Log in to GHCR
         uses: docker/login-action@v4
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -41,13 +65,13 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ steps.img.outputs.name }}
+          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
           tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=sha,format=short
-            type=raw,value=latest
 
       - name: Build and push
         id: build
@@ -58,22 +82,22 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          provenance: true
+          provenance: mode=max
           sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            VERSION=${{ github.ref_name }}
+            VERSION=${{ steps.version.outputs.value }}
             COMMIT=${{ github.sha }}
             DATE=${{ github.event.repository.updated_at }}
 
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
 
-      - name: Sign the image
+      - name: Sign the image (keyless)
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
-          IMAGE: ${{ steps.img.outputs.name }}
+          IMAGE: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
         run: cosign sign --yes "${IMAGE}@${DIGEST}"
 
       - name: Scan image with Trivy
@@ -81,46 +105,45 @@ jobs:
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         with:
-          image-ref: ${{ steps.img.outputs.name }}@${{ steps.build.outputs.digest }}
+          image-ref: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
           ignore-unfixed: true
 
       - name: Upload Trivy results
-        if: always() && hashFiles('trivy-results.sarif') != ''
+        if: ${{ always() && hashFiles('trivy-results.sarif') != '' }}
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-results.sarif
 
   github-release:
     name: GitHub release
-    needs: release
+    if: github.ref_type == 'tag'
+    needs: publish
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      # The generated notes only list merged pull requests, so work pushed
-      # straight to main would go unmentioned. The tag annotation is used as
-      # the body and carries the migration notes.
       - name: Checkout
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Read tag annotation
-        id: tag
+      # Generated notes only list merged pull requests, so work pushed straight
+      # to main would go unmentioned. An annotated tag carries the real notes.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
         run: |
-          {
-            echo 'body<<HB_RELEASE_BODY_EOF'
-            git tag -l --format='%(contents)' "$GITHUB_REF_NAME"
-            echo 'HB_RELEASE_BODY_EOF'
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Create release
-        uses: softprops/action-gh-release@v2
-        with:
-          body: ${{ steps.tag.outputs.body }}
-          generate_release_notes: true
+          if [ "$(git for-each-ref "refs/tags/$TAG" --format='%(objecttype)')" = "tag" ]; then
+            notes=--notes-from-tag
+          else
+            notes=--generate-notes
+          fi
+          gh release create "$TAG" --verify-tag --title "Haushaltsbuch ${TAG#v}" "$notes"

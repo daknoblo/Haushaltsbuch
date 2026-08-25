@@ -28,20 +28,28 @@ _Not captured yet._
 
 - **Multiple households**, exactly one of which is active at a time. Switch via
   the header dropdown; create, rename and delete them in the settings.
-- **Expenses** grouped by section, with
-  - a **weekly / monthly / yearly** rhythm (normalised to a monthly amount),
-  - **one-off** dated expenses,
-  - **category**, **fixed/variable** and **need/want/saving** (50/30/20),
-  - a flexible **split** per expense: equal, percentage or fixed amounts –
+- **Bookings** — income and expenses are maintained in one place, so a figure
+  never has to be kept in sync in two lists:
+  - a **one-off** dated booking or a **weekly / monthly / quarterly / yearly**
+    rhythm with an interval ("every second month"), normalised to a monthly
+    amount,
+  - a **mandatory category** that knows whether it belongs to income or
+    expenses, plus free **tags** for anything that cuts across categories,
+  - **fixed/variable** and **need/want/saving** (50/30/20),
+  - a flexible **split** per booking: equal, percentage or fixed amounts –
     e.g. rent 50/50, insurance 100 % on one person.
-- **Income** per person and month with an arbitrary number of lines (e.g. salary
-  plus bonus) and a "copy from previous month" action that refuses to run twice
-  into the same month.
 - **Overview** per month: income, expenses and balance – in total and per
-  person, broken down by section, category, cost nature and 50/30/20.
-- **Statistics** for the last 12 months including averages and a trend chart.
-- **PDF export** of the overview, the statistics and the expense list.
-- **Custom ordering**: households, people, sections and expenses can be moved up
+  person, broken down by area, category, cost nature and 50/30/20.
+- **Dashboard** with a selectable period (this month, last month, year to date,
+  last 12 months):
+  - **fixed costs** with their share of income and the largest items,
+  - **savings rate** — deliberate savings plus surplus against net income — and
+    the 50/30/20 split against its targets,
+  - a **Sankey diagram** of the money flow, from every income source through the
+    budget classes down to the single category,
+  - spending **by category** and **by tag**, plus an income/expense trend.
+- **PDF export** of the overview, the dashboard and the booking list.
+- **Custom ordering**: households, people, areas and bookings can be moved up
   and down with the arrow buttons.
 - **Automatic saving**: every input is persisted as soon as a field changes –
   there is no save button.

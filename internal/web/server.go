@@ -35,7 +35,6 @@ func (s *Server) Handler() http.Handler {
 	// Static assets.
 	assets := http.StripPrefix("/static/", cacheControl(http.FileServer(http.FS(AssetsFS()))))
 	mux.Handle("GET /static/", assets)
-
 	// Health, readiness and build metadata.
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("GET /readyz", s.handleReady)
@@ -43,10 +42,14 @@ func (s *Server) Handler() http.Handler {
 
 	// Pages.
 	mux.HandleFunc("GET /{$}", s.handleOverview)
-	mux.HandleFunc("GET /expenses", s.handleExpenses)
-	mux.HandleFunc("GET /income", s.handleIncome)
-	mux.HandleFunc("GET /statistics", s.handleStatistics)
+	mux.HandleFunc("GET /bookings", s.handleBookings)
+	mux.HandleFunc("GET /dashboard", s.handleDashboard)
 	mux.HandleFunc("GET /settings", s.handleSettings)
+
+	// The pages that used to hold expenses and income now live in one place.
+	mux.HandleFunc("GET /expenses", redirectTo("/bookings"))
+	mux.HandleFunc("GET /income", redirectTo("/bookings"))
+	mux.HandleFunc("GET /statistics", redirectTo("/dashboard"))
 
 	// Households.
 	mux.HandleFunc("POST /households", s.handleHouseholdCreate)
@@ -69,20 +72,19 @@ func (s *Server) Handler() http.Handler {
 
 	// Categories.
 	mux.HandleFunc("POST /categories", s.handleCategoryCreate)
-	mux.HandleFunc("POST /categories/{id}", s.handleCategoryRename)
+	mux.HandleFunc("POST /categories/{id}", s.handleCategoryUpdate)
 	mux.HandleFunc("POST /categories/{id}/delete", s.handleCategoryDelete)
 
-	// Expenses.
-	mux.HandleFunc("POST /expenses/new", s.handleExpenseCreate)
-	mux.HandleFunc("POST /expenses/{id}", s.handleExpenseUpdate)
-	mux.HandleFunc("POST /expenses/{id}/delete", s.handleExpenseDelete)
-	mux.HandleFunc("POST /expenses/{id}/move", s.handleExpenseMove)
+	// Tags.
+	mux.HandleFunc("POST /tags", s.handleTagCreate)
+	mux.HandleFunc("POST /tags/{id}", s.handleTagUpdate)
+	mux.HandleFunc("POST /tags/{id}/delete", s.handleTagDelete)
 
-	// Income.
-	mux.HandleFunc("POST /income/new", s.handleIncomeCreate)
-	mux.HandleFunc("POST /income/copy", s.handleIncomeCopy)
-	mux.HandleFunc("POST /income/{id}", s.handleIncomeUpdate)
-	mux.HandleFunc("POST /income/{id}/delete", s.handleIncomeDelete)
+	// Bookings.
+	mux.HandleFunc("POST /bookings/new", s.handleBookingCreate)
+	mux.HandleFunc("POST /bookings/{id}", s.handleBookingUpdate)
+	mux.HandleFunc("POST /bookings/{id}/delete", s.handleBookingDelete)
+	mux.HandleFunc("POST /bookings/{id}/move", s.handleBookingMove)
 
 	// PDF export.
 	mux.HandleFunc("GET /export/overview.pdf", s.handleExportOverview)
@@ -93,6 +95,14 @@ func (s *Server) Handler() http.Handler {
 	// security headers, reject cross-origin writes, then throttle. Language
 	// resolution sits near the top so that rejections are translated too.
 	return s.recoverer(s.logRequests(withLang(limitBody(securityHeaders(s.sameOrigin(s.rateLimit(compressResponses(mux))))))))
+}
+
+// redirectTo keeps the old page URLs working after expenses and income were
+// merged into one place.
+func redirectTo(target string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target, http.StatusMovedPermanently)
+	}
 }
 
 // handleHealth is the liveness probe. It answers without touching the database

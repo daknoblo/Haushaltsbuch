@@ -62,7 +62,7 @@ func get(t *testing.T, h http.Handler, path string) *httptest.ResponseRecorder {
 
 func TestPagesRender(t *testing.T) {
 	_, h, _ := newTestServer(t)
-	for _, path := range []string{"/", "/expenses", "/income", "/statistics", "/settings"} {
+	for _, path := range []string{"/", "/bookings", "/dashboard", "/settings"} {
 		if got := get(t, h, path).Code; got != http.StatusOK {
 			t.Errorf("GET %s = %d, want 200", path, got)
 		}
@@ -140,7 +140,7 @@ func TestRateLimitRejectsFloods(t *testing.T) {
 func TestLanguageFollowsAcceptLanguage(t *testing.T) {
 	_, h, _ := newTestServer(t)
 
-	r := httptest.NewRequest(http.MethodGet, "/expenses", nil)
+	r := httptest.NewRequest(http.MethodGet, "/bookings", nil)
 	r.Header.Set("Accept-Language", "en-US,en;q=0.9")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -156,7 +156,7 @@ func TestLanguageFollowsAcceptLanguage(t *testing.T) {
 
 func TestCrossOriginPostIsRejected(t *testing.T) {
 	_, h, _ := newTestServer(t)
-	r := httptest.NewRequest(http.MethodPost, "/expenses/new", nil)
+	r := httptest.NewRequest(http.MethodPost, "/bookings/new", nil)
 	r.Header.Set("Sec-Fetch-Site", "cross-site")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -166,7 +166,45 @@ func TestCrossOriginPostIsRejected(t *testing.T) {
 	}
 }
 
-func TestExpenseMutationsAreHouseholdScoped(t *testing.T) {
+// newExpenseBooking stores an expense booking of the given household.
+func newExpenseBooking(t *testing.T, srv *Server, householdID int64) store.Booking {
+	dir := store.DirExpense
+	t.Helper()
+	ctx := t.Context()
+	cats, err := srv.store.ListCategories(ctx, householdID)
+	if err != nil {
+		t.Fatalf("categories: %v", err)
+	}
+	var catID int64
+	for _, c := range cats {
+		if c.Classification == dir {
+			catID = c.ID
+			break
+		}
+	}
+	if catID == 0 {
+		t.Fatalf("no %s category available", dir)
+	}
+	b, err := srv.store.CreateBooking(ctx, store.Booking{
+		HouseholdID: householdID,
+		CategoryID:  catID,
+		Direction:   dir,
+		Name:        "Miete",
+		AmountCents: 120000,
+		Frequency:   store.FreqMonthly,
+		Interval:    1,
+		StartsOn:    "2026-01-01",
+		CostNature:  store.CostFix,
+		BudgetClass: store.ClassNeed,
+		SplitMode:   store.SplitEqual,
+	}, nil, nil)
+	if err != nil {
+		t.Fatalf("create booking: %v", err)
+	}
+	return b
+}
+
+func TestBookingMutationsAreHouseholdScoped(t *testing.T) {
 	srv, h, active := newTestServer(t)
 	ctx := t.Context()
 
@@ -174,40 +212,29 @@ func TestExpenseMutationsAreHouseholdScoped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create other household: %v", err)
 	}
-	foreign, err := srv.store.CreateExpense(ctx, store.Expense{
-		HouseholdID: other.ID,
-		Name:        "Fremde Ausgabe",
-		AmountCents: 5000,
-		Frequency:   store.FreqMonthly,
-		CostNature:  store.CostFix,
-		BudgetClass: store.ClassNeed,
-		SplitMode:   store.SplitEqual,
-	}, nil)
-	if err != nil {
-		t.Fatalf("create foreign expense: %v", err)
-	}
 	if active.ID == other.ID {
 		t.Fatal("test setup: households must differ")
 	}
+	foreign := newExpenseBooking(t, srv, other.ID)
 
 	id := strconv.FormatInt(foreign.ID, 10)
-	if got := post(t, h, "/expenses/"+id, url.Values{"name": {"gekapert"}}).Code; got != http.StatusNotFound {
-		t.Errorf("update foreign expense = %d, want 404", got)
+	if got := post(t, h, "/bookings/"+id, url.Values{"name": {"gekapert"}}).Code; got != http.StatusNotFound {
+		t.Errorf("update foreign booking = %d, want 404", got)
 	}
-	if got := post(t, h, "/expenses/"+id+"/delete", nil).Code; got != http.StatusNotFound {
-		t.Errorf("delete foreign expense = %d, want 404", got)
+	if got := post(t, h, "/bookings/"+id+"/delete", nil).Code; got != http.StatusNotFound {
+		t.Errorf("delete foreign booking = %d, want 404", got)
 	}
 
-	unchanged, err := srv.store.GetExpense(ctx, foreign.ID)
+	unchanged, err := srv.store.GetBooking(ctx, other.ID, foreign.ID)
 	if err != nil {
-		t.Fatalf("get foreign expense: %v", err)
+		t.Fatalf("get foreign booking: %v", err)
 	}
-	if unchanged.Name != "Fremde Ausgabe" {
-		t.Errorf("foreign expense was modified: %q", unchanged.Name)
+	if unchanged.Name != "Miete" {
+		t.Errorf("foreign booking was modified: %q", unchanged.Name)
 	}
 }
 
-func TestExpenseUpdateIgnoresForeignSection(t *testing.T) {
+func TestBookingUpdateIgnoresForeignSection(t *testing.T) {
 	srv, h, active := newTestServer(t)
 	ctx := t.Context()
 
@@ -216,20 +243,9 @@ func TestExpenseUpdateIgnoresForeignSection(t *testing.T) {
 		t.Fatalf("create other household: %v", err)
 	}
 	foreignSections, _ := srv.store.ListSections(ctx, other.ID)
+	own := newExpenseBooking(t, srv, active.ID)
 
-	own, err := srv.store.CreateExpense(ctx, store.Expense{
-		HouseholdID: active.ID,
-		Name:        "Miete",
-		Frequency:   store.FreqMonthly,
-		CostNature:  store.CostFix,
-		BudgetClass: store.ClassNeed,
-		SplitMode:   store.SplitEqual,
-	}, nil)
-	if err != nil {
-		t.Fatalf("create expense: %v", err)
-	}
-
-	w := post(t, h, "/expenses/"+strconv.FormatInt(own.ID, 10), url.Values{
+	w := post(t, h, "/bookings/"+strconv.FormatInt(own.ID, 10), url.Values{
 		"name":       {"Miete"},
 		"amount":     {"100"},
 		"section_id": {strconv.FormatInt(foreignSections[0].ID, 10)},
@@ -238,32 +254,21 @@ func TestExpenseUpdateIgnoresForeignSection(t *testing.T) {
 		t.Fatalf("update = %d, want 200", w.Code)
 	}
 
-	updated, err := srv.store.GetExpense(ctx, own.ID)
+	updated, err := srv.store.GetBooking(ctx, active.ID, own.ID)
 	if err != nil {
-		t.Fatalf("get expense: %v", err)
+		t.Fatalf("get booking: %v", err)
 	}
 	if updated.SectionID != nil {
 		t.Errorf("foreign section was stored: %d", *updated.SectionID)
 	}
 }
 
-func TestExpenseUpdateRejectsOutOfRangeAmount(t *testing.T) {
+func TestBookingUpdateRejectsOutOfRangeAmount(t *testing.T) {
 	srv, h, active := newTestServer(t)
 	ctx := t.Context()
 
-	e, err := srv.store.CreateExpense(ctx, store.Expense{
-		HouseholdID: active.ID,
-		Name:        "Miete",
-		AmountCents: 120000,
-		Frequency:   store.FreqMonthly,
-		CostNature:  store.CostFix,
-		BudgetClass: store.ClassNeed,
-		SplitMode:   store.SplitEqual,
-	}, nil)
-	if err != nil {
-		t.Fatalf("create expense: %v", err)
-	}
-	path := "/expenses/" + strconv.FormatInt(e.ID, 10)
+	b := newExpenseBooking(t, srv, active.ID)
+	path := "/bookings/" + strconv.FormatInt(b.ID, 10)
 
 	for _, amount := range []string{"Inf", "NaN", "1e30"} {
 		if got := post(t, h, path, url.Values{"name": {"Miete"}, "amount": {amount}}).Code; got != http.StatusBadRequest {
@@ -275,30 +280,100 @@ func TestExpenseUpdateRejectsOutOfRangeAmount(t *testing.T) {
 	if got := post(t, h, path, url.Values{"name": {"Miete"}, "amount": {"-"}}).Code; got != http.StatusOK {
 		t.Fatalf("partial amount = %d, want 200", got)
 	}
-	after, _ := srv.store.GetExpense(ctx, e.ID)
+	after, _ := srv.store.GetBooking(ctx, active.ID, b.ID)
 	if after.AmountCents != 120000 {
 		t.Errorf("amount = %d, want 120000", after.AmountCents)
 	}
 }
 
-func TestIncomeCopyRejectsRepeat(t *testing.T) {
+func TestBookingCreateSetsDirectionAndCategory(t *testing.T) {
 	srv, h, active := newTestServer(t)
 	ctx := t.Context()
-	members, _ := srv.store.ListMembers(ctx, active.ID)
 
-	if _, err := srv.store.CreateIncome(ctx, active.ID, members[0].ID, "2026-07", "Gehalt", 300000); err != nil {
-		t.Fatalf("create income: %v", err)
+	if got := post(t, h, "/bookings/new?direction=income", nil).Code; got != http.StatusOK {
+		t.Fatalf("create income booking = %d, want 200", got)
 	}
-	if got := post(t, h, "/income/copy?from=2026-07&to=2026-08", nil).Code; got != http.StatusNoContent {
-		t.Fatalf("first copy = %d, want 204", got)
+	bookings, err := srv.store.ListBookings(ctx, active.ID)
+	if err != nil {
+		t.Fatalf("list bookings: %v", err)
 	}
-	if got := post(t, h, "/income/copy?from=2026-07&to=2026-08", nil).Code; got != http.StatusConflict {
-		t.Errorf("second copy = %d, want 409", got)
+	if len(bookings) != 1 {
+		t.Fatalf("want 1 booking, got %d", len(bookings))
+	}
+	b := bookings[0]
+	if b.Direction != store.DirIncome {
+		t.Errorf("direction = %q, want income", b.Direction)
+	}
+	// A booking without a category cannot exist, so one has to be assigned.
+	if b.CategoryID == 0 {
+		t.Error("booking was created without a category")
+	}
+	cat, err := srv.store.GetCategory(ctx, active.ID, b.CategoryID)
+	if err != nil {
+		t.Fatalf("get category: %v", err)
+	}
+	if cat.Classification != store.DirIncome {
+		t.Errorf("category %q is %q, want an income category", cat.Name, cat.Classification)
+	}
+}
+
+func TestBookingTagsRoundTrip(t *testing.T) {
+	srv, h, active := newTestServer(t)
+	ctx := t.Context()
+
+	b := newExpenseBooking(t, srv, active.ID)
+	tag, err := srv.store.CreateTag(ctx, active.ID, "Urlaub", "#14b8a6")
+	if err != nil {
+		t.Fatalf("create tag: %v", err)
 	}
 
-	lines, _ := srv.store.ListIncomes(ctx, active.ID, "2026-08")
-	if len(lines) != 1 {
-		t.Errorf("want 1 income line, got %d", len(lines))
+	w := post(t, h, "/bookings/"+strconv.FormatInt(b.ID, 10), url.Values{
+		"name":   {"Miete"},
+		"amount": {"1200"},
+		"tag":    {strconv.FormatInt(tag.ID, 10)},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("update = %d, want 200", w.Code)
+	}
+	links, _ := srv.store.ListBookingTags(ctx, active.ID)
+	if len(links[b.ID]) != 1 || links[b.ID][0] != tag.ID {
+		t.Fatalf("tags = %v, want [%d]", links[b.ID], tag.ID)
+	}
+
+	// Submitting without the checkbox has to detach the tag again.
+	post(t, h, "/bookings/"+strconv.FormatInt(b.ID, 10), url.Values{
+		"name":   {"Miete"},
+		"amount": {"1200"},
+	})
+	links, _ = srv.store.ListBookingTags(ctx, active.ID)
+	if len(links[b.ID]) != 0 {
+		t.Errorf("tags = %v, want none", links[b.ID])
+	}
+}
+
+func TestDashboardRendersForEveryRange(t *testing.T) {
+	_, h, _ := newTestServer(t)
+	for _, key := range []string{"", "month", "last", "ytd", "12m", "bogus"} {
+		if got := get(t, h, "/dashboard?range="+key).Code; got != http.StatusOK {
+			t.Errorf("range %q = %d, want 200", key, got)
+		}
+	}
+}
+
+func TestOldPagesRedirect(t *testing.T) {
+	_, h, _ := newTestServer(t)
+	for path, want := range map[string]string{
+		"/expenses":   "/bookings",
+		"/income":     "/bookings",
+		"/statistics": "/dashboard",
+	} {
+		w := get(t, h, path)
+		if w.Code != http.StatusMovedPermanently {
+			t.Errorf("GET %s = %d, want 301", path, w.Code)
+		}
+		if got := w.Header().Get("Location"); got != want {
+			t.Errorf("GET %s redirects to %q, want %q", path, got, want)
+		}
 	}
 }
 
@@ -390,23 +465,10 @@ func TestAssetsCacheHeader(t *testing.T) {
 	}
 }
 
-func TestExpenseRowKeepsExpandedState(t *testing.T) {
+func TestBookingRowKeepsExpandedState(t *testing.T) {
 	srv, h, active := newTestServer(t)
-	ctx := t.Context()
-
-	e, err := srv.store.CreateExpense(ctx, store.Expense{
-		HouseholdID: active.ID,
-		Name:        "Miete",
-		AmountCents: 120000,
-		Frequency:   store.FreqMonthly,
-		CostNature:  store.CostFix,
-		BudgetClass: store.ClassNeed,
-		SplitMode:   store.SplitEqual,
-	}, nil)
-	if err != nil {
-		t.Fatalf("create expense: %v", err)
-	}
-	path := "/expenses/" + strconv.FormatInt(e.ID, 10)
+	b := newExpenseBooking(t, srv, active.ID)
+	path := "/bookings/" + strconv.FormatInt(b.ID, 10)
 
 	open := post(t, h, path, url.Values{"name": {"Miete"}, "amount": {"1200"}, "expanded": {"1"}})
 	if !strings.Contains(open.Body.String(), "<details class=\"exp\" open") {

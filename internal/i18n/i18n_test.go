@@ -85,7 +85,7 @@ func TestContextRoundTrip(t *testing.T) {
 	if got := LangFrom(ctx); got != English {
 		t.Errorf("LangFrom = %q", got)
 	}
-	if got := C(ctx, "nav.income"); got != "Income" {
+	if got := C(ctx, "nav.bookings"); got != "Bookings" {
 		t.Errorf("C = %q", got)
 	}
 	if got := LangFrom(context.Background()); got != Default {

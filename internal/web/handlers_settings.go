@@ -1,7 +1,10 @@
 package web
 
 import (
+	"errors"
 	"net/http"
+
+	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
 
 var memberColors = []string{"#2563eb", "#db2777", "#059669", "#d97706", "#7c3aed", "#0891b2"}
@@ -279,7 +282,78 @@ func (s *Server) handleSectionMove(w http.ResponseWriter, r *http.Request) {
 
 // ---- categories ----
 
+// categoryFormFields reads the fields shared by create and update.
+func categoryFormFields(r *http.Request) (name string, class store.Direction, color string) {
+	name = cleanName(r.FormValue("name"))
+	class = store.Direction(r.FormValue("classification"))
+	if !class.Valid() {
+		class = store.DirExpense
+	}
+	return name, class, cleanColor(r.FormValue("color"))
+}
+
 func (s *Server) handleCategoryCreate(w http.ResponseWriter, r *http.Request) {
+	active, ok := s.requireActiveHousehold(w, r)
+	if !ok {
+		return
+	}
+	if !s.parseForm(w, r) {
+		return
+	}
+	name, class, color := categoryFormFields(r)
+	if name == "" {
+		s.clientError(w, r, http.StatusBadRequest, "error.nameMissing")
+		return
+	}
+	c, err := s.store.CreateCategory(r.Context(), active, name, class, color)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	s.render(w, r, CategoryRowView(c, 0))
+}
+
+func (s *Server) handleCategoryUpdate(w http.ResponseWriter, r *http.Request) {
+	active, ok := s.requireActiveHousehold(w, r)
+	if !ok {
+		return
+	}
+	if !s.parseForm(w, r) {
+		return
+	}
+	id := parseID(r.PathValue("id"))
+	name, class, color := categoryFormFields(r)
+	if id == 0 || name == "" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if err := s.store.UpdateCategory(r.Context(), active, id, name, class, color); err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleCategoryDelete(w http.ResponseWriter, r *http.Request) {
+	active, ok := s.requireActiveHousehold(w, r)
+	if !ok {
+		return
+	}
+	err := s.store.DeleteCategory(r.Context(), active, parseID(r.PathValue("id")))
+	if errors.Is(err, store.ErrCategoryInUse) {
+		s.clientError(w, r, http.StatusConflict, "error.categoryUsed")
+		return
+	}
+	if err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// ---- tags ----
+
+func (s *Server) handleTagCreate(w http.ResponseWriter, r *http.Request) {
 	active, ok := s.requireActiveHousehold(w, r)
 	if !ok {
 		return
@@ -292,15 +366,15 @@ func (s *Server) handleCategoryCreate(w http.ResponseWriter, r *http.Request) {
 		s.clientError(w, r, http.StatusBadRequest, "error.nameMissing")
 		return
 	}
-	c, err := s.store.CreateCategory(r.Context(), active, name)
+	t, err := s.store.CreateTag(r.Context(), active, name, cleanColor(r.FormValue("color")))
 	if err != nil {
 		s.serverError(w, r, err)
 		return
 	}
-	s.render(w, r, CategoryRowView(c))
+	s.render(w, r, TagRowView(t))
 }
 
-func (s *Server) handleCategoryRename(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleTagUpdate(w http.ResponseWriter, r *http.Request) {
 	active, ok := s.requireActiveHousehold(w, r)
 	if !ok {
 		return
@@ -314,19 +388,19 @@ func (s *Server) handleCategoryRename(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	if err := s.store.RenameCategory(r.Context(), active, id, name); err != nil {
+	if err := s.store.RenameTag(r.Context(), active, id, name, cleanColor(r.FormValue("color"))); err != nil {
 		s.writeStoreError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) handleCategoryDelete(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleTagDelete(w http.ResponseWriter, r *http.Request) {
 	active, ok := s.requireActiveHousehold(w, r)
 	if !ok {
 		return
 	}
-	if err := s.store.DeleteCategory(r.Context(), active, parseID(r.PathValue("id"))); err != nil {
+	if err := s.store.DeleteTag(r.Context(), active, parseID(r.PathValue("id"))); err != nil {
 		s.writeStoreError(w, r, err)
 		return
 	}

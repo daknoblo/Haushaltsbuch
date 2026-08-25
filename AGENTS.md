@@ -3,11 +3,11 @@
 ## Purpose
 
 Haushaltsbuch is a self-hosted household budget book. It records recurring and
-one-off expenses, normalizes them to a monthly figure, splits them between the
-people of a household and tracks each person's income per month. From that it
-derives a monthly overview, a twelve-month trend, a 50/30/20 breakdown and PDF
-exports. It is a planning tool: figures are entered by hand, there is no bank
-connection and no import.
+one-off bookings, normalizes them to a monthly figure, splits them between the
+people of a household and derives a monthly overview, a twelve-month trend, a
+fixed-cost and savings dashboard, a Sankey flow diagram and PDF exports. It is a
+planning tool: figures are entered by hand, there is no bank connection and no
+import.
 
 ## Shared conventions
 
@@ -18,17 +18,28 @@ document wins over this file unless a deviation is listed below.
 
 - **Household** – the top-level container. Exactly one is active at a time; the
   active id lives in the `app_state` table.
-- **Member** – a person of a household who can carry expense shares and record
-  income. Has a color used throughout the UI.
-- **Section** – a display grouping for expenses (housing, insurance, …).
-- **Category** – a free label per expense, used for the breakdowns.
-- **Expense** – recurring (`weekly`/`monthly`/`yearly`) or one-off with a date.
-  Carries a cost nature (fixed/variable) and a budget class (need/want/saving).
-  `internal/calc` normalizes every expense to a monthly equivalent.
-- **ExpenseSplit** – a member's share. `split_mode` decides how `value` is read:
+- **Member** – a person of a household who can carry booking shares. Has a color
+  used throughout the UI.
+- **Section** – a display grouping for expense bookings (housing, insurance, …).
+- **Category** – **mandatory** on every booking. Carries a `classification`
+  (`income`/`expense`) so an income cannot be filed under an expense category,
+  plus a color that drives the breakdowns and the Sankey diagram.
+- **Tag** – free, cross-cutting label, N:M via `booking_tags`. Tags are the
+  escape hatch; resist adding further enums once they exist.
+- **Booking** – the single unit of planning, replacing the former split between
+  expenses and incomes so that a figure is maintained in exactly one place. A
+  booking has a `direction` (`income`/`expense`), a non-negative amount, a
+  frequency (`once`/`weekly`/`monthly`/`quarterly`/`yearly`) with an interval, an
+  active range, a cost nature (fixed/variable) and a budget class
+  (need/want/saving).
+- **BookingSplit** – a member's share. `split_mode` decides how `value` is read:
   ignored for `equal`, a percentage for `percent`, cents for `fixed`.
-- **Income** – a named line for one member in one month; several lines per
-  member are normal (salary plus bonus).
+
+Recurrence is **evaluated on the fly, never materialized into rows**. A planning
+tool has no actuals to reconcile against, so generated occurrences would buy
+nothing and cost a scheduler. `internal/calc` spreads a recurring amount evenly
+across the months it covers, so a yearly premium contributes a twelfth every
+month; a one-off counts only in the month it falls into.
 
 Money is stored as `int64` cents everywhere. Amounts are parsed and rendered in
 German notation by `internal/web/format.go`.
@@ -53,6 +64,14 @@ outbound connections.
 - **No actuals tracking yet.** The app compares planned figures, not individual
   transactions.
 
+## Releases
+
+Every push to `main` publishes a moving `:latest` image, a `v*.*.*` tag publishes
+the pinned semver tags. Both run the identical build, so a release can never
+differ from what `main` was already producing. `make release BUMP=major|minor|patch`
+computes the next version and opens an editor for the tag annotation — that
+annotation becomes the body of the GitHub release, so write it properly.
+
 ## Deviations from the standard
 
 - **`go.mod` pins a patch version and carries a `toolchain` directive.** The
@@ -64,10 +83,17 @@ outbound connections.
   directive is removed as soon as maroto relaxes its requirement.
 - **`darkMode: "class"` with a light palette.** waim and CFTM are dark-only. This
   app keeps a theme toggle, so every component class carries a `dark:` variant.
-- **Expense rows are collapsible.** The editor has eleven fields per expense;
-  rendering them all at once made the page unreadable. Rows therefore ship as a
-  one-line summary inside a `<details>` element and the open state travels
-  through the auto-save round trip in a hidden field.
+- **Expense rows are collapsible.** The editor has more than ten fields per
+  booking; rendering them all at once made the page unreadable. Rows therefore
+  ship as a one-line summary inside a `<details>` element and the open state
+  travels through the auto-save round trip in a hidden field.
+- **Tailwind only scans the templates and `viewmodel.go`.** Tailwind matches bare
+  words anywhere in a scanned file, so ordinary prose in a Go comment would emit
+  a utility and break the "CSS is up to date" check on an unrelated edit.
+- **The Sankey diagram is laid out in Go and emitted as plain SVG.** The CSP
+  forbids `unsafe-eval`, and a charting library would be a large dependency for
+  one diagram. `internal/calc/sankey.go` computes node positions and ribbon
+  paths; a node's value is the larger of its inflow and outflow, never the sum.
 - **`contextcheck` is disabled for `internal/web`.** templ components receive the
   context through `Component.Render`, which the linter cannot follow, so it
   reports every render call.

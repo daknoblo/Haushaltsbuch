@@ -163,7 +163,7 @@ func (s *Server) exportStatisticsPDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	month := NormalizeMonth(r.URL.Query().Get("m"))
-	vm, err := s.buildStatisticsVM(r.Context(), hh.ID, month)
+	vm, err := s.buildDashboardVM(r.Context(), hh.ID, month, "12m")
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -194,7 +194,7 @@ func (s *Server) exportExpensesPDF(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	vm, err := s.buildExpensesVM(r.Context(), hh.ID)
+	vm, err := s.buildBookingsVM(r.Context(), hh.ID, NormalizeMonth(r.URL.Query().Get("m")))
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -210,17 +210,17 @@ func (s *Server) exportExpensesPDF(w http.ResponseWriter, r *http.Request) {
 
 	var grand int64
 	for _, g := range vm.Groups {
-		if len(g.Expenses) == 0 {
+		if len(g.Bookings) == 0 {
 			continue
 		}
 		pdfHeading(m, g.Title()+"  ("+FormatEUR(g.TotalCents)+" / Monat)")
 		pdfRow4(m, T(ctx, "pdf.label"), T(ctx, "pdf.amount"), T(ctx, "pdf.rhythm"), T(ctx, "pdf.monthly"), true)
-		for _, row := range g.Expenses {
+		for _, row := range g.Bookings {
 			pdfRow4(m,
-				row.Expense.Name+"  ["+splitNames(ctx, row, memberName)+"]",
-				FormatEUR(row.Expense.AmountCents),
-				FrequencyLabel(ctx, row.Expense.Frequency),
-				FormatEUR(calc.MonthlyCents(row.Expense)), false)
+				row.Booking.Name+"  ["+splitNames(ctx, row, memberName)+"]",
+				FormatEUR(row.Booking.AmountCents),
+				RhythmLabel(ctx, row.Booking),
+				FormatEUR(calc.MonthlyCents(row.Booking)), false)
 		}
 		grand += g.TotalCents
 	}
@@ -231,7 +231,7 @@ func (s *Server) exportExpensesPDF(w http.ResponseWriter, r *http.Request) {
 	s.writePDF(w, r, m, "ausgaben-"+pdfSlug(hh.Name)+".pdf")
 }
 
-func splitNames(ctx context.Context, row ExpenseRow, names map[int64]string) string {
+func splitNames(ctx context.Context, row BookingRow, names map[int64]string) string {
 	if len(row.Splits) == 0 {
 		return T(ctx, "pdf.everyone")
 	}

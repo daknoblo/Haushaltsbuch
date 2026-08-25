@@ -2,9 +2,32 @@ package store
 
 import "context"
 
+// seedCategory is a category created for every new household.
+type seedCategory struct {
+	name  string
+	class Direction
+	color string
+}
+
 var (
-	defaultSections   = []string{"Wohnen", "Versicherungen", "Lebenshaltung", "Freizeit", "Sparen"}
-	defaultCategories = []string{"Miete", "Strom", "Versicherung", "Lebensmittel", "Abo", "Sparrate"}
+	defaultSections = []string{"Wohnen", "Versicherungen", "Lebenshaltung", "Freizeit", "Sparen"}
+
+	// Colors are reused by the category breakdowns and the Sankey diagram, so
+	// every seeded category carries one from the start.
+	defaultCategories = []seedCategory{
+		{"Gehalt", DirIncome, "#10b981"},
+		{"Sonstige Einnahmen", DirIncome, "#34d399"},
+		{"Miete", DirExpense, "#6366f1"},
+		{"Nebenkosten", DirExpense, "#818cf8"},
+		{"Strom", DirExpense, "#a78bfa"},
+		{"Versicherung", DirExpense, "#f59e0b"},
+		{"Lebensmittel", DirExpense, "#ef4444"},
+		{"Mobilität", DirExpense, "#f97316"},
+		{"Abo", DirExpense, "#ec4899"},
+		{"Freizeit", DirExpense, "#14b8a6"},
+		{"Sparrate", DirExpense, "#0ea5e9"},
+		{"Sonstiges", DirExpense, "#94a3b8"},
+	}
 )
 
 // CreateHouseholdSeeded creates a household pre-populated with one member and
@@ -25,8 +48,8 @@ func (s *Store) CreateHouseholdSeeded(ctx context.Context, name string) (Househo
 				return err
 			}
 		}
-		for _, n := range defaultCategories {
-			if _, err := tx.CreateCategory(ctx, h.ID, n); err != nil {
+		for _, c := range defaultCategories {
+			if _, err := tx.CreateCategory(ctx, h.ID, c.name, c.class, c.color); err != nil {
 				return err
 			}
 		}

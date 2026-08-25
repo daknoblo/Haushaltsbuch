@@ -24,6 +24,11 @@ var migrationsFS embed.FS
 // ErrNotFound is returned when a requested row does not exist.
 var ErrNotFound = errors.New("store: not found")
 
+// ErrCategoryInUse is returned when a category still carries bookings. A
+// booking cannot exist without a category, so the reference must be moved
+// before the category can go.
+var ErrCategoryInUse = errors.New("store: category still in use")
+
 // dbtx is the subset of *sql.DB and *sql.Tx used by the queries, so that every
 // method can run standalone or inside a transaction.
 type dbtx interface {

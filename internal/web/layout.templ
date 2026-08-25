@@ -55,9 +55,8 @@ templ topbar(nav Nav) {
 			</button>
 			<nav class="hidden flex-wrap items-center gap-1 text-sm md:flex">
 				@navLink(nav, "overview", "/", T(ctx, "nav.overview"))
-				@navLink(nav, "expenses", "/expenses", T(ctx, "nav.expenses"))
-				@navLink(nav, "income", "/income", T(ctx, "nav.income"))
-				@navLink(nav, "statistics", "/statistics", T(ctx, "nav.statistics"))
+				@navLink(nav, "bookings", "/bookings", T(ctx, "nav.bookings"))
+				@navLink(nav, "dashboard", "/dashboard", T(ctx, "nav.dashboard"))
 				@navLink(nav, "settings", "/settings", T(ctx, "nav.settings"))
 			</nav>
 			<div class="ml-auto hidden items-center gap-2 md:flex">
@@ -69,9 +68,8 @@ templ topbar(nav Nav) {
 			<div class="w-full md:hidden" data-nav-panel hidden>
 				<nav class="nav-panel">
 					@navLink(nav, "overview", "/", T(ctx, "nav.overview"))
-					@navLink(nav, "expenses", "/expenses", T(ctx, "nav.expenses"))
-					@navLink(nav, "income", "/income", T(ctx, "nav.income"))
-					@navLink(nav, "statistics", "/statistics", T(ctx, "nav.statistics"))
+					@navLink(nav, "bookings", "/bookings", T(ctx, "nav.bookings"))
+					@navLink(nav, "dashboard", "/dashboard", T(ctx, "nav.dashboard"))
 					@navLink(nav, "settings", "/settings", T(ctx, "nav.settings"))
 				</nav>
 				<div class="flex items-center gap-2 pb-2">

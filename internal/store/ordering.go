@@ -25,9 +25,9 @@ func householdsScope() orderScope {
 	return orderScope{"households", "1 = 1", nil}
 }
 
-func expensesScope(householdID, sectionID int64) orderScope {
+func bookingsScope(householdID, sectionID int64) orderScope {
 	return orderScope{
-		"expenses",
+		"bookings",
 		"household_id = ? AND COALESCE(section_id, 0) = ?",
 		[]any{householdID, sectionID},
 	}
@@ -108,7 +108,7 @@ func (s *Store) MoveSection(ctx context.Context, householdID, id int64, delta in
 	return s.reorder(ctx, sectionsScope(householdID), id, delta)
 }
 
-// MoveExpense reorders an expense within its household and section.
-func (s *Store) MoveExpense(ctx context.Context, householdID, sectionID, id int64, delta int) error {
-	return s.reorder(ctx, expensesScope(householdID, sectionID), id, delta)
+// MoveBooking reorders a booking within its household and section.
+func (s *Store) MoveBooking(ctx context.Context, householdID, sectionID, id int64, delta int) error {
+	return s.reorder(ctx, bookingsScope(householdID, sectionID), id, delta)
 }

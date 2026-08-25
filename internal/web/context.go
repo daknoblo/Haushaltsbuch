@@ -94,41 +94,33 @@ func (s *Server) buildNav(r *http.Request, active, path string, showMonth bool) 
 // householdData bundles the household-scoped data that every month report
 // needs. Loading it once allows several months to be aggregated without
 // re-querying the same rows.
-type householdData struct {
-	members    []store.Member
-	sections   []store.Section
-	categories []store.Category
-	expenses   []store.Expense
-	splits     map[int64][]store.ExpenseSplit
-}
-
-// loadHouseholdData reads members, sections, categories, expenses and splits of
-// a household.
-func (s *Server) loadHouseholdData(ctx context.Context, householdID int64) (householdData, error) {
-	var d householdData
+// loadHouseholdData reads everything the reports are built from in one go, so
+// several months can be aggregated without re-querying the same rows.
+func (s *Server) loadHouseholdData(ctx context.Context, householdID int64) (calc.Data, error) {
+	var d calc.Data
 	var err error
-	if d.members, err = s.store.ListMembers(ctx, householdID); err != nil {
-		return householdData{}, err
+	if d.Members, err = s.store.ListMembers(ctx, householdID); err != nil {
+		return calc.Data{}, err
 	}
-	if d.sections, err = s.store.ListSections(ctx, householdID); err != nil {
-		return householdData{}, err
+	if d.Sections, err = s.store.ListSections(ctx, householdID); err != nil {
+		return calc.Data{}, err
 	}
-	if d.categories, err = s.store.ListCategories(ctx, householdID); err != nil {
-		return householdData{}, err
+	if d.Categories, err = s.store.ListCategories(ctx, householdID); err != nil {
+		return calc.Data{}, err
 	}
-	if d.expenses, err = s.store.ListExpenses(ctx, householdID); err != nil {
-		return householdData{}, err
+	if d.Tags, err = s.store.ListTags(ctx, householdID); err != nil {
+		return calc.Data{}, err
 	}
-	if d.splits, err = s.store.ListSplitsForHousehold(ctx, householdID); err != nil {
-		return householdData{}, err
+	if d.Bookings, err = s.store.ListBookings(ctx, householdID); err != nil {
+		return calc.Data{}, err
+	}
+	if d.Splits, err = s.store.ListSplitsForHousehold(ctx, householdID); err != nil {
+		return calc.Data{}, err
+	}
+	if d.TagLinks, err = s.store.ListBookingTags(ctx, householdID); err != nil {
+		return calc.Data{}, err
 	}
 	return d, nil
-}
-
-// report aggregates the already loaded household data for a single month.
-func (d householdData) report(month string, incomes []store.Income) calc.MonthReport {
-	return calc.BuildMonthReport(month, d.members, d.sections, d.categories,
-		d.expenses, d.splits, incomes)
 }
 
 // buildMonthReport loads all data for a household/month and aggregates it.
@@ -137,29 +129,29 @@ func (s *Server) buildMonthReport(ctx context.Context, householdID int64, month 
 	if err != nil {
 		return calc.MonthReport{}, err
 	}
-	incomes, err := s.store.ListIncomes(ctx, householdID, month)
-	if err != nil {
-		return calc.MonthReport{}, err
-	}
-	return data.report(month, incomes), nil
+	return calc.BuildMonthReport(data, month), nil
 }
 
-// expenseContext returns the members, sections and categories needed to render
-// an expense row.
-func (s *Server) expenseContext(ctx context.Context, householdID int64) (ExpensesVM, error) {
+// bookingContext returns the members, sections, categories and tags needed to
+// render a single booking row.
+func (s *Server) bookingContext(ctx context.Context, householdID int64) (BookingsVM, error) {
 	members, err := s.store.ListMembers(ctx, householdID)
 	if err != nil {
-		return ExpensesVM{}, err
+		return BookingsVM{}, err
 	}
 	sections, err := s.store.ListSections(ctx, householdID)
 	if err != nil {
-		return ExpensesVM{}, err
+		return BookingsVM{}, err
 	}
 	categories, err := s.store.ListCategories(ctx, householdID)
 	if err != nil {
-		return ExpensesVM{}, err
+		return BookingsVM{}, err
 	}
-	return ExpensesVM{Members: members, Sections: sections, Categories: categories}, nil
+	tags, err := s.store.ListTags(ctx, householdID)
+	if err != nil {
+		return BookingsVM{}, err
+	}
+	return BookingsVM{Members: members, Sections: sections, Categories: categories, Tags: tags}, nil
 }
 
 // parseID parses a decimal id, returning 0 on failure.

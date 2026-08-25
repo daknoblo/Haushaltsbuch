@@ -21,12 +21,32 @@ func Tf(ctx context.Context, key string, args ...any) string {
 // FrequencyLabel returns the localized label for a frequency.
 func FrequencyLabel(ctx context.Context, f store.Frequency) string {
 	switch f {
+	case store.FreqOnce:
+		return T(ctx, "freq.oneOff")
 	case store.FreqWeekly:
 		return T(ctx, "freq.weekly")
+	case store.FreqQuarterly:
+		return T(ctx, "freq.quarterly")
 	case store.FreqYearly:
 		return T(ctx, "freq.yearly")
 	default:
 		return T(ctx, "freq.monthly")
+	}
+}
+
+// DirectionLabel returns the localized label for a booking direction.
+func DirectionLabel(ctx context.Context, d store.Direction) string {
+	if d == store.DirIncome {
+		return T(ctx, "dir.income")
+	}
+	return T(ctx, "dir.expense")
+}
+
+// DirectionOptions returns the selectable booking directions.
+func DirectionOptions(ctx context.Context) []Option {
+	return []Option{
+		{string(store.DirExpense), T(ctx, "dir.expense")},
+		{string(store.DirIncome), T(ctx, "dir.income")},
 	}
 }
 
@@ -66,7 +86,9 @@ func SplitModeLabel(ctx context.Context, m store.SplitMode) string {
 func FrequencyOptions(ctx context.Context) []Option {
 	return []Option{
 		{string(store.FreqMonthly), T(ctx, "freq.monthly")},
+		{string(store.FreqOnce), T(ctx, "freq.oneOff")},
 		{string(store.FreqWeekly), T(ctx, "freq.weekly")},
+		{string(store.FreqQuarterly), T(ctx, "freq.quarterly")},
 		{string(store.FreqYearly), T(ctx, "freq.yearly")},
 	}
 }
@@ -97,23 +119,24 @@ func SplitModeOptions(ctx context.Context) []Option {
 	}
 }
 
-// RhythmLabel describes how often an expense occurs, for the collapsed row.
-func RhythmLabel(ctx context.Context, e store.Expense) string {
-	if e.IsOneOff {
+// RhythmLabel describes how often a booking occurs, for the collapsed row.
+func RhythmLabel(ctx context.Context, b store.Booking) string {
+	if !b.Frequency.Recurring() {
 		return T(ctx, "freq.oneOff")
 	}
-	return FrequencyLabel(ctx, e.Frequency)
+	if b.Interval > 1 {
+		return Tf(ctx, "freq.everyN", b.Interval, FrequencyLabel(ctx, b.Frequency))
+	}
+	return FrequencyLabel(ctx, b.Frequency)
 }
 
 // PageTitle returns the localized title of the active page.
 func PageTitle(ctx context.Context, active string) string {
 	switch active {
-	case "expenses":
-		return T(ctx, "nav.expenses")
-	case "income":
-		return T(ctx, "nav.income")
-	case "statistics":
-		return T(ctx, "nav.statistics")
+	case "bookings":
+		return T(ctx, "nav.bookings")
+	case "dashboard":
+		return T(ctx, "nav.dashboard")
 	case "settings":
 		return T(ctx, "nav.settings")
 	default:

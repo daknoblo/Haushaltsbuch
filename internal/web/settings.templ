@@ -51,7 +51,7 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 					</form>
 				</div>
 			</div>
-			<div class="card-tight" id="sektionen">
+			<div class="card-tight" id="bereiche">
 				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "settings.sections") }</h2></div>
 				<div class="card-body">
 					<div id="section-list" class="grid gap-2">
@@ -76,17 +76,44 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 				<div class="card-body">
 					<div id="category-list" class="grid gap-2">
 						for _, c := range vm.Categories {
-							@CategoryRowView(c)
+							@CategoryRowView(c, vm.UsageOf(c.ID))
 						}
 					</div>
 					<form
-						class="mt-3 flex gap-2"
+						class="mt-3 flex flex-wrap gap-2"
 						hx-post="/categories"
 						hx-target="#category-list"
 						hx-swap="beforeend"
 						data-reset-on-success
 					>
-						<input class="input flex-1" type="text" name="name" placeholder={ T(ctx, "settings.newCategory") } required/>
+						<input class="input min-w-0 flex-1" type="text" name="name" placeholder={ T(ctx, "settings.newCategory") } required/>
+						<select class="input w-32 shrink-0" name="classification" aria-label={ T(ctx, "settings.kind") }>
+							for _, o := range DirectionOptions(ctx) {
+								<option value={ o.Value }>{ o.Label }</option>
+							}
+						</select>
+						<input class="input h-11 w-14 shrink-0 p-1" type="color" name="color" value="#6366f1" aria-label={ T(ctx, "settings.color") }/>
+						<button class="btn-primary shrink-0" type="submit">{ T(ctx, "action.add") }</button>
+					</form>
+				</div>
+			</div>
+			<div class="card-tight" id="tags">
+				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "settings.tags") }</h2></div>
+				<div class="card-body">
+					<div id="tag-list" class="grid gap-2">
+						for _, t := range vm.Tags {
+							@TagRowView(t)
+						}
+					</div>
+					<form
+						class="mt-3 flex flex-wrap gap-2"
+						hx-post="/tags"
+						hx-target="#tag-list"
+						hx-swap="beforeend"
+						data-reset-on-success
+					>
+						<input class="input min-w-0 flex-1" type="text" name="name" placeholder={ T(ctx, "settings.newTag") } required/>
+						<input class="input h-11 w-14 shrink-0 p-1" type="color" name="color" value="#14b8a6" aria-label={ T(ctx, "settings.color") }/>
 						<button class="btn-primary shrink-0" type="submit">{ T(ctx, "action.add") }</button>
 					</form>
 				</div>
@@ -173,24 +200,56 @@ templ SectionRowView(s store.Section) {
 	</div>
 }
 
-templ CategoryRowView(c store.Category) {
+templ CategoryRowView(c store.Category, usage int) {
 	<div id={ "cat-" + strconv.FormatInt(c.ID, 10) } class="flex items-center gap-2 border-b border-slate-200/70 pb-2 last:border-0 last:pb-0 dark:border-slate-800/60">
 		<form
-			class="min-w-0 flex-1"
+			class="flex min-w-0 flex-1 items-center gap-2"
 			hx-post={ "/categories/" + strconv.FormatInt(c.ID, 10) }
 			hx-trigger="change, keyup changed delay:700ms"
 			hx-target="this"
 			hx-swap="none"
 		>
-			<input class="input" type="text" name="name" value={ c.Name }/>
+			<input class="input h-11 w-12 shrink-0 p-1" type="color" name="color" value={ ColorOr(c.Color) } aria-label={ T(ctx, "settings.color") }/>
+			<input class="input min-w-0 flex-1" type="text" name="name" value={ c.Name }/>
+			<select class="input w-32 shrink-0" name="classification" aria-label={ T(ctx, "settings.kind") }>
+				for _, o := range DirectionOptions(ctx) {
+					<option value={ o.Value } selected?={ o.Value == string(c.Classification) }>{ o.Label }</option>
+				}
+			</select>
 		</form>
+		if usage > 0 {
+			<span class="badge shrink-0">{ Tf(ctx, "settings.usedBy", usage) }</span>
+		}
 		<button
 			class="btn-icon shrink-0 no-print"
 			hx-post={ "/categories/" + strconv.FormatInt(c.ID, 10) + "/delete" }
 			hx-target={ "#cat-" + strconv.FormatInt(c.ID, 10) }
 			hx-swap="outerHTML"
 			hx-confirm={ T(ctx, "settings.confirmCategory") }
-			aria-label="Löschen"
+			aria-label={ T(ctx, "action.delete") }
+		>✕</button>
+	</div>
+}
+
+templ TagRowView(t store.Tag) {
+	<div id={ "tag-" + strconv.FormatInt(t.ID, 10) } class="flex items-center gap-2 border-b border-slate-200/70 pb-2 last:border-0 last:pb-0 dark:border-slate-800/60">
+		<form
+			class="flex min-w-0 flex-1 items-center gap-2"
+			hx-post={ "/tags/" + strconv.FormatInt(t.ID, 10) }
+			hx-trigger="change, keyup changed delay:700ms"
+			hx-target="this"
+			hx-swap="none"
+		>
+			<input class="input h-11 w-12 shrink-0 p-1" type="color" name="color" value={ ColorOr(t.Color) } aria-label={ T(ctx, "settings.color") }/>
+			<input class="input min-w-0 flex-1" type="text" name="name" value={ t.Name }/>
+		</form>
+		<button
+			class="btn-icon shrink-0 no-print"
+			hx-post={ "/tags/" + strconv.FormatInt(t.ID, 10) + "/delete" }
+			hx-target={ "#tag-" + strconv.FormatInt(t.ID, 10) }
+			hx-swap="outerHTML"
+			hx-confirm={ T(ctx, "settings.confirmTag") }
+			aria-label={ T(ctx, "action.delete") }
 		>✕</button>
 	</div>
 }

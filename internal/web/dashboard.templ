@@ -1,0 +1,272 @@
+package web
+
+import "github.com/daknoblo/Haushaltsbuch/internal/calc"
+
+templ DashboardPage(nav Nav, vm DashboardVM) {
+	@Layout(nav) {
+		@pageHeading(T(ctx, "dash.title"), T(ctx, "dash.subtitle")) {
+			<div class="ml-auto no-print">
+				<a class="btn-ghost" href={ templ.SafeURL("/export/statistics.pdf") }>{ T(ctx, "action.exportPDF") }</a>
+			</div>
+		}
+		if nav.ActiveHousehold.ID == 0 {
+			@noHousehold()
+		} else {
+			<div class="grid gap-4">
+				@rangePicker(nav, vm)
+				@headlineTiles(vm)
+				<div class="grid gap-4 lg:grid-cols-2">
+					@fixedCostCard(vm)
+					@savingsCard(vm)
+				</div>
+				@sankeyCard(vm)
+				@categoryCard(vm)
+				<div class="grid gap-4 lg:grid-cols-2">
+					@trendCard(vm)
+					@tagCard(vm)
+				</div>
+			</div>
+		}
+	}
+}
+
+templ rangePicker(nav Nav, vm DashboardVM) {
+	<div class="card-tight no-print">
+		<div class="flex flex-wrap items-center gap-2 px-4 py-3">
+			<span class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "dash.range") }</span>
+			for _, o := range vm.Ranges {
+				if o.Active {
+					<span class="btn-primary pointer-events-none">{ o.Label }</span>
+				} else {
+					<a class="btn-ghost" href={ templ.SafeURL("/dashboard?m=" + nav.Month + "&range=" + o.Key) }>{ o.Label }</a>
+				}
+			}
+		</div>
+	</div>
+}
+
+templ headlineTiles(vm DashboardVM) {
+	<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+		@statTile(T(ctx, "overview.income"), FormatEUR(vm.Report.IncomeCents), T(ctx, "overview.normalized"), "text-emerald-600 dark:text-emerald-400")
+		@statTile(T(ctx, "overview.expenses"), FormatEUR(vm.Report.ExpenseCents), T(ctx, "overview.normalized"), "text-slate-900 dark:text-slate-100")
+		@statTile(T(ctx, "dash.fixedCosts"), FormatEUR(vm.Report.FixedCents), FormatPercent(vm.Report.FixedCostRate())+" "+T(ctx, "dash.fixedShare"), "text-indigo-600 dark:text-indigo-400")
+		@statTile(T(ctx, "dash.savingsRate"), FormatPercent(vm.Report.SavingsRate()), T(ctx, "dash.perMonth"), "text-sky-600 dark:text-sky-400")
+	</div>
+}
+
+templ fixedCostCard(vm DashboardVM) {
+	<div class="card">
+		<div class="card-head">
+			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.fixedCosts") }</h2>
+			<span class="badge badge-info ml-auto">{ FormatPercent(vm.Report.FixedCostRate()) }</span>
+		</div>
+		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.fixedHint") }</p>
+		<div class="mb-4 flex items-baseline gap-3">
+			<span class="tnum text-2xl font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(vm.Report.FixedCents) }</span>
+			<span class="text-sm text-slate-500 dark:text-slate-400">
+				{ T(ctx, "dash.variableCosts") }: { FormatEUR(vm.Report.VariableCents) }
+			</span>
+		</div>
+		if len(vm.FixedTop) == 0 {
+			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.noCategories") }</p>
+		} else {
+			for _, it := range vm.FixedTop {
+				@hbar(it.Label, it.Cents, MaxLabeled(vm.FixedTop))
+			}
+		}
+	</div>
+}
+
+templ savingsCard(vm DashboardVM) {
+	<div class="card">
+		<div class="card-head">
+			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.savingsRate") }</h2>
+			<span class="badge badge-ok ml-auto">{ FormatPercent(vm.Report.SavingsRate()) }</span>
+		</div>
+		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.savingsHint") }</p>
+		<div class="grid grid-cols-2 gap-3">
+			<div>
+				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "dash.deliberate") }</div>
+				<div class="tnum mt-1 text-lg font-semibold text-sky-600 dark:text-sky-400">{ FormatEUR(vm.Report.SavingCents()) }</div>
+			</div>
+			<div>
+				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "dash.surplus") }</div>
+				<div class="tnum mt-1 text-lg font-semibold">
+					@signedMoney(vm.Report.BalanceCents)
+				</div>
+			</div>
+		</div>
+		<h3 class="mb-2 mt-5 text-sm font-medium text-slate-700 dark:text-slate-300">{ T(ctx, "dash.rule503020") }</h3>
+		@budgetClassBar(vm.Report)
+	</div>
+}
+
+// budgetClassBar is a single 100 % bar, which reads better against the 50/30/20
+// targets than three separate figures.
+templ budgetClassBar(rep calc.MonthReport) {
+	<div class="flex h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+		<div class="bg-indigo-500" style={ "width:" + BarWidth(rep.ByBudgetClass["need"], rep.ExpenseCents) }></div>
+		<div class="bg-amber-500" style={ "width:" + BarWidth(rep.ByBudgetClass["want"], rep.ExpenseCents) }></div>
+		<div class="bg-sky-500" style={ "width:" + BarWidth(rep.ByBudgetClass["saving"], rep.ExpenseCents) }></div>
+	</div>
+	<div class="mt-2 grid grid-cols-3 gap-2 text-xs">
+		@classLegend("bg-indigo-500", T(ctx, "class.need"), rep.ByBudgetClass["need"], rep.ExpenseCents, 50)
+		@classLegend("bg-amber-500", T(ctx, "class.want"), rep.ByBudgetClass["want"], rep.ExpenseCents, 30)
+		@classLegend("bg-sky-500", T(ctx, "class.saving"), rep.ByBudgetClass["saving"], rep.ExpenseCents, 20)
+	</div>
+}
+
+templ classLegend(dot, label string, cents, total int64, target int) {
+	<div>
+		<div class="flex items-center gap-1.5">
+			<span class={ "inline-block h-2 w-2 rounded-full", dot }></span>
+			<span class="text-slate-600 dark:text-slate-400">{ label }</span>
+		</div>
+		<div class="tnum mt-0.5 font-medium text-slate-900 dark:text-slate-100">{ SharePercent(cents, total) }</div>
+		<div class="tnum text-slate-400 dark:text-slate-500">{ TargetLabel(target) }</div>
+	</div>
+}
+
+templ sankeyCard(vm DashboardVM) {
+	<div class="card">
+		<div class="card-head">
+			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.flow") }</h2>
+			<span class="badge ml-auto">{ vm.RangeLabel }</span>
+		</div>
+		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.flowHint") }</p>
+		if vm.Sankey.Empty() {
+			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.noData") }</p>
+		} else {
+			if vm.Sankey.Deficit {
+				<p class="mb-3 text-sm text-rose-600 dark:text-rose-400">{ T(ctx, "dash.flowDeficit") }</p>
+			}
+			<div class="overflow-x-auto">
+				@sankeySVG(vm.Sankey)
+			</div>
+		}
+	</div>
+}
+
+// sankeySVG renders the diagram the layout was already computed for. Doing the
+// maths in Go keeps the strict CSP intact, since no charting library is needed.
+templ sankeySVG(s calc.Sankey) {
+	<svg
+		class="h-auto w-full min-w-[42rem]"
+		viewBox={ SankeyViewBox(s) }
+		role="img"
+		aria-label={ T(ctx, "dash.flow") }
+	>
+		<g>
+			for _, l := range s.Links {
+				<path d={ l.Path } fill={ l.Color } fill-opacity="0.28">
+					<title>{ l.Label + ": " + FormatEUR(l.Cents) }</title>
+				</path>
+			}
+		</g>
+		<g>
+			for _, n := range s.Nodes {
+				<rect
+					x={ Coord(n.X) }
+					y={ Coord(n.Y) }
+					width={ Coord(n.Width) }
+					height={ Coord(n.Height) }
+					rx="3"
+					fill={ n.Color }
+				>
+					<title>{ n.Label + ": " + FormatEUR(n.Cents) }</title>
+				</rect>
+				<text
+					x={ Coord(n.LabelX()) }
+					y={ Coord(n.LabelY()) }
+					text-anchor={ n.LabelAnchor() }
+					dominant-baseline="middle"
+					class="fill-slate-600 text-[11px] dark:fill-slate-300"
+				>{ n.Label }</text>
+			}
+		</g>
+	</svg>
+}
+
+templ categoryCard(vm DashboardVM) {
+	<div class="card">
+		<div class="card-head">
+			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.topCategories") }</h2>
+			<span class="badge ml-auto">{ vm.RangeLabel }</span>
+		</div>
+		if len(vm.Report.Categories) == 0 {
+			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.noCategories") }</p>
+		} else {
+			for _, c := range vm.Report.Categories {
+				@categoryBar(c, MaxLabeled(vm.Report.Categories), vm.Report.ExpenseCents)
+			}
+		}
+	</div>
+}
+
+// categoryBar shows the category's own colour plus its share, so "how much does
+// food cost" is answerable at a glance.
+templ categoryBar(c calc.LabeledTotal, max, total int64) {
+	<div class="grid grid-cols-[minmax(0,9rem)_1fr_auto_auto] items-center gap-3 py-1.5">
+		<div class="flex min-w-0 items-center gap-2">
+			@memberDot(c.Color)
+			<span class="truncate text-sm text-slate-600 dark:text-slate-400">{ c.Label }</span>
+		</div>
+		<div class="bar-track">
+			<div class="bar-fill" style={ "width:" + BarWidth(c.Cents, max) + ";background-color:" + ColorOr(c.Color) }></div>
+		</div>
+		<div class="tnum w-14 text-right text-xs text-slate-400 dark:text-slate-500">{ SharePercent(c.Cents, total) }</div>
+		<div class="tnum text-right text-sm text-slate-700 dark:text-slate-300">{ FormatEUR(c.Cents) }</div>
+	</div>
+}
+
+templ trendCard(vm DashboardVM) {
+	<div class="card">
+		<div class="card-head">
+			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.chartTitle") }</h2>
+		</div>
+		<div class="mb-4 grid grid-cols-2 gap-3">
+			<div>
+				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "dash.avgIncome") }</div>
+				<div class="tnum mt-1 font-semibold text-emerald-600 dark:text-emerald-400">{ FormatEUR(vm.AvgIncome) }</div>
+			</div>
+			<div>
+				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "dash.avgExpenses") }</div>
+				<div class="tnum mt-1 font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(vm.AvgExpense) }</div>
+			</div>
+		</div>
+		if len(vm.Months) == 0 {
+			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.noData") }</p>
+		} else {
+			<div class="flex items-end gap-1 overflow-x-auto pb-1">
+				for _, m := range vm.Months {
+					@trendColumn(m, vm.MaxCents)
+				}
+			</div>
+		}
+	</div>
+}
+
+templ trendColumn(m StatMonth, max int64) {
+	<div class="flex min-w-[2.25rem] flex-1 flex-col items-center gap-1">
+		<div class="flex h-28 w-full items-end justify-center gap-0.5">
+			<div class="w-1/2 rounded-t bg-emerald-500/70" style={ "height:" + BarWidth(m.IncomeCents, max) } title={ FormatEUR(m.IncomeCents) }></div>
+			<div class="w-1/2 rounded-t bg-indigo-500/70" style={ "height:" + BarWidth(m.ExpenseCents, max) } title={ FormatEUR(m.ExpenseCents) }></div>
+		</div>
+		<span class="text-[10px] text-slate-400 dark:text-slate-500">{ m.Label() }</span>
+	</div>
+}
+
+templ tagCard(vm DashboardVM) {
+	<div class="card">
+		<div class="card-head">
+			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.byTag") }</h2>
+		</div>
+		if len(vm.Report.Tags) == 0 {
+			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.noTagData") }</p>
+		} else {
+			for _, t := range vm.Report.Tags {
+				@categoryBar(t, MaxLabeled(vm.Report.Tags), vm.Report.ExpenseCents)
+			}
+		}
+	</div>
+}

@@ -1,42 +1,66 @@
 package store
 
-// Frequency describes how often a recurring expense occurs.
+// Direction says whether a booking feeds the budget or draws from it.
+type Direction string
+
+// Directions of a booking.
+const (
+	DirIncome  Direction = "income"
+	DirExpense Direction = "expense"
+)
+
+// Valid reports whether d is a known direction.
+func (d Direction) Valid() bool {
+	return d == DirIncome || d == DirExpense
+}
+
+// Frequency describes how often a booking occurs.
 type Frequency string
 
-// Frequencies of a recurring expense.
+// Frequencies of a booking.
 const (
-	FreqWeekly  Frequency = "weekly"
-	FreqMonthly Frequency = "monthly"
-	FreqYearly  Frequency = "yearly"
+	FreqOnce      Frequency = "once"
+	FreqWeekly    Frequency = "weekly"
+	FreqMonthly   Frequency = "monthly"
+	FreqQuarterly Frequency = "quarterly"
+	FreqYearly    Frequency = "yearly"
 )
 
 // Valid reports whether f is a known frequency.
 func (f Frequency) Valid() bool {
 	switch f {
-	case FreqWeekly, FreqMonthly, FreqYearly:
+	case FreqOnce, FreqWeekly, FreqMonthly, FreqQuarterly, FreqYearly:
 		return true
 	default:
 		return false
 	}
 }
 
+// Recurring reports whether f repeats rather than happening a single time.
+func (f Frequency) Recurring() bool {
+	return f != FreqOnce
+}
+
 // MonthlyFactor returns the factor to normalise an amount of this frequency to
-// a monthly-equivalent value.
+// a monthly-equivalent value. A recurring amount is spread evenly across the
+// months it covers, so a yearly premium contributes a twelfth every month.
 func (f Frequency) MonthlyFactor() float64 {
 	switch f {
 	case FreqWeekly:
 		return 52.0 / 12.0
+	case FreqQuarterly:
+		return 1.0 / 3.0
 	case FreqYearly:
 		return 1.0 / 12.0
-	default: // monthly
+	default: // once, monthly
 		return 1.0
 	}
 }
 
-// CostNature classifies an expense as fixed or variable.
+// CostNature classifies a booking as fixed or variable.
 type CostNature string
 
-// Cost natures of an expense.
+// Cost natures of a booking.
 const (
 	CostFix      CostNature = "fix"
 	CostVariable CostNature = "variable"
@@ -47,7 +71,7 @@ func (c CostNature) Valid() bool {
 	return c == CostFix || c == CostVariable
 }
 
-// BudgetClass is the 50/30/20 classification of an expense.
+// BudgetClass is the 50/30/20 classification of a booking.
 type BudgetClass string
 
 // Budget classes of the 50/30/20 rule.
@@ -67,10 +91,10 @@ func (b BudgetClass) Valid() bool {
 	}
 }
 
-// SplitMode describes how an expense is split between members.
+// SplitMode describes how a booking is split between members.
 type SplitMode string
 
-// Split modes of an expense.
+// Split modes of a booking.
 const (
 	SplitEqual   SplitMode = "equal"
 	SplitPercent SplitMode = "percent"
@@ -104,7 +128,7 @@ type Member struct {
 	SortOrder   int
 }
 
-// Section groups expenses for a clearer overview.
+// Section groups bookings for a clearer overview.
 type Section struct {
 	ID          int64
 	HouseholdID int64
@@ -112,51 +136,54 @@ type Section struct {
 	SortOrder   int
 }
 
-// Category is a free, managed label for an expense (e.g. "Miete").
+// Category is the mandatory label of a booking (e.g. "Miete"). Its
+// classification keeps income categories out of expense pickers.
 type Category struct {
-	ID          int64
-	HouseholdID int64
-	Name        string
+	ID             int64
+	HouseholdID    int64
+	Name           string
+	Classification Direction
+	Color          string
+	SortOrder      int
 }
 
-// Expense is a recurring or one-off cost.
-type Expense struct {
+// Tag is a free, cross-cutting label. A booking can carry any number of them.
+type Tag struct {
 	ID          int64
 	HouseholdID int64
-	SectionID   *int64
-	CategoryID  *int64
 	Name        string
+	Color       string
+}
+
+// Booking is a single planned figure: either money coming in or going out,
+// happening once or repeating. It replaces the former split between expenses
+// and incomes so that a figure is maintained in exactly one place.
+type Booking struct {
+	ID          int64
+	HouseholdID int64
+	CategoryID  int64
+	SectionID   *int64
+	Direction   Direction
+	Name        string
+	Note        string
 	AmountCents int64
 	Frequency   Frequency
+	Interval    int
+	StartsOn    string // YYYY-MM-DD, the date itself when Frequency is once
+	EndsOn      string // YYYY-MM-DD, empty means open ended
 	CostNature  CostNature
 	BudgetClass BudgetClass
-	IsOneOff    bool
-	OccurredOn  string // YYYY-MM-DD (one-off only)
-	ActiveFrom  string // YYYY-MM (recurring)
-	ActiveUntil string // YYYY-MM (recurring, optional)
 	SplitMode   SplitMode
 	SortOrder   int
 	CreatedAt   string
 	UpdatedAt   string
 }
 
-// ExpenseSplit records a member's participation/share in an expense. The
-// meaning of Value depends on the expense's SplitMode: it is ignored for
-// equal, a percentage (0-100) for percent, and cents for fixed.
-type ExpenseSplit struct {
-	ID        int64
-	ExpenseID int64
+// BookingSplit records a member's share of a booking. The meaning of Value
+// depends on the booking's SplitMode: it is ignored for equal, a percentage
+// (0-100) for percent, and cents for fixed.
+type BookingSplit struct {
+	BookingID int64
 	MemberID  int64
 	Value     float64
-}
-
-// Income is a manually entered income line for a member in a given month.
-type Income struct {
-	ID          int64
-	HouseholdID int64
-	MemberID    int64
-	YearMonth   string // YYYY-MM
-	Name        string
-	AmountCents int64
-	SortOrder   int
 }

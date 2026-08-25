@@ -1,0 +1,326 @@
+package web
+
+import (
+	"strconv"
+
+	"github.com/daknoblo/Haushaltsbuch/internal/store"
+)
+
+templ BookingsPage(nav Nav, vm BookingsVM) {
+	@Layout(nav) {
+		@pageHeading(T(ctx, "bookings.title"), T(ctx, "bookings.subtitle")) {
+			<div class="ml-auto flex flex-wrap items-center gap-2 no-print">
+				<a class="btn-ghost" href="/settings#bereiche">{ T(ctx, "bookings.manageSections") }</a>
+				<a class="btn-ghost" href={ templ.SafeURL("/export/expenses.pdf") }>{ T(ctx, "action.exportPDF") }</a>
+			</div>
+		}
+		if nav.ActiveHousehold.ID == 0 {
+			@noHousehold()
+		} else {
+			<div class="grid gap-4">
+				@bookingBalanceStrip(vm)
+				@incomeSection(vm)
+				<h2 class="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+					{ T(ctx, "bookings.expenseHeading") }
+				</h2>
+				for _, g := range vm.Groups {
+					@bookingSection(g, vm)
+				}
+			</div>
+		}
+	}
+}
+
+// bookingBalanceStrip keeps the effect of an edit visible while editing.
+templ bookingBalanceStrip(vm BookingsVM) {
+	<div class="card-tight">
+		<div class="grid grid-cols-3 divide-x divide-slate-200 dark:divide-slate-800">
+			<div class="px-4 py-3">
+				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "overview.income") }</div>
+				<div class="tnum mt-1 text-lg font-semibold text-emerald-600 dark:text-emerald-400">{ FormatEUR(vm.Report.IncomeCents) }</div>
+			</div>
+			<div class="px-4 py-3">
+				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "overview.expenses") }</div>
+				<div class="tnum mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(vm.Report.ExpenseCents) }</div>
+			</div>
+			<div class="px-4 py-3">
+				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "overview.balance") }</div>
+				<div class="tnum mt-1 text-lg font-semibold">
+					@signedMoney(vm.Report.BalanceCents)
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+templ incomeSection(vm BookingsVM) {
+	<div class="card-tight">
+		<div class="card-head">
+			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "bookings.incomeHeading") }</h2>
+			<span class="badge badge-ok ml-auto">{ FormatEUR(vm.Report.IncomeCents) } { T(ctx, "bookings.perMonth") }</span>
+		</div>
+		<div class="card-body">
+			<div id="income-rows" class="grid gap-1.5">
+				for _, b := range vm.Income {
+					@BookingRowView(b, vm)
+				}
+			</div>
+			if len(vm.Income) == 0 {
+				<p class="py-2 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.noIncome") }</p>
+			}
+			<button
+				class="btn-ghost mt-3 no-print"
+				hx-post="/bookings/new?direction=income"
+				hx-target="#income-rows"
+				hx-swap="beforeend"
+			>{ T(ctx, "bookings.addIncome") }</button>
+		</div>
+	</div>
+}
+
+templ bookingSection(g SectionGroup, vm BookingsVM) {
+	<div class="card-tight">
+		<div class="card-head">
+			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ g.Title() }</h2>
+			<span class="badge ml-auto">{ FormatEUR(g.TotalCents) } { T(ctx, "bookings.perMonth") }</span>
+		</div>
+		<div class="card-body">
+			<div id={ "section-" + strconv.FormatInt(g.SectionID(), 10) } class="grid gap-1.5">
+				for _, b := range g.Bookings {
+					@BookingRowView(b, vm)
+				}
+			</div>
+			<button
+				class="btn-ghost mt-3 no-print"
+				hx-post={ "/bookings/new?direction=expense&section_id=" + strconv.FormatInt(g.SectionID(), 10) }
+				hx-target={ "#section-" + strconv.FormatInt(g.SectionID(), 10) }
+				hx-swap="beforeend"
+			>{ T(ctx, "bookings.addExpense") }</button>
+		</div>
+	</div>
+}
+
+templ BookingRowView(b BookingRow, vm BookingsVM) {
+	<form
+		id={ b.DOMID() }
+		hx-post={ b.PostURL() }
+		hx-trigger="change, keyup changed delay:700ms"
+		hx-target="this"
+		hx-swap="outerHTML"
+	>
+		// Carries the open state through the auto-save round trip.
+		<input type="hidden" name="expanded" value={ b.ExpandedValue() } data-expanded-state/>
+		<input type="hidden" name="direction" value={ string(b.Booking.Direction) }/>
+		<details class="exp" open?={ b.Expanded }>
+			<summary class="exp-summary">
+				<span class="exp-caret" aria-hidden="true">›</span>
+				if b.Booking.Name == "" {
+					<span class="min-w-0 flex-1 truncate italic text-slate-400 dark:text-slate-500">{ T(ctx, "bookings.unnamed") }</span>
+				} else {
+					<span class="min-w-0 flex-1 truncate font-medium text-slate-900 dark:text-slate-100">{ b.Booking.Name }</span>
+				}
+				<span class="hidden items-center gap-1.5 sm:flex">
+					<span class="badge">{ RhythmLabel(ctx, b.Booking) }</span>
+					if !b.IsIncome() {
+						<span class={ "badge", b.BudgetClassBadge() }>{ BudgetClassLabel(ctx, b.Booking.BudgetClass) }</span>
+					}
+					for _, t := range vm.Tags {
+						if b.HasTag(t.ID) {
+							<span class="badge" style={ tagStyle(t.Color) }>{ t.Name }</span>
+						}
+					}
+				</span>
+				<span class="hidden items-center gap-1 sm:flex">
+					for _, m := range vm.Members {
+						if b.HasMember(m.ID) {
+							@memberDot(m.Color)
+						}
+					}
+				</span>
+				<span class="tnum shrink-0 text-right text-sm font-semibold">
+					if b.IsIncome() {
+						<span class="text-emerald-600 dark:text-emerald-400">{ FormatEUR(b.MonthlyCents()) }</span>
+					} else {
+						<span class="text-slate-900 dark:text-slate-100">{ FormatEUR(b.MonthlyCents()) }</span>
+					}
+					<span class="font-normal text-slate-400 dark:text-slate-500">{ T(ctx, "bookings.perMonthShort") }</span>
+				</span>
+			</summary>
+			<div class="exp-body grid gap-4 p-4">
+				<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+					<div class="sm:col-span-2">
+						<label class="field-label" for={ "name-" + b.IDStr() }>{ T(ctx, "bookings.name") }</label>
+						<input id={ "name-" + b.IDStr() } class="input" type="text" name="name" value={ b.Booking.Name } placeholder={ T(ctx, "bookings.namePlaceholder") }/>
+					</div>
+					<div>
+						<label class="field-label" for={ "amount-" + b.IDStr() }>{ T(ctx, "bookings.amount") }</label>
+						<input id={ "amount-" + b.IDStr() } class="input tnum" type="number" step="0.01" min="0" name="amount" value={ CentsToInput(b.Booking.AmountCents) }/>
+					</div>
+					<div>
+						<label class="field-label" for={ "cat-" + b.IDStr() }>{ T(ctx, "bookings.category") }</label>
+						<select id={ "cat-" + b.IDStr() } class="input" name="category_id">
+							for _, c := range categoriesFor(vm, b.IsIncome()) {
+								<option value={ strconv.FormatInt(c.ID, 10) } selected?={ c.ID == b.Booking.CategoryID }>{ c.Name }</option>
+							}
+						</select>
+					</div>
+					<div>
+						<label class="field-label" for={ "freq-" + b.IDStr() }>{ T(ctx, "bookings.frequency") }</label>
+						<select id={ "freq-" + b.IDStr() } class="input" name="frequency">
+							for _, o := range FrequencyOptions(ctx) {
+								<option value={ o.Value } selected?={ o.Value == string(b.Booking.Frequency) }>{ o.Label }</option>
+							}
+						</select>
+					</div>
+					if b.Booking.Frequency.Recurring() {
+						<div>
+							<label class="field-label" for={ "interval-" + b.IDStr() }>{ T(ctx, "bookings.interval") }</label>
+							<input id={ "interval-" + b.IDStr() } class="input tnum" type="number" min="1" max="60" name="interval" value={ b.IntervalInput() } title={ T(ctx, "bookings.intervalHint") }/>
+						</div>
+						<div>
+							<label class="field-label" for={ "from-" + b.IDStr() }>{ T(ctx, "bookings.activeFrom") }</label>
+							<input id={ "from-" + b.IDStr() } class="input" type="month" name="active_from" value={ b.StartMonth() }/>
+						</div>
+						<div>
+							<label class="field-label" for={ "until-" + b.IDStr() }>{ T(ctx, "bookings.activeUntil") }</label>
+							<input id={ "until-" + b.IDStr() } class="input" type="month" name="active_until" value={ b.EndMonth() }/>
+						</div>
+					} else {
+						<div>
+							<label class="field-label" for={ "date-" + b.IDStr() }>{ T(ctx, "bookings.date") }</label>
+							<input id={ "date-" + b.IDStr() } class="input" type="date" name="occurred_on" value={ b.Booking.StartsOn }/>
+						</div>
+					}
+					if !b.IsIncome() {
+						<div>
+							<label class="field-label" for={ "sec-" + b.IDStr() }>{ T(ctx, "bookings.section") }</label>
+							<select id={ "sec-" + b.IDStr() } class="input" name="section_id">
+								<option value="0">{ T(ctx, "bookings.noSection") }</option>
+								for _, sec := range vm.Sections {
+									<option value={ strconv.FormatInt(sec.ID, 10) } selected?={ b.Booking.SectionID != nil && *b.Booking.SectionID == sec.ID }>{ sec.Name }</option>
+								}
+							</select>
+						</div>
+						<div>
+							<label class="field-label" for={ "cost-" + b.IDStr() }>{ T(ctx, "bookings.costNature") }</label>
+							<select id={ "cost-" + b.IDStr() } class="input" name="cost_nature">
+								for _, o := range CostNatureOptions(ctx) {
+									<option value={ o.Value } selected?={ o.Value == string(b.Booking.CostNature) }>{ o.Label }</option>
+								}
+							</select>
+						</div>
+						<div>
+							<label class="field-label" for={ "class-" + b.IDStr() }>{ T(ctx, "bookings.budgetClass") }</label>
+							<select id={ "class-" + b.IDStr() } class="input" name="budget_class">
+								for _, o := range BudgetClassOptions(ctx) {
+									<option value={ o.Value } selected?={ o.Value == string(b.Booking.BudgetClass) }>{ o.Label }</option>
+								}
+							</select>
+						</div>
+					}
+					<div class="sm:col-span-2">
+						<label class="field-label" for={ "note-" + b.IDStr() }>{ T(ctx, "bookings.note") }</label>
+						<input id={ "note-" + b.IDStr() } class="input" type="text" name="note" value={ b.Booking.Note }/>
+					</div>
+				</div>
+				@tagPicker(b, vm)
+				@splitEditor(b, vm)
+				<div class="flex items-center justify-between border-t border-slate-200 pt-3 dark:border-slate-800 no-print">
+					<span class="text-xs text-slate-400 dark:text-slate-500" data-saved-hint>{ T(ctx, "status.saved") }</span>
+					<div class="flex items-center gap-1">
+						@moveButtons("/bookings/" + b.IDStr() + "/move")
+						<button
+							type="button"
+							class="btn-icon text-rose-600 dark:text-rose-400"
+							title={ T(ctx, "action.delete") }
+							hx-post={ b.DeleteURL() }
+							hx-target={ "#" + b.DOMID() }
+							hx-swap="delete"
+							hx-confirm={ T(ctx, "bookings.confirmDelete") }
+						>✕</button>
+					</div>
+				</div>
+			</div>
+		</details>
+	</form>
+}
+
+templ tagPicker(b BookingRow, vm BookingsVM) {
+	<div>
+		<span class="field-label">{ T(ctx, "bookings.tags") }</span>
+		if len(vm.Tags) == 0 {
+			<p class="text-sm text-slate-500 dark:text-slate-400">
+				{ T(ctx, "bookings.noTags") } <a class="underline" href="/settings#tags">{ T(ctx, "settings.newTag") }</a>
+			</p>
+		} else {
+			<div class="flex flex-wrap gap-2">
+				for _, t := range vm.Tags {
+					<label class={ memberChipClass(b.HasTag(t.ID)) }>
+						<input class="sr-only" type="checkbox" name="tag" value={ strconv.FormatInt(t.ID, 10) } checked?={ b.HasTag(t.ID) }/>
+						@memberDot(t.Color)
+						{ t.Name }
+					</label>
+				}
+			</div>
+		}
+	</div>
+}
+
+templ splitEditor(b BookingRow, vm BookingsVM) {
+	<div class="grid gap-3">
+		<div class="sm:max-w-xs">
+			<label class="field-label" for={ "split-" + b.IDStr() }>{ T(ctx, "bookings.splitMode") }</label>
+			<select id={ "split-" + b.IDStr() } class="input" name="split_mode">
+				for _, o := range SplitModeOptions(ctx) {
+					<option value={ o.Value } selected?={ o.Value == string(b.Booking.SplitMode) }>{ o.Label }</option>
+				}
+			</select>
+		</div>
+		<div>
+			<span class="field-label">
+				if b.IsIncome() {
+					{ T(ctx, "bookings.whoGets") }
+				} else {
+					{ T(ctx, "bookings.whoPays") }
+				}
+			</span>
+			<div class="flex flex-wrap items-center gap-2">
+				for _, m := range vm.Members {
+					<label class={ memberChipClass(b.HasMember(m.ID)) }>
+						<input class="sr-only" type="checkbox" name={ "m_" + strconv.FormatInt(m.ID, 10) } value="1" checked?={ b.HasMember(m.ID) }/>
+						@memberDot(m.Color)
+						{ m.Name }
+					</label>
+					if b.Booking.SplitMode == store.SplitPercent && b.HasMember(m.ID) {
+						<input
+							class="input tnum w-24"
+							type="number"
+							min="0"
+							max="100"
+							step="1"
+							name={ "v_" + strconv.FormatInt(m.ID, 10) }
+							value={ b.PercentInput(m.ID) }
+							aria-label={ Tf(ctx, "bookings.shareOf", m.Name) }
+						/>
+					}
+					if b.Booking.SplitMode == store.SplitFixed && b.HasMember(m.ID) {
+						<input
+							class="input tnum w-28"
+							type="number"
+							min="0"
+							step="0.01"
+							name={ "v_" + strconv.FormatInt(m.ID, 10) }
+							value={ b.FixedInput(m.ID) }
+							aria-label={ Tf(ctx, "bookings.amountOf", m.Name) }
+						/>
+					}
+				}
+			</div>
+			if b.Booking.SplitMode == store.SplitFixed {
+				<p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+					{ Tf(ctx, "bookings.fixedHint", FrequencyLabel(ctx, b.Booking.Frequency)) }
+				</p>
+			}
+		</div>
+	</div>
+}
