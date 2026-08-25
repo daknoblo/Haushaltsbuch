@@ -65,6 +65,13 @@
   .btn-danger {
     @apply inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-lg border border-rose-300 px-3 py-1.5 text-sm text-rose-700 transition hover:bg-rose-500 hover:text-white sm:min-h-0 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500 dark:hover:text-white;
   }
+  /* Direction is colour-coded everywhere, so the two add buttons carry it too. */
+  .btn-income {
+    @apply inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 sm:min-h-0;
+  }
+  .btn-expense {
+    @apply inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-rose-500 sm:min-h-0;
+  }
 
   /* text-base below sm: iOS zooms into any control with a font under 16px. */
   .input {
@@ -243,8 +250,30 @@
     @apply bg-indigo-500 text-white hover:bg-indigo-500 dark:text-white;
   }
 
-  .settle-row {
-    @apply flex flex-wrap items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-sm dark:bg-slate-800/60;
+  /* A payment, expandable into the bookings it is made of. */
+  .settle {
+    @apply overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800/60;
+  }
+  .settle-summary {
+    @apply flex cursor-pointer list-none flex-wrap items-center gap-2 px-3 py-2 text-sm;
+  }
+  .settle-summary::-webkit-details-marker {
+    display: none;
+  }
+  .settle[open] .settle-summary {
+    @apply border-b border-slate-200 dark:border-slate-700/60;
+  }
+  .settle-caret {
+    @apply shrink-0 text-xs text-slate-400 transition-transform dark:text-slate-500;
+  }
+  .settle[open] .settle-caret {
+    @apply rotate-90;
+  }
+  .settle-body {
+    @apply grid gap-1.5 px-3 py-2.5;
+  }
+  .settle-line {
+    @apply flex items-center gap-2 text-sm;
   }
 
   .suggest-chip {

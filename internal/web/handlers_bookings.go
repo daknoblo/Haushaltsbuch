@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -97,7 +98,7 @@ func (s *Server) handleBookingCreate(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, r, err)
 		return
 	}
-	s.renderDialog(w, r, active, created.ID, month)
+	s.renderDialog(w, r, active, created.ID, month, true)
 }
 
 // handleBookingEdit renders the dialog for an existing booking.
@@ -107,12 +108,49 @@ func (s *Server) handleBookingEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.renderDialog(w, r, active, parseID(r.PathValue("id")),
-		NormalizeMonth(r.URL.Query().Get("m")))
+		NormalizeMonth(r.URL.Query().Get("m")), false)
+}
+
+// handleBookingDiscard drops a draft the dialog was closed on without a single
+// edit. The row has to exist before it can save itself, so without this every
+// mistaken click on "add" would leave a dead booking behind.
+func (s *Server) handleBookingDiscard(w http.ResponseWriter, r *http.Request) {
+	active, ok := s.requireActiveHousehold(w, r)
+	if !ok {
+		return
+	}
+	ctx := r.Context()
+	b, err := s.store.GetBooking(ctx, active, parseID(r.PathValue("id")))
+	if errors.Is(err, store.ErrNotFound) {
+		// Deleting from inside the dialog closes it too, so there is nothing left.
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	}
+	if !isBlankDraft(ctx, b) {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if err := s.store.DeleteBooking(ctx, active, b.ID); err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	}
+	hxChanged(w)
+}
+
+// isBlankDraft reports whether a booking still holds nothing but the values the
+// dialog created it with.
+func isBlankDraft(ctx context.Context, b store.Booking) bool {
+	return b.AmountCents == 0 && b.Note == "" &&
+		(b.Name == "" || nameIsSuggested(ctx, b.Name))
 }
 
 // renderDialog assembles the booking dialog from the stored state, so what the
 // user sees is always what was actually saved.
-func (s *Server) renderDialog(w http.ResponseWriter, r *http.Request, householdID, id int64, month string) {
+func (s *Server) renderDialog(w http.ResponseWriter, r *http.Request, householdID, id int64, month string, draft bool) {
 	ctx := r.Context()
 	b, err := s.store.GetBooking(ctx, householdID, id)
 	if err != nil {
@@ -143,6 +181,7 @@ func (s *Server) renderDialog(w http.ResponseWriter, r *http.Request, householdI
 		}
 	}
 	form.Row = row
+	form.Draft = draft
 	s.render(w, r, BookingDialog(form))
 }
 
@@ -364,7 +403,7 @@ func (s *Server) handleOverrideCreate(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, r, err)
 		return
 	}
-	s.renderDialog(w, r, active, o.BookingID, NormalizeMonth(r.FormValue("m")))
+	s.renderDialog(w, r, active, o.BookingID, NormalizeMonth(r.FormValue("m")), false)
 }
 
 func (s *Server) handleOverrideUpdate(w http.ResponseWriter, r *http.Request) {
@@ -401,5 +440,5 @@ func (s *Server) handleOverrideDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.renderDialog(w, r, active, parseID(r.FormValue("booking_id")),
-		NormalizeMonth(r.FormValue("m")))
+		NormalizeMonth(r.FormValue("m")), false)
 }

@@ -29,7 +29,7 @@ templ BookingsPage(nav Nav, vm BookingsVM) {
 
 templ newBookingButton(month string, dir store.Direction, label string) {
 	<button
-		class={ "no-print", templ.KV("btn-primary", dir == store.DirExpense), templ.KV("btn-ghost", dir == store.DirIncome) }
+		class={ "no-print", templ.KV("btn-expense", dir == store.DirExpense), templ.KV("btn-income", dir == store.DirIncome) }
 		hx-post={ "/bookings/new?m=" + month + "&direction=" + string(dir) }
 		hx-target="#booking-dialog"
 		hx-swap="innerHTML"
@@ -125,8 +125,12 @@ templ bookingRow(b BookingRow) {
 			if b.Discounted() {
 				<span class="badge badge-ok">{ FormatEUR(b.AmountCents()) }</span>
 			}
-			if !b.IsIncome() && b.ShareCount() > 1 {
-				<span class="badge">÷ { strconv.Itoa(b.ShareCount()) }</span>
+			if !b.IsIncome() && b.MemberCount > 1 {
+				if b.ShareCount() > 1 {
+					<span class="badge badge-info">÷ { strconv.Itoa(b.ShareCount()) }</span>
+				} else {
+					<span class="badge badge-muted">{ T(ctx, "dash.splitAlone") }</span>
+				}
 			}
 		</span>
 		<span class="tnum shrink-0 text-right text-sm font-semibold">

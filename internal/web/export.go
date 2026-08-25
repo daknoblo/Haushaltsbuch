@@ -185,9 +185,9 @@ func (s *Server) handleExportStatistics(w http.ResponseWriter, r *http.Request) 
 			FormatEUR(rep.BalanceCents), false)
 	}
 
-	if len(vm.Transfers) > 0 {
+	if len(vm.Settlement.Transfers) > 0 {
 		pdfHeading(m, T(ctx, "dash.settlement"))
-		for _, tr := range vm.Transfers {
+		for _, tr := range vm.Settlement.Transfers {
 			pdfKV(m, Tf(ctx, "dash.owes", tr.From.Name, tr.To.Name), FormatEUR(tr.Cents))
 		}
 	}

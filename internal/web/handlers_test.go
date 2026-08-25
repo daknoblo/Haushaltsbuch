@@ -523,6 +523,71 @@ func TestBookingEditRendersStoredState(t *testing.T) {
 	if !strings.Contains(w.Body.String(), `value="Miete"`) {
 		t.Error("the dialog does not show the stored name")
 	}
+	// Only a fresh draft may be thrown away by closing its dialog.
+	if strings.Contains(w.Body.String(), "/discard") {
+		t.Error("an existing booking must not offer to discard itself")
+	}
+}
+
+// A draft nobody typed into is worth nothing, so closing its dialog has to
+// leave the list as empty as it was.
+func TestDiscardDropsAnUntouchedDraft(t *testing.T) {
+	srv, h, active := newTestServer(t)
+	ctx := t.Context()
+
+	w := post(t, h, "/bookings/new?direction=expense", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("create = %d, want 200", w.Code)
+	}
+	bookings, _ := srv.store.ListBookings(ctx, active.ID)
+	if len(bookings) != 1 {
+		t.Fatalf("want the draft to exist, got %d bookings", len(bookings))
+	}
+	id := strconv.FormatInt(bookings[0].ID, 10)
+	if !strings.Contains(w.Body.String(), "/bookings/"+id+"/discard") {
+		t.Error("the draft dialog carries no discard URL")
+	}
+
+	if got := post(t, h, "/bookings/"+id+"/discard", nil).Code; got != http.StatusNoContent {
+		t.Fatalf("discard = %d, want 204", got)
+	}
+	if bookings, _ = srv.store.ListBookings(ctx, active.ID); len(bookings) != 0 {
+		t.Errorf("the untouched draft survived: %+v", bookings)
+	}
+
+	// Discarding twice is what the delete button leaves behind.
+	if got := post(t, h, "/bookings/"+id+"/discard", nil).Code; got != http.StatusNoContent {
+		t.Errorf("discard of a gone booking = %d, want 204", got)
+	}
+}
+
+func TestDiscardKeepsAnythingTypedIn(t *testing.T) {
+	srv, h, active := newTestServer(t)
+	ctx := t.Context()
+
+	post(t, h, "/bookings/new?direction=expense", nil)
+	bookings, _ := srv.store.ListBookings(ctx, active.ID)
+	id := strconv.FormatInt(bookings[0].ID, 10)
+
+	if got := post(t, h, "/bookings/"+id, url.Values{"amount": {"12"}}).Code; got != http.StatusNoContent {
+		t.Fatalf("update = %d, want 204", got)
+	}
+	if got := post(t, h, "/bookings/"+id+"/discard", nil).Code; got != http.StatusNoContent {
+		t.Fatalf("discard = %d, want 204", got)
+	}
+	if bookings, _ = srv.store.ListBookings(ctx, active.ID); len(bookings) != 1 {
+		t.Fatalf("a booking with an amount was discarded")
+	}
+
+	// A name alone is an edit too: the amount can still follow later.
+	post(t, h, "/bookings/new?direction=expense", nil)
+	bookings, _ = srv.store.ListBookings(ctx, active.ID)
+	named := strconv.FormatInt(bookings[len(bookings)-1].ID, 10)
+	post(t, h, "/bookings/"+named, url.Values{"name": {"Miete"}})
+	post(t, h, "/bookings/"+named+"/discard", nil)
+	if bookings, _ = srv.store.ListBookings(ctx, active.ID); len(bookings) != 2 {
+		t.Errorf("a named booking was discarded: %+v", bookings)
+	}
 }
 
 func TestOverrideChangesTheAmountForItsRange(t *testing.T) {

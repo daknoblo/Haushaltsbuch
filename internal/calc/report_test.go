@@ -108,7 +108,8 @@ func TestPersonViewShowsOwnShareOnly(t *testing.T) {
 }
 
 func TestSettlementSquaresTheBooks(t *testing.T) {
-	positions, moves := Settlement(sharedPlan(), month("2026-05"))
+	rep := Settlement(sharedPlan(), month("2026-05"))
+	positions, moves := rep.Positions, rep.Transfers
 	if len(positions) != 2 {
 		t.Fatalf("positions = %+v", positions)
 	}
@@ -137,13 +138,109 @@ func TestSettlementSquaresTheBooks(t *testing.T) {
 	}
 }
 
+// A bill only its payer carries must not move a cent, which is the difference
+// between the shared rent and the policy Anna keeps to herself.
+func TestSettlementLinesSeparateSharedFromSole(t *testing.T) {
+	rep := Settlement(sharedPlan(), month("2026-05"))
+	if len(rep.Lines) != 2 {
+		t.Fatalf("lines = %+v", rep.Lines)
+	}
+
+	rent, policy := rep.Lines[0], rep.Lines[1]
+	if !rent.Shared() || rent.Carriers != 2 {
+		t.Errorf("rent = %+v, want it divided by two", rent)
+	}
+	if rent.ShareOf(1) != 50000 || rent.ShareOf(2) != 50000 {
+		t.Errorf("rent shares = %v, want 50000 each", rent.Shares)
+	}
+	if policy.Shared() || policy.ShareOf(2) != 0 {
+		t.Errorf("policy = %+v, want Anna to carry it alone", policy)
+	}
+	if policy.Payer.ID != 1 {
+		t.Errorf("policy payer = %d, want Anna", policy.Payer.ID)
+	}
+
+	household := rep.CarriedBy(Everyone)
+	if household.SharedCents != 100000 || household.SoleCents != 5000 {
+		t.Errorf("household = %+v, want 100000 shared / 5000 alone", household)
+	}
+	// What Ben transfers is his half of the rent, never a part of the policy.
+	if rep.Transfers[0].Cents != rent.ShareOf(2) {
+		t.Errorf("transfer = %d, want Ben's rent share %d", rep.Transfers[0].Cents, rent.ShareOf(2))
+	}
+}
+
+// The person view answers "what does this cost me": half the shared rent plus
+// what that member carries alone, and nothing they have no share in.
+func TestCarriedByMemberMatchesTheirExpenses(t *testing.T) {
+	d := sharedPlan()
+	rep := Settlement(d, month("2026-05"))
+
+	anna := rep.CarriedBy(1)
+	if anna.SharedCents != 50000 || anna.SoleCents != 5000 {
+		t.Errorf("Anna = %+v, want 50000 shared / 5000 alone", anna)
+	}
+	if got := anna.SharedCents + anna.SoleCents; got != BuildMonthReport(d, "2026-05", 1).ExpenseCents {
+		t.Errorf("Anna carries %d, but her report says %d", got, BuildMonthReport(d, "2026-05", 1).ExpenseCents)
+	}
+
+	ben := rep.CarriedBy(2)
+	if ben.SharedCents != 50000 || ben.SoleCents != 0 {
+		t.Errorf("Ben = %+v, want 50000 shared and nothing alone", ben)
+	}
+	if lines := rep.LinesFor(2); len(lines) != 1 || lines[0].Booking.ID != 1 {
+		t.Errorf("Ben's lines = %+v, want the rent only", lines)
+	}
+}
+
+// A payment has to be checkable: what Ben owes is the rent share Anna fronted,
+// less whatever he fronted for her.
+func TestBetweenExplainsTheTransfer(t *testing.T) {
+	d := sharedPlan()
+	// Ben fronts the groceries both of them share.
+	d.Bookings = append(d.Bookings, store.Booking{
+		ID: 3, CategoryID: 22, Direction: store.DirExpense, AmountCents: 25000,
+		Frequency: store.FreqMonthly, Interval: 1, SplitMode: store.SplitEqual,
+		CostNature: store.CostVariable, BudgetClass: store.ClassNeed,
+		PayerMemberID: memberRef(2),
+	})
+	d.Splits[3] = []store.BookingSplit{{BookingID: 3, MemberID: 1}, {BookingID: 3, MemberID: 2}}
+
+	rep := Settlement(d, month("2026-05"))
+	if len(rep.Transfers) != 1 {
+		t.Fatalf("transfers = %+v", rep.Transfers)
+	}
+	tr := rep.Transfers[0]
+
+	b := rep.Between(tr.From.ID, tr.To.ID)
+	if b.TotalCents != tr.Cents {
+		t.Errorf("breakdown = %d, but the payment is %d", b.TotalCents, tr.Cents)
+	}
+	if len(b.Lines) != 2 {
+		t.Fatalf("lines = %+v, want the rent and the groceries", b.Lines)
+	}
+	// Ben carries 500 € of the rent Anna fronted and 125 € of his own groceries.
+	if b.Lines[0].Cents != 50000 || b.Lines[1].Cents != -12500 {
+		t.Errorf("lines = %+v, want +50000 and -12500", b.Lines)
+	}
+	// The policy Anna carries alone never shows up between the two.
+	for _, l := range b.Lines {
+		if l.Booking.ID == 2 {
+			t.Error("a booking only Anna carries leaked into the breakdown")
+		}
+	}
+}
+
 func TestSettlementIgnoresBookingsWithoutPayer(t *testing.T) {
 	d := sharedPlan()
 	d.Bookings[0].PayerMemberID = nil
-	_, moves := Settlement(d, month("2026-05"))
+	rep := Settlement(d, month("2026-05"))
 	// Only the policy is left, and Anna both pays and owes it.
-	if len(moves) != 0 {
-		t.Errorf("transfers = %+v, want none", moves)
+	if len(rep.Transfers) != 0 {
+		t.Errorf("transfers = %+v, want none", rep.Transfers)
+	}
+	if len(rep.Lines) != 1 || rep.Lines[0].Booking.ID != 2 {
+		t.Errorf("lines = %+v, want only the policy", rep.Lines)
 	}
 }
 

@@ -139,6 +139,9 @@ type BookingRow struct {
 	// Month is the month the displayed amount is computed for, because a
 	// temporary override makes that amount depend on when you look.
 	Month string
+	// MemberCount is how many people the household has, which is what decides
+	// whether "carried alone" says anything at all.
+	MemberCount int
 }
 
 // IsIncome reports whether the booking adds to the budget.
@@ -214,6 +217,10 @@ func (r BookingRow) EditURL() string { return "/bookings/" + r.IDStr() + "/edit"
 // DeleteURL returns the delete endpoint for the booking.
 func (r BookingRow) DeleteURL() string { return "/bookings/" + r.IDStr() + "/delete" }
 
+// DiscardURL returns the endpoint that drops the booking if it was never
+// edited.
+func (r BookingRow) DiscardURL() string { return "/bookings/" + r.IDStr() + "/discard" }
+
 // PercentInput returns the percent split value for a member as an input string.
 func (r BookingRow) PercentInput(id int64) string {
 	if !r.HasMember(id) {
@@ -234,8 +241,11 @@ func (r BookingRow) FixedInput(id int64) string {
 // NameIsSuggested reports whether the name is still the one a fresh booking was
 // created with, which is what the dialog clears on first focus.
 func (r BookingRow) NameIsSuggested(ctx context.Context) bool {
-	return r.Booking.Name == T(ctx, "bookings.newExpense") ||
-		r.Booking.Name == T(ctx, "bookings.newIncome")
+	return nameIsSuggested(ctx, r.Booking.Name)
+}
+
+func nameIsSuggested(ctx context.Context, name string) bool {
+	return name == T(ctx, "bookings.newExpense") || name == T(ctx, "bookings.newIncome")
 }
 
 // IntervalInput returns the recurrence interval as an input string.
@@ -289,6 +299,9 @@ type BookingFormVM struct {
 	Members    []store.Member
 	Categories []store.Category
 	Tags       []store.Tag
+	// Draft marks a booking that was just created, so closing the dialog
+	// without a single edit can throw it away again.
+	Draft bool
 }
 
 // PickableCategories returns the categories matching the booking's direction,
@@ -315,6 +328,15 @@ func (f BookingFormVM) Title(ctx context.Context) string {
 	return T(ctx, "bookings.editExpense")
 }
 
+// DiscardURL is set only on a fresh draft: an existing booking is never thrown
+// away just because its dialog was closed.
+func (f BookingFormVM) DiscardURL() string {
+	if !f.Draft {
+		return ""
+	}
+	return f.Row.DiscardURL()
+}
+
 // tagStyle tints a tag badge with the tag's own color.
 func tagStyle(color string) string {
 	c := ColorOr(color)
@@ -337,6 +359,16 @@ func TargetLabel(ctx context.Context, target int) string {
 // SankeyViewBox returns the SVG viewBox of a laid-out diagram.
 func SankeyViewBox(s calc.Sankey) string {
 	return "0 0 " + Coord(s.Width) + " " + Coord(s.Height)
+}
+
+// SankeyValue is the figure a node carries next to its name, so reading the
+// diagram does not depend on hovering every box.
+func SankeyValue(s calc.Sankey, n calc.SankeyNode) string {
+	out := FormatEURShort(n.Cents)
+	if s.TotalCents > 0 {
+		out += " · " + FormatPercent(s.Share(n.Cents))
+	}
+	return out
 }
 
 // ChartViewBox returns the SVG viewBox of the trend chart.
@@ -383,15 +415,47 @@ type DashboardVM struct {
 	NextURL     string
 	Views       []ViewOption
 	ViewMember  int64
-	Positions   []calc.MemberPosition
-	Transfers   []calc.Transfer
+	Settlement  calc.SettlementReport
 }
 
+// Positions is every member's paid/owed position of the period.
+func (v DashboardVM) Positions() []calc.MemberPosition { return v.Settlement.Positions }
+
+// Transfers are the payments that square the period.
+func (v DashboardVM) Transfers() []calc.Transfer { return v.Settlement.Transfers }
+
 // ShowSettlement hides the settlement while there is nobody to settle with.
-func (v DashboardVM) ShowSettlement() bool { return len(v.Positions) > 1 }
+func (v DashboardVM) ShowSettlement() bool { return len(v.Settlement.Positions) > 1 }
 
 // SettlementEven reports whether nothing has to change hands.
-func (v DashboardVM) SettlementEven() bool { return len(v.Transfers) == 0 }
+func (v DashboardVM) SettlementEven() bool { return len(v.Settlement.Transfers) == 0 }
+
+// ShareLines are the expenses the selected view carries: all of them for the
+// household, only the ones the member has a share in for a person.
+func (v DashboardVM) ShareLines() []calc.ShareLine {
+	return v.Settlement.LinesFor(v.ViewMember)
+}
+
+// Carried splits what the selected view shoulders into the divided part and
+// the part it carries alone; the two add up to the expenses shown above.
+func (v DashboardVM) Carried() calc.Carried { return v.Settlement.CarriedBy(v.ViewMember) }
+
+// Explain lists the bookings a payment is made of.
+func (v DashboardVM) Explain(tr calc.Transfer) calc.DebtBreakdown {
+	return v.Settlement.Between(tr.From.ID, tr.To.ID)
+}
+
+// HouseholdView reports whether the dashboard shows the whole household.
+func (v DashboardVM) HouseholdView() bool { return v.ViewMember == calc.Everyone }
+
+// SplitLabel names how a booking is divided, which is what tells a shared bill
+// apart from one a single member carries alone.
+func SplitLabel(ctx context.Context, l calc.ShareLine) string {
+	if l.Shared() {
+		return "÷ " + strconv.Itoa(l.Carriers)
+	}
+	return T(ctx, "dash.splitAlone")
+}
 
 // SettingsVM is the view model of the settings page.
 type SettingsVM struct {

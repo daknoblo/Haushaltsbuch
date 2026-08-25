@@ -60,6 +60,9 @@ type Sankey struct {
 	Height float64
 	Nodes  []SankeyNode
 	Links  []SankeyLink
+	// TotalCents is what passes through the trunk, which is the base every
+	// node's share is measured against.
+	TotalCents int64
 	// Deficit is set when the plan spends more than it earns. The diagram then
 	// contains an explicit withdrawal node, because a Sankey cannot show a
 	// negative flow.
@@ -68,6 +71,14 @@ type Sankey struct {
 
 // Empty reports whether there is nothing to draw.
 func (s Sankey) Empty() bool { return len(s.Nodes) == 0 }
+
+// Share is a node's percentage of everything that flows through the diagram.
+func (s Sankey) Share(cents int64) float64 {
+	if s.TotalCents <= 0 {
+		return 0
+	}
+	return float64(cents) / float64(s.TotalCents) * 100
+}
 
 type sankeyBuilder struct {
 	nodes []SankeyNode
@@ -196,6 +207,9 @@ func BuildSankey(ctx context.Context, d Data, rep MonthReport, months []string, 
 	b.finish()
 
 	s := Sankey{Width: width, Height: height, Nodes: b.nodes, Links: b.links, Deficit: deficit}
+	if i, ok := b.index["trunk"]; ok {
+		s.TotalCents = b.nodes[i].Cents
+	}
 	layoutSankey(&s)
 	return s
 }
@@ -263,9 +277,9 @@ func layoutSankey(s *Sankey) {
 		nodeWidth = 14.0
 		gap       = 10.0
 		padTop    = 8.0
-		// Captions sit to the right of their node, so the rightmost column
-		// needs room or its labels would run off the canvas.
-		labelPad = 110.0
+		// Captions carry the amount and its share next to the name, so the
+		// rightmost column needs room or they would run off the canvas.
+		labelPad = 200.0
 	)
 	if len(s.Nodes) == 0 {
 		return

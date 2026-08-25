@@ -214,8 +214,9 @@ func TestBuildSankeyBalances(t *testing.T) {
 		if n.Height < 0 || n.Y < 0 || n.Y+n.Height > s.Height+0.01 {
 			t.Errorf("node %s lies outside the canvas: y=%.2f h=%.2f", n.ID, n.Y, n.Height)
 		}
-		// A caption needs room to its right, otherwise it is cut off.
-		if n.LabelX() > s.Width-40 {
+		// A caption carries the name plus the amount and its share, so it needs
+		// considerably more room than the name alone.
+		if n.LabelX() > s.Width-190 {
 			t.Errorf("caption of %s starts at %.2f and would be clipped (width %.0f)", n.ID, n.LabelX(), s.Width)
 		}
 	}
@@ -240,6 +241,13 @@ func TestSankeyNodeValueIsThroughputNotSum(t *testing.T) {
 
 	if got := byID["trunk"].Cents; got != rep.IncomeCents {
 		t.Errorf("trunk = %d, want %d", got, rep.IncomeCents)
+	}
+	// Every share is measured against the trunk, so 100 % has to be its value.
+	if s.TotalCents != byID["trunk"].Cents {
+		t.Errorf("total = %d, want the trunk's %d", s.TotalCents, byID["trunk"].Cents)
+	}
+	if got := s.Share(byID["trunk"].Cents); got != 100 {
+		t.Errorf("trunk share = %.2f, want 100", got)
 	}
 	if got := byID["class-need"].Cents; got != rep.ByBudgetClass[store.ClassNeed] {
 		t.Errorf("need class = %d, want %d", got, rep.ByBudgetClass[store.ClassNeed])

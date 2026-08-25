@@ -103,11 +103,12 @@ func (s *Server) buildBookingsVM(ctx context.Context, householdID int64, month s
 	byCategory := make(map[int64][]BookingRow, len(data.Categories))
 	for _, b := range data.Bookings {
 		byCategory[b.CategoryID] = append(byCategory[b.CategoryID], BookingRow{
-			Booking:   b,
-			Splits:    data.Splits[b.ID],
-			TagIDs:    data.TagLinks[b.ID],
-			Overrides: data.Overrides[b.ID],
-			Month:     month,
+			Booking:     b,
+			Splits:      data.Splits[b.ID],
+			TagIDs:      data.TagLinks[b.ID],
+			Overrides:   data.Overrides[b.ID],
+			Month:       month,
+			MemberCount: len(data.Members),
 		})
 	}
 
@@ -236,7 +237,7 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 	vm.Chart = calc.BuildTrendChart(vm.Trend, chartWidth, chartHeight)
 	vm.FixedTop = calc.FixedCosts(data, months, member, fixedCostTop)
 	vm.Sankey = calc.BuildSankey(ctx, data, vm.Report, months, sankeyWidth, sankeyHeight)
-	vm.Positions, vm.Transfers = calc.Settlement(data, months)
+	vm.Settlement = calc.Settlement(data, months)
 	return vm, nil
 }
 

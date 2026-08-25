@@ -39,6 +39,24 @@ func FormatEUR(c int64) string {
 	return FormatCents(c) + " €"
 }
 
+// FormatEURShort drops the cents, for captions where a figure has to stay
+// short enough to be read at a glance.
+func FormatEURShort(c int64) string {
+	if c < -MaxAmountCents {
+		c = -MaxAmountCents
+	} else if c > MaxAmountCents {
+		c = MaxAmountCents
+	}
+	euros := (c + 50) / 100
+	if c < 0 {
+		euros = (c - 50) / 100
+	}
+	if euros < 0 {
+		return "-" + groupThousands(-euros) + " €"
+	}
+	return groupThousands(euros) + " €"
+}
+
 func groupThousands(n int64) string {
 	s := strconv.FormatInt(n, 10)
 	if len(s) <= 3 {

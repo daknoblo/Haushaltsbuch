@@ -23,6 +23,12 @@
     return document.querySelector("dialog[data-dialog]");
   }
 
+  // A draft nobody typed into is worth nothing, so closing its dialog throws
+  // it away again. The flag is set from the input events rather than from the
+  // save requests, because a bare Escape also produces a keyup and would
+  // otherwise count as an edit.
+  var dialogTouched = false;
+
   document.addEventListener("click", function (e) {
     var toggle = e.target.closest("[data-theme-toggle]");
     if (toggle) {
@@ -73,18 +79,40 @@
     var dlg = currentDialog();
     if (!dlg) return;
     if (!dlg.open) dlg.showModal();
+    dialogTouched = false;
     // A modal focuses its first field anyway, so a suggested name is selected
     // rather than cleared: typing replaces it, clicking into the field wipes it.
     var name = dlg.querySelector("input[data-clear-on-focus]");
     if (name) name.select();
   });
 
+  // Typing into a field beats what the server knows: the save may still be in
+  // flight when the dialog closes, so a draft that was typed into is never
+  // discarded. Picking from a select or a checkbox carries no value of its own
+  // and leaves the decision to the server.
+  function markDialogTouched(e) {
+    var el = e.target;
+    if (!el || (el.tagName !== "INPUT" && el.tagName !== "TEXTAREA")) return;
+    if (el.type === "checkbox" || el.type === "radio") return;
+    var dlg = currentDialog();
+    if (dlg && dlg.contains(el)) dialogTouched = true;
+  }
+
+  document.addEventListener("input", markDialogTouched);
+
   // Closing empties the container, otherwise a stale dialog would linger in
   // the DOM and its fields would keep posting.
   document.addEventListener("close", function (e) {
     if (!e.target || e.target.tagName !== "DIALOG") return;
+    var discard = dialogTouched ? "" : e.target.getAttribute("data-discard-url");
     var host = document.getElementById("booking-dialog");
     if (host) host.innerHTML = "";
+    if (discard) {
+      // The answer carries HX-Trigger, so the list refreshes once the draft is
+      // actually gone.
+      htmx.ajax("POST", discard, { source: document.body, swap: "none" });
+      return;
+    }
     document.body.dispatchEvent(new CustomEvent("hb:changed"));
   }, true);
 
