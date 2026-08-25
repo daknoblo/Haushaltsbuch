@@ -142,6 +142,15 @@ func (s *Store) migrate(ctx context.Context) error {
 		return err
 	}
 
+	// Rebuilding a table means dropping it, and DROP TABLE with enforcement on
+	// runs an implicit DELETE that fires the children's ON DELETE CASCADE. The
+	// pragma is a no-op inside a transaction, so it has to bracket the loop
+	// rather than sit in a migration; foreign_key_check takes over the job.
+	if _, err := s.db.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); err != nil {
+		return err
+	}
+	defer func() { _, _ = s.db.ExecContext(ctx, `PRAGMA foreign_keys = ON`) }()
+
 	entries, err := fs.ReadDir(migrationsFS, "migrations")
 	if err != nil {
 		return err
@@ -188,8 +197,30 @@ func (s *Store) migrate(ctx context.Context) error {
 		if err := tx.Commit(); err != nil {
 			return err
 		}
+		if err := s.checkForeignKeys(ctx, name); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// checkForeignKeys reports rows a migration left pointing at nothing, which is
+// the price of running the migrations with enforcement turned off.
+func (s *Store) checkForeignKeys(ctx context.Context, migration string) error {
+	rows, err := s.db.QueryContext(ctx, `PRAGMA foreign_key_check`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		var table, rowID, parent, fkID any
+		if err := rows.Scan(&table, &rowID, &parent, &fkID); err != nil {
+			return err
+		}
+		return fmt.Errorf("migration %s left %v pointing at a missing %v", migration, table, parent)
+	}
+	return rows.Err()
 }
 
 // GetState returns the value for key from app_state, or "" if unset.

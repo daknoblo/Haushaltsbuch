@@ -141,10 +141,10 @@ func (s *Server) handleExportOverview(w http.ResponseWriter, r *http.Request) {
 			FormatEUR(mb.BalanceCents), false)
 	}
 
-	if len(rep.Sections) > 0 {
-		pdfHeading(m, T(ctx, "overview.bySection"))
-		for _, sec := range rep.Sections {
-			pdfKV(m, sec.Label, FormatEUR(sec.Cents))
+	if len(rep.Categories) > 0 {
+		pdfHeading(m, T(ctx, "overview.byCategory"))
+		for _, c := range rep.Categories {
+			pdfKV(m, c.Label, FormatEUR(c.Cents))
 		}
 	}
 
@@ -163,14 +163,14 @@ func (s *Server) handleExportStatistics(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	month := NormalizeMonth(r.URL.Query().Get("m"))
-	vm, err := s.buildDashboardVM(r.Context(), hh.ID, month, "12m")
+	vm, err := s.buildDashboardVM(r.Context(), hh.ID, month, "12m", calc.Everyone)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
 	}
 
 	m := newPDF()
-	pdfHeader(ctx, m, T(ctx, "pdf.statistics"), hh.Name, Tf(ctx, "pdf.periodUntil", MonthLabel(ctx, month)))
+	pdfHeader(ctx, m, T(ctx, "pdf.statistics"), hh.Name, vm.RangeLabel)
 
 	pdfKV(m, T(ctx, "pdf.avgIncome"), FormatEUR(vm.Report.IncomeCents))
 	pdfKV(m, T(ctx, "pdf.avgExpenses"), FormatEUR(vm.Report.ExpenseCents))
@@ -178,11 +178,18 @@ func (s *Server) handleExportStatistics(w http.ResponseWriter, r *http.Request) 
 
 	pdfHeading(m, T(ctx, "pdf.monthCourse"))
 	pdfRow4(m, T(ctx, "pdf.month"), T(ctx, "overview.income"), T(ctx, "overview.expenses"), T(ctx, "overview.balance"), true)
-	for _, sm := range vm.Months {
-		pdfRow4(m, MonthLabel(ctx, sm.Month),
-			FormatEUR(sm.IncomeCents),
-			FormatEUR(sm.ExpenseCents),
-			FormatEUR(sm.BalanceCents), false)
+	for _, rep := range vm.Trend {
+		pdfRow4(m, MonthLabel(ctx, rep.Month),
+			FormatEUR(rep.IncomeCents),
+			FormatEUR(rep.ExpenseCents),
+			FormatEUR(rep.BalanceCents), false)
+	}
+
+	if len(vm.Transfers) > 0 {
+		pdfHeading(m, T(ctx, "dash.settlement"))
+		for _, tr := range vm.Transfers {
+			pdfKV(m, Tf(ctx, "dash.owes", tr.From.Name, tr.To.Name), FormatEUR(tr.Cents))
+		}
 	}
 
 	s.writePDF(w, r, m, T(ctx, "pdf.fileStatistics")+"-"+month+".pdf")
@@ -194,35 +201,39 @@ func (s *Server) handleExportExpenses(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	vm, err := s.buildBookingsVM(r.Context(), hh.ID, NormalizeMonth(r.URL.Query().Get("m")))
+	month := NormalizeMonth(r.URL.Query().Get("m"))
+	vm, err := s.buildBookingsVM(r.Context(), hh.ID, month)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
 	}
-
-	memberName := make(map[int64]string, len(vm.Members))
-	for _, mem := range vm.Members {
+	members, err := s.store.ListMembers(ctx, hh.ID)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	memberName := make(map[int64]string, len(members))
+	for _, mem := range members {
 		memberName[mem.ID] = mem.Name
 	}
 
 	m := newPDF()
-	pdfHeader(ctx, m, T(ctx, "pdf.expenseList"), hh.Name, T(ctx, "pdf.allExpenses"))
+	pdfHeader(ctx, m, T(ctx, "pdf.expenseList"), hh.Name, MonthLabel(ctx, month))
 
 	var grand int64
-	for _, g := range vm.Groups {
-		if len(g.Bookings) == 0 {
-			continue
-		}
-		pdfHeading(m, g.Title(ctx)+"  ("+FormatEUR(g.TotalCents)+" "+T(ctx, "bookings.perMonth")+")")
+	for _, g := range append(append([]CategoryGroup{}, vm.Income...), vm.Expenses...) {
+		pdfHeading(m, g.Category.Name+"  ("+FormatEUR(g.TotalCents)+" "+T(ctx, "bookings.perMonth")+")")
 		pdfRow4(m, T(ctx, "pdf.label"), T(ctx, "pdf.amount"), T(ctx, "pdf.rhythm"), T(ctx, "pdf.monthly"), true)
 		for _, row := range g.Bookings {
 			pdfRow4(m,
 				row.Booking.Name+"  ["+splitNames(ctx, row, memberName)+"]",
-				FormatEUR(row.Booking.AmountCents),
+				FormatEUR(row.AmountCents()),
 				RhythmLabel(ctx, row.Booking),
-				FormatEUR(calc.MonthlyCents(row.Booking)), false)
+				FormatEUR(row.MonthlyCents()), false)
 		}
-		grand += g.TotalCents
+		if g.Category.Classification == store.DirExpense {
+			grand += g.TotalCents
+		}
 	}
 
 	m.AddRow(4)

@@ -6,11 +6,11 @@ import (
 	"errors"
 )
 
-const categoryColumns = `id, household_id, name, classification, color, sort_order`
+const categoryColumns = `id, household_id, name, classification, color, icon, sort_order`
 
 func scanCategory(sc scanner) (Category, error) {
 	var c Category
-	err := sc.Scan(&c.ID, &c.HouseholdID, &c.Name, &c.Classification, &c.Color, &c.SortOrder)
+	err := sc.Scan(&c.ID, &c.HouseholdID, &c.Name, &c.Classification, &c.Color, &c.Icon, &c.SortOrder)
 	return c, err
 }
 
@@ -49,14 +49,14 @@ func (s *Store) GetCategory(ctx context.Context, householdID, id int64) (Categor
 }
 
 // CreateCategory inserts a new category and returns it.
-func (s *Store) CreateCategory(ctx context.Context, householdID int64, name string, class Direction, color string) (Category, error) {
+func (s *Store) CreateCategory(ctx context.Context, householdID int64, c Category) (Category, error) {
 	var out Category
 	err := s.withTx(ctx, func(tx *Store) error {
 		res, err := tx.q.ExecContext(ctx,
-			`INSERT INTO categories (household_id, name, classification, color, sort_order)
-			 VALUES (?, ?, ?, ?,
+			`INSERT INTO categories (household_id, name, classification, color, icon, sort_order)
+			 VALUES (?, ?, ?, ?, ?,
 				(SELECT COALESCE(MAX(sort_order)+1, 0) FROM categories WHERE household_id = ?))`,
-			householdID, name, string(class), color, householdID,
+			householdID, c.Name, string(c.Classification), c.Color, c.Icon, householdID,
 		)
 		if err != nil {
 			return err
@@ -74,12 +74,12 @@ func (s *Store) CreateCategory(ctx context.Context, householdID int64, name stri
 	return out, nil
 }
 
-// UpdateCategory changes a category's name, classification and color.
-func (s *Store) UpdateCategory(ctx context.Context, householdID, id int64, name string, class Direction, color string) error {
+// UpdateCategory changes a category's name, classification, color and icon.
+func (s *Store) UpdateCategory(ctx context.Context, householdID, id int64, c Category) error {
 	return affected(s.q.ExecContext(ctx,
-		`UPDATE categories SET name = ?, classification = ?, color = ?
+		`UPDATE categories SET name = ?, classification = ?, color = ?, icon = ?
 		 WHERE id = ? AND household_id = ?`,
-		name, string(class), color, id, householdID))
+		c.Name, string(c.Classification), c.Color, c.Icon, id, householdID))
 }
 
 // DeleteCategory removes a category of a household. It refuses while bookings

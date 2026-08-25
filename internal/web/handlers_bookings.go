@@ -35,6 +35,8 @@ func defaultCategory(cats []store.Category, dir store.Direction) int64 {
 	return 0
 }
 
+// handleBookingCreate opens the dialog on a fresh draft. Creating it up front is
+// what lets every field save itself, so the dialog needs no save button.
 func (s *Server) handleBookingCreate(w http.ResponseWriter, r *http.Request) {
 	active, ok := s.requireActiveHousehold(w, r)
 	if !ok {
@@ -47,14 +49,18 @@ func (s *Server) handleBookingCreate(w http.ResponseWriter, r *http.Request) {
 		dir = store.DirExpense
 	}
 
-	vmCtx, err := s.bookingContext(ctx, active)
+	form, err := s.bookingForm(ctx, active)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
 	}
-	catID := defaultCategory(vmCtx.Categories, dir)
+	catID := defaultCategory(form.Categories, dir)
 	if catID == 0 {
 		s.clientError(w, r, http.StatusBadRequest, "error.categoryNeeded")
+		return
+	}
+	if len(form.Members) == 0 {
+		s.clientError(w, r, http.StatusBadRequest, "error.payerMissing")
 		return
 	}
 
@@ -62,25 +68,27 @@ func (s *Server) handleBookingCreate(w http.ResponseWriter, r *http.Request) {
 	if dir == store.DirIncome {
 		name = T(ctx, "bookings.newIncome")
 	}
+	month := NormalizeMonth(r.URL.Query().Get("m"))
+	payer := form.Members[0].ID
 	b := store.Booking{
-		HouseholdID: active,
-		CategoryID:  catID,
-		Direction:   dir,
-		Name:        name,
-		Frequency:   store.FreqMonthly,
-		Interval:    1,
-		StartsOn:    CurrentMonth() + "-01",
-		CostNature:  store.CostFix,
-		BudgetClass: store.ClassNeed,
-		SplitMode:   store.SplitEqual,
-	}
-	if sectionID := parseID(r.URL.Query().Get("section_id")); sectionID != 0 && dir == store.DirExpense {
-		b.SectionID = &sectionID
+		HouseholdID:   active,
+		CategoryID:    catID,
+		PayerMemberID: &payer,
+		Direction:     dir,
+		Name:          name,
+		Frequency:     store.FreqMonthly,
+		Interval:      1,
+		DuePoint:      store.DueStart,
+		StartsOn:      month + "-01",
+		CostNature:    store.CostFix,
+		BudgetClass:   store.ClassNeed,
+		SplitMode:     store.SplitEqual,
 	}
 
-	// Default split: everyone participates equally.
-	splits := make([]store.SplitInput, 0, len(vmCtx.Members))
-	for _, m := range vmCtx.Members {
+	// Everyone participates by default, which is what a shared household bill
+	// almost always is.
+	splits := make([]store.SplitInput, 0, len(form.Members))
+	for _, m := range form.Members {
 		splits = append(splits, store.SplitInput{MemberID: m.ID})
 	}
 
@@ -89,15 +97,58 @@ func (s *Server) handleBookingCreate(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, r, err)
 		return
 	}
-	stored, err := s.store.ListSplits(ctx, active, created.ID)
+	s.renderDialog(w, r, active, created.ID, month)
+}
+
+// handleBookingEdit renders the dialog for an existing booking.
+func (s *Server) handleBookingEdit(w http.ResponseWriter, r *http.Request) {
+	active, ok := s.requireActiveHousehold(w, r)
+	if !ok {
+		return
+	}
+	s.renderDialog(w, r, active, parseID(r.PathValue("id")),
+		NormalizeMonth(r.URL.Query().Get("m")))
+}
+
+// renderDialog assembles the booking dialog from the stored state, so what the
+// user sees is always what was actually saved.
+func (s *Server) renderDialog(w http.ResponseWriter, r *http.Request, householdID, id int64, month string) {
+	ctx := r.Context()
+	b, err := s.store.GetBooking(ctx, householdID, id)
+	if err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	}
+	form, err := s.bookingForm(ctx, householdID)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
 	}
-	// A freshly created row opens straight into the editor.
-	s.render(w, r, BookingRowView(BookingRow{Booking: created, Splits: stored, Expanded: true}, vmCtx))
+	row := BookingRow{Booking: b, Month: month}
+	if row.Splits, err = s.store.ListSplits(ctx, householdID, id); err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	if row.TagIDs, err = s.store.ListTagIDs(ctx, householdID, id); err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	if row.Overrides, err = s.store.ListOverrides(ctx, householdID, id); err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	for _, c := range form.Categories {
+		if c.ID == b.CategoryID {
+			row.Category = c
+		}
+	}
+	form.Row = row
+	s.render(w, r, BookingDialog(form))
 }
 
+// handleBookingUpdate saves one edit and answers without any markup. Replacing
+// the dialog would move the caret and could drop characters typed while the
+// request was in flight, so the DOM is left alone.
 func (s *Server) handleBookingUpdate(w http.ResponseWriter, r *http.Request) {
 	active, ok := s.requireActiveHousehold(w, r)
 	if !ok {
@@ -127,11 +178,20 @@ func (s *Server) handleBookingUpdate(w http.ResponseWriter, r *http.Request) {
 	if dir := store.Direction(r.FormValue("direction")); dir.Valid() {
 		b.Direction = dir
 	}
-	b.Frequency = store.Frequency(r.FormValue("frequency"))
-	if !b.Frequency.Valid() {
-		b.Frequency = store.FreqMonthly
+	// The dialog offers a recurring switch rather than "once" as a rhythm.
+	if r.FormValue("recurring") == "" {
+		b.Frequency = store.FreqOnce
+	} else {
+		b.Frequency = store.Frequency(r.FormValue("frequency"))
+		if !b.Frequency.Valid() || !b.Frequency.Recurring() {
+			b.Frequency = store.FreqMonthly
+		}
 	}
 	b.Interval = clampInterval(r.FormValue("interval"))
+	b.DuePoint = store.DuePoint(r.FormValue("due_point"))
+	if !b.DuePoint.Valid() {
+		b.DuePoint = store.DueStart
+	}
 	b.CostNature = store.CostNature(r.FormValue("cost_nature"))
 	if !b.CostNature.Valid() {
 		b.CostNature = store.CostFix
@@ -153,13 +213,11 @@ func (s *Server) handleBookingUpdate(w http.ResponseWriter, r *http.Request) {
 		b.EndsOn = ""
 	}
 
-	if secID := parseID(r.FormValue("section_id")); secID != 0 {
-		b.SectionID = &secID
-	} else {
-		b.SectionID = nil
-	}
 	if catID := parseID(r.FormValue("category_id")); catID != 0 {
 		b.CategoryID = catID
+	}
+	if payer := parseID(r.FormValue("payer_member_id")); payer != 0 {
+		b.PayerMemberID = &payer
 	}
 
 	splits, err := s.splitsFromForm(r, b)
@@ -171,34 +229,7 @@ func (s *Server) handleBookingUpdate(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, r, err)
 		return
 	}
-
-	updated, err := s.store.GetBooking(ctx, active, id)
-	if err != nil {
-		s.writeStoreError(w, r, err)
-		return
-	}
-	stored, err := s.store.ListSplits(ctx, active, id)
-	if err != nil {
-		s.serverError(w, r, err)
-		return
-	}
-	vmCtx, err := s.bookingContext(ctx, active)
-	if err != nil {
-		s.serverError(w, r, err)
-		return
-	}
-	tagIDs, err := s.store.ListTagIDs(ctx, active, id)
-	if err != nil {
-		s.serverError(w, r, err)
-		return
-	}
-	row := BookingRow{
-		Booking:  updated,
-		Splits:   stored,
-		TagIDs:   tagIDs,
-		Expanded: r.FormValue("expanded") == "1",
-	}
-	s.render(w, r, BookingRowView(row, vmCtx))
+	hxChanged(w)
 }
 
 // clampInterval keeps a submitted recurrence interval sane.
@@ -296,10 +327,26 @@ func (s *Server) handleBookingDelete(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, r, err)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
+	hxChanged(w)
 }
 
-func (s *Server) handleBookingMove(w http.ResponseWriter, r *http.Request) {
+// ---- amount overrides ----
+
+// overrideFromForm reads the fields shared by create and update.
+func overrideFromForm(r *http.Request) (store.BookingOverride, error) {
+	cents, err := ParseCents(r.FormValue("amount"))
+	if errors.Is(err, ErrAmountRange) {
+		return store.BookingOverride{}, err
+	}
+	return store.BookingOverride{
+		StartsOn:    cleanDate(r.FormValue("starts_on")),
+		EndsOn:      cleanDate(r.FormValue("ends_on")),
+		AmountCents: cents,
+		Note:        cleanName(r.FormValue("note")),
+	}, nil
+}
+
+func (s *Server) handleOverrideCreate(w http.ResponseWriter, r *http.Request) {
 	active, ok := s.requireActiveHousehold(w, r)
 	if !ok {
 		return
@@ -307,25 +354,52 @@ func (s *Server) handleBookingMove(w http.ResponseWriter, r *http.Request) {
 	if !s.parseForm(w, r) {
 		return
 	}
-	delta, ok := parseDelta(r.FormValue("dir"))
-	if !ok {
-		s.clientError(w, r, http.StatusBadRequest, "error.invalidDir")
-		return
-	}
-	ctx := r.Context()
-	id := parseID(r.PathValue("id"))
-	b, err := s.store.GetBooking(ctx, active, id)
+	o, err := overrideFromForm(r)
 	if err != nil {
+		s.clientError(w, r, http.StatusBadRequest, "error.amountRange")
+		return
+	}
+	o.BookingID = parseID(r.PathValue("id"))
+	if _, err := s.store.CreateOverride(r.Context(), active, o); err != nil {
 		s.writeStoreError(w, r, err)
 		return
 	}
-	var sectionID int64
-	if b.SectionID != nil {
-		sectionID = *b.SectionID
+	s.renderDialog(w, r, active, o.BookingID, NormalizeMonth(r.FormValue("m")))
+}
+
+func (s *Server) handleOverrideUpdate(w http.ResponseWriter, r *http.Request) {
+	active, ok := s.requireActiveHousehold(w, r)
+	if !ok {
+		return
 	}
-	if err := s.store.MoveBooking(ctx, active, sectionID, id, delta); err != nil {
+	if !s.parseForm(w, r) {
+		return
+	}
+	o, err := overrideFromForm(r)
+	if err != nil {
+		s.clientError(w, r, http.StatusBadRequest, "error.amountRange")
+		return
+	}
+	o.ID = parseID(r.PathValue("id"))
+	if err := s.store.UpdateOverride(r.Context(), active, o); err != nil {
 		s.writeStoreError(w, r, err)
 		return
 	}
-	hxRefresh(w)
+	hxChanged(w)
+}
+
+func (s *Server) handleOverrideDelete(w http.ResponseWriter, r *http.Request) {
+	active, ok := s.requireActiveHousehold(w, r)
+	if !ok {
+		return
+	}
+	if !s.parseForm(w, r) {
+		return
+	}
+	if err := s.store.DeleteOverride(r.Context(), active, parseID(r.PathValue("id"))); err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	}
+	s.renderDialog(w, r, active, parseID(r.FormValue("booking_id")),
+		NormalizeMonth(r.FormValue("m")))
 }

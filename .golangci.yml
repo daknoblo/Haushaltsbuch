@@ -38,8 +38,11 @@ linters:
       - path: internal/web/
         linters: [contextcheck]
       # The German catalog contains German words by definition; misspell is
-      # configured for US English.
+      # configured for US English. The icon keyword table matches German
+      # category names for the same reason.
       - path: internal/i18n/catalog_de\.go
+        linters: [misspell]
+      - path: internal/web/icons\.go
         linters: [misspell]
 
 formatters:

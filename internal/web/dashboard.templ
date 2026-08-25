@@ -8,52 +8,190 @@ import (
 templ DashboardPage(nav Nav, vm DashboardVM) {
 	@Layout(nav) {
 		@pageHeading(T(ctx, "dash.title"), T(ctx, "dash.subtitle")) {
-			<div class="ml-auto no-print">
-				<a class="btn-ghost" href={ templ.SafeURL("/export/statistics.pdf") }>{ T(ctx, "action.exportPDF") }</a>
+			<div class="ml-auto flex flex-wrap items-center gap-2 no-print">
+				<a class="btn-ghost" href={ templ.SafeURL("/export/overview.pdf?m=" + nav.Month) }>{ T(ctx, "pdf.overview") }</a>
+				<a class="btn-ghost" href={ templ.SafeURL("/export/expenses.pdf?m=" + nav.Month) }>{ T(ctx, "pdf.expenseList") }</a>
+				<a class="btn-primary" href={ templ.SafeURL("/export/statistics.pdf?m=" + nav.Month) }>{ T(ctx, "action.exportPDF") }</a>
 			</div>
 		}
 		if nav.ActiveHousehold.ID == 0 {
 			@noHousehold()
 		} else {
 			<div class="grid gap-4">
-				@rangePicker(nav, vm)
+				@viewSwitch(vm)
+				@chartCard(vm)
 				@headlineTiles(vm)
+				if vm.ShowSettlement() {
+					@settlementCard(vm)
+				}
 				<div class="grid gap-4 lg:grid-cols-2">
 					@fixedCostCard(vm)
 					@savingsCard(vm)
 				</div>
 				@sankeyCard(vm)
 				@categoryCard(vm)
-				<div class="grid gap-4 lg:grid-cols-2">
-					@trendCard(vm)
-					@tagCard(vm)
-				</div>
+				@tagCard(vm)
 			</div>
 		}
 	}
 }
 
-templ rangePicker(nav Nav, vm DashboardVM) {
+// viewSwitch flips every card between the whole household and a single person.
+templ viewSwitch(vm DashboardVM) {
 	<div class="card-tight no-print">
 		<div class="flex flex-wrap items-center gap-2 px-4 py-3">
-			<span class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "dash.range") }</span>
-			for _, o := range vm.Ranges {
-				if o.Active {
-					<span class="btn-primary pointer-events-none">{ o.Label }</span>
+			<span class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "dash.view") }</span>
+			for _, v := range vm.Views {
+				if v.Active {
+					<span class="btn-primary pointer-events-none">
+						if v.Member != 0 {
+							@memberDot(v.Color)
+						}
+						{ v.Label }
+					</span>
 				} else {
-					<a class="btn-ghost" href={ templ.SafeURL("/dashboard?m=" + nav.Month + "&range=" + o.Key) }>{ o.Label }</a>
+					<a class="btn-ghost" href={ templ.SafeURL(v.URL) }>
+						if v.Member != 0 {
+							@memberDot(v.Color)
+						}
+						{ v.Label }
+					</a>
 				}
 			}
 		</div>
 	</div>
 }
 
+// chartCard carries the period control, centred above the chart it drives.
+templ chartCard(vm DashboardVM) {
+	<div class="card">
+		<div class="mb-4 grid gap-3">
+			<div class="flex items-center justify-center gap-2 no-print">
+				<a class="btn-icon" href={ templ.SafeURL(vm.PrevURL) } aria-label={ T(ctx, "dash.rangePrev") }>‹</a>
+				<div class="flex flex-wrap items-center justify-center gap-1">
+					for _, p := range vm.Periods {
+						if p.Active {
+							<span class="period-chip period-chip-active">{ p.Label }</span>
+						} else {
+							<a class="period-chip" href={ templ.SafeURL(p.URL) }>{ p.Label }</a>
+						}
+					}
+				</div>
+				<a class="btn-icon" href={ templ.SafeURL(vm.NextURL) } aria-label={ T(ctx, "dash.rangeNext") }>›</a>
+			</div>
+			<div class="text-center text-sm font-medium text-slate-700 dark:text-slate-300">{ vm.RangeLabel }</div>
+		</div>
+		if vm.Chart.Empty() {
+			<p class="text-center text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.noData") }</p>
+		} else {
+			@trendChart(vm.Chart)
+			<div class="mt-3 flex items-center justify-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+				<span class="flex items-center gap-1.5"><span class="dot bg-emerald-500"></span>{ T(ctx, "overview.income") }</span>
+				<span class="flex items-center gap-1.5"><span class="dot bg-indigo-500"></span>{ T(ctx, "overview.expenses") }</span>
+			</div>
+		}
+	</div>
+}
+
+// trendChart is laid out in Go, because the CSP grants no 'unsafe-eval' and a
+// charting library would be a large dependency for one picture.
+templ trendChart(c calc.TrendChart) {
+	<svg class="h-auto w-full" viewBox={ ChartViewBox(c) } role="img" aria-label={ T(ctx, "dash.chartTitle") }>
+		<g class="chart-grid">
+			for _, g := range c.Grid {
+				<line x1={ Coord(c.Left) } y1={ Coord(g.Y) } x2={ Coord(c.Right) } y2={ Coord(g.Y) }></line>
+				<text class="chart-label" x={ Coord(c.Left - 8) } y={ Coord(g.Y) } text-anchor="end" dominant-baseline="middle">
+					{ FormatCents(g.Cents) }
+				</text>
+			}
+		</g>
+		<g>
+			for _, b := range c.Bars {
+				<rect
+					class={ templ.KV("chart-bar-income", b.Income), templ.KV("chart-bar-expense", !b.Income) }
+					x={ Coord(b.X) }
+					y={ Coord(b.Y) }
+					width={ Coord(b.Width) }
+					height={ Coord(b.Height) }
+					rx="2"
+				>
+					<title>{ MonthShort(ctx, b.Month) + ": " + FormatEUR(b.Cents) }</title>
+				</rect>
+			}
+		</g>
+		<g>
+			for _, t := range c.Ticks {
+				<text class="chart-label" x={ Coord(t.X) } y={ Coord(c.Bottom + 15) } text-anchor="middle">
+					{ MonthShort(ctx, t.Month) }
+				</text>
+			}
+		</g>
+	</svg>
+}
+
 templ headlineTiles(vm DashboardVM) {
 	<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-		@statTile(T(ctx, "overview.income"), FormatEUR(vm.Report.IncomeCents), T(ctx, "overview.normalized"), "text-emerald-600 dark:text-emerald-400")
-		@statTile(T(ctx, "overview.expenses"), FormatEUR(vm.Report.ExpenseCents), T(ctx, "overview.normalized"), "text-slate-900 dark:text-slate-100")
+		@statTile(T(ctx, "overview.income"), FormatEUR(vm.Report.IncomeCents), T(ctx, "dash.perMonth"), "text-emerald-600 dark:text-emerald-400")
+		@statTile(T(ctx, "overview.expenses"), FormatEUR(vm.Report.ExpenseCents), T(ctx, "dash.perMonth"), "text-slate-900 dark:text-slate-100")
 		@statTile(T(ctx, "dash.fixedCosts"), FormatEUR(vm.Report.FixedCents), FormatPercent(vm.Report.FixedCostRate())+" "+T(ctx, "dash.fixedShare"), "text-indigo-600 dark:text-indigo-400")
 		@statTile(T(ctx, "dash.savingsRate"), FormatPercent(vm.Report.SavingsRate()), T(ctx, "dash.perMonth"), "text-sky-600 dark:text-sky-400")
+	</div>
+}
+
+// settlementCard answers "who owes whom", which only the payer of a booking
+// makes computable.
+templ settlementCard(vm DashboardVM) {
+	<div class="card">
+		<div class="card-head">
+			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.settlement") }</h2>
+			<span class="badge ml-auto">{ vm.RangeLabel }</span>
+		</div>
+		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.settlementHint") }</p>
+		if vm.SettlementEven() {
+			<p class="alert-info">{ T(ctx, "dash.settlementEven") }</p>
+		} else {
+			<div class="grid gap-2">
+				for _, tr := range vm.Transfers {
+					<div class="settle-row">
+						@memberDot(tr.From.Color)
+						<span class="font-medium text-slate-900 dark:text-slate-100">{ tr.From.Name }</span>
+						<span class="text-slate-400" aria-hidden="true">→</span>
+						@memberDot(tr.To.Color)
+						<span class="font-medium text-slate-900 dark:text-slate-100">{ tr.To.Name }</span>
+						<span class="tnum ml-auto font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(tr.Cents) }</span>
+					</div>
+				}
+			</div>
+		}
+		<div class="mt-4 overflow-x-auto">
+			<table class="w-full">
+				<thead>
+					<tr>
+						<th class="table-head">{ T(ctx, "overview.person") }</th>
+						<th class="table-head text-right">{ T(ctx, "dash.paid") }</th>
+						<th class="table-head text-right">{ T(ctx, "dash.owed") }</th>
+						<th class="table-head text-right">{ T(ctx, "overview.balance") }</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, p := range vm.Positions {
+						<tr>
+							<td class="table-cell">
+								<span class="flex items-center gap-2">
+									@memberDot(p.Member.Color)
+									{ p.Member.Name }
+								</span>
+							</td>
+							<td class="table-cell tnum text-right">{ FormatEUR(p.PaidCents) }</td>
+							<td class="table-cell tnum text-right">{ FormatEUR(p.OwedCents) }</td>
+							<td class="table-cell text-right">
+								@signedMoney(p.NetCents)
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
 	</div>
 }
 
@@ -150,8 +288,6 @@ templ sankeyCard(vm DashboardVM) {
 	</div>
 }
 
-// sankeySVG renders the diagram the layout was already computed for. Doing the
-// maths in Go keeps the strict CSP intact, since no charting library is needed.
 templ sankeySVG(s calc.Sankey) {
 	<svg
 		class="h-auto w-full min-w-[42rem]"
@@ -206,12 +342,18 @@ templ categoryCard(vm DashboardVM) {
 	</div>
 }
 
-// categoryBar shows the category's own colour plus its share, so "how much does
-// food cost" is answerable at a glance.
+// categoryBar shows the category's own symbol and colour plus its share, so
+// "how much does food cost" is answerable at a glance.
 templ categoryBar(c calc.LabeledTotal, max, total int64) {
-	<div class="grid grid-cols-[minmax(0,9rem)_1fr_auto_auto] items-center gap-3 py-1.5">
+	<div class="grid grid-cols-[minmax(0,10rem)_1fr_auto_auto] items-center gap-3 py-1.5">
 		<div class="flex min-w-0 items-center gap-2">
-			@memberDot(c.Color)
+			if c.Icon != "" {
+				<span class="cat-icon cat-icon-sm" style={ "color:" + ColorOr(c.Color) }>
+					@iconSVG(c.Icon)
+				</span>
+			} else {
+				@memberDot(c.Color)
+			}
 			<span class="truncate text-sm text-slate-600 dark:text-slate-400">{ c.Label }</span>
 		</div>
 		<div class="bar-track">
@@ -219,43 +361,6 @@ templ categoryBar(c calc.LabeledTotal, max, total int64) {
 		</div>
 		<div class="tnum w-14 text-right text-xs text-slate-400 dark:text-slate-500">{ SharePercent(c.Cents, total) }</div>
 		<div class="tnum text-right text-sm text-slate-700 dark:text-slate-300">{ FormatEUR(c.Cents) }</div>
-	</div>
-}
-
-templ trendCard(vm DashboardVM) {
-	<div class="card">
-		<div class="card-head">
-			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.chartTitle") }</h2>
-		</div>
-		<div class="mb-4 grid grid-cols-2 gap-3">
-			<div>
-				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "dash.avgIncome") }</div>
-				<div class="tnum mt-1 font-semibold text-emerald-600 dark:text-emerald-400">{ FormatEUR(vm.Report.IncomeCents) }</div>
-			</div>
-			<div>
-				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "dash.avgExpenses") }</div>
-				<div class="tnum mt-1 font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(vm.Report.ExpenseCents) }</div>
-			</div>
-		</div>
-		if len(vm.Months) == 0 {
-			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.noData") }</p>
-		} else {
-			<div class="flex items-end gap-1 overflow-x-auto pb-1">
-				for _, m := range vm.Months {
-					@trendColumn(m, vm.MaxCents)
-				}
-			</div>
-		}
-	</div>
-}
-
-templ trendColumn(m StatMonth, max int64) {
-	<div class="flex min-w-[2.25rem] flex-1 flex-col items-center gap-1">
-		<div class="flex h-28 w-full items-end justify-center gap-0.5">
-			<div class="w-1/2 rounded-t bg-emerald-500/70" style={ "height:" + BarWidth(m.IncomeCents, max) } title={ FormatEUR(m.IncomeCents) }></div>
-			<div class="w-1/2 rounded-t bg-indigo-500/70" style={ "height:" + BarWidth(m.ExpenseCents, max) } title={ FormatEUR(m.ExpenseCents) }></div>
-		</div>
-		<span class="text-[10px] text-slate-400 dark:text-slate-500">{ m.Label(ctx) }</span>
 	</div>
 }
 

@@ -156,8 +156,14 @@ func (s *Server) handleMemberUpdate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := parseID(r.PathValue("id"))
 	name := cleanName(r.FormValue("name"))
-	if id == 0 || name == "" {
-		w.WriteHeader(http.StatusNoContent)
+	if id == 0 {
+		http.NotFound(w, r)
+		return
+	}
+	// A person without a name cannot be told apart in a split, so an empty one
+	// is refused rather than silently ignored.
+	if name == "" {
+		s.clientError(w, r, http.StatusBadRequest, "error.nameMissing")
 		return
 	}
 	m, err := s.store.GetMember(ctx, active, id)
@@ -169,7 +175,7 @@ func (s *Server) handleMemberUpdate(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, r, err)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	hxChanged(w)
 }
 
 func (s *Server) handleMemberDelete(w http.ResponseWriter, r *http.Request) {
@@ -204,92 +210,24 @@ func (s *Server) handleMemberMove(w http.ResponseWriter, r *http.Request) {
 	hxRefresh(w)
 }
 
-// ---- sections ----
-
-func (s *Server) handleSectionCreate(w http.ResponseWriter, r *http.Request) {
-	active, ok := s.requireActiveHousehold(w, r)
-	if !ok {
-		return
-	}
-	if !s.parseForm(w, r) {
-		return
-	}
-	name := cleanName(r.FormValue("name"))
-	if name == "" {
-		s.clientError(w, r, http.StatusBadRequest, "error.nameMissing")
-		return
-	}
-	sec, err := s.store.CreateSection(r.Context(), active, name)
-	if err != nil {
-		s.serverError(w, r, err)
-		return
-	}
-	s.render(w, r, SectionRowView(sec))
-}
-
-func (s *Server) handleSectionRename(w http.ResponseWriter, r *http.Request) {
-	active, ok := s.requireActiveHousehold(w, r)
-	if !ok {
-		return
-	}
-	if !s.parseForm(w, r) {
-		return
-	}
-	id := parseID(r.PathValue("id"))
-	name := cleanName(r.FormValue("name"))
-	if id == 0 || name == "" {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-	if err := s.store.RenameSection(r.Context(), active, id, name); err != nil {
-		s.writeStoreError(w, r, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (s *Server) handleSectionDelete(w http.ResponseWriter, r *http.Request) {
-	active, ok := s.requireActiveHousehold(w, r)
-	if !ok {
-		return
-	}
-	if err := s.store.DeleteSection(r.Context(), active, parseID(r.PathValue("id"))); err != nil {
-		s.writeStoreError(w, r, err)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-}
-
-func (s *Server) handleSectionMove(w http.ResponseWriter, r *http.Request) {
-	active, ok := s.requireActiveHousehold(w, r)
-	if !ok {
-		return
-	}
-	if !s.parseForm(w, r) {
-		return
-	}
-	delta, ok := parseDelta(r.FormValue("dir"))
-	if !ok {
-		s.clientError(w, r, http.StatusBadRequest, "error.invalidDir")
-		return
-	}
-	if err := s.store.MoveSection(r.Context(), active, parseID(r.PathValue("id")), delta); err != nil {
-		s.writeStoreError(w, r, err)
-		return
-	}
-	hxRefresh(w)
-}
-
 // ---- categories ----
 
-// categoryFormFields reads the fields shared by create and update.
-func categoryFormFields(r *http.Request) (name string, class store.Direction, color string) {
-	name = cleanName(r.FormValue("name"))
-	class = store.Direction(r.FormValue("classification"))
-	if !class.Valid() {
-		class = store.DirExpense
+// categoryFromForm reads the fields shared by create and update. An icon left
+// unset is guessed from the name, so a category never renders blank.
+func categoryFromForm(r *http.Request) store.Category {
+	c := store.Category{
+		Name:           cleanName(r.FormValue("name")),
+		Classification: store.Direction(r.FormValue("classification")),
+		Color:          cleanColor(r.FormValue("color")),
+		Icon:           cleanIcon(r.FormValue("icon")),
 	}
-	return name, class, cleanColor(r.FormValue("color"))
+	if !c.Classification.Valid() {
+		c.Classification = store.DirExpense
+	}
+	if c.Icon == "" {
+		c.Icon = GuessIcon(c.Name)
+	}
+	return c
 }
 
 func (s *Server) handleCategoryCreate(w http.ResponseWriter, r *http.Request) {
@@ -300,17 +238,42 @@ func (s *Server) handleCategoryCreate(w http.ResponseWriter, r *http.Request) {
 	if !s.parseForm(w, r) {
 		return
 	}
-	name, class, color := categoryFormFields(r)
-	if name == "" {
+	c := categoryFromForm(r)
+	if c.Name == "" {
 		s.clientError(w, r, http.StatusBadRequest, "error.nameMissing")
 		return
 	}
-	c, err := s.store.CreateCategory(r.Context(), active, name, class, color)
-	if err != nil {
+	if _, err := s.store.CreateCategory(r.Context(), active, c); err != nil {
 		s.serverError(w, r, err)
 		return
 	}
-	s.render(w, r, CategoryRowView(c, 0))
+	hxRefresh(w)
+}
+
+// handleCategorySuggest creates one of the proposed categories, matched by name
+// so a hand-crafted request cannot invent an arbitrary one.
+func (s *Server) handleCategorySuggest(w http.ResponseWriter, r *http.Request) {
+	active, ok := s.requireActiveHousehold(w, r)
+	if !ok {
+		return
+	}
+	if !s.parseForm(w, r) {
+		return
+	}
+	want := cleanName(r.FormValue("name"))
+	for _, sug := range suggestCategories(nil) {
+		if sug.Name != want {
+			continue
+		}
+		c := store.Category{Name: sug.Name, Classification: sug.Class, Color: sug.Color, Icon: sug.Icon}
+		if _, err := s.store.CreateCategory(r.Context(), active, c); err != nil {
+			s.serverError(w, r, err)
+			return
+		}
+		hxRefresh(w)
+		return
+	}
+	s.clientError(w, r, http.StatusBadRequest, "error.invalidInput")
 }
 
 func (s *Server) handleCategoryUpdate(w http.ResponseWriter, r *http.Request) {
@@ -322,16 +285,20 @@ func (s *Server) handleCategoryUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := parseID(r.PathValue("id"))
-	name, class, color := categoryFormFields(r)
-	if id == 0 || name == "" {
-		w.WriteHeader(http.StatusNoContent)
+	c := categoryFromForm(r)
+	if id == 0 {
+		http.NotFound(w, r)
 		return
 	}
-	if err := s.store.UpdateCategory(r.Context(), active, id, name, class, color); err != nil {
+	if c.Name == "" {
+		s.clientError(w, r, http.StatusBadRequest, "error.nameMissing")
+		return
+	}
+	if err := s.store.UpdateCategory(r.Context(), active, id, c); err != nil {
 		s.writeStoreError(w, r, err)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	hxChanged(w)
 }
 
 func (s *Server) handleCategoryDelete(w http.ResponseWriter, r *http.Request) {
@@ -348,7 +315,7 @@ func (s *Server) handleCategoryDelete(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, r, err)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
+	hxRefresh(w)
 }
 
 // ---- tags ----
@@ -373,7 +340,6 @@ func (s *Server) handleTagCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	s.render(w, r, TagRowView(t))
 }
-
 func (s *Server) handleTagUpdate(w http.ResponseWriter, r *http.Request) {
 	active, ok := s.requireActiveHousehold(w, r)
 	if !ok {
@@ -384,15 +350,19 @@ func (s *Server) handleTagUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	id := parseID(r.PathValue("id"))
 	name := cleanName(r.FormValue("name"))
-	if id == 0 || name == "" {
-		w.WriteHeader(http.StatusNoContent)
+	if id == 0 {
+		http.NotFound(w, r)
+		return
+	}
+	if name == "" {
+		s.clientError(w, r, http.StatusBadRequest, "error.nameMissing")
 		return
 	}
 	if err := s.store.RenameTag(r.Context(), active, id, name, cleanColor(r.FormValue("color"))); err != nil {
 		s.writeStoreError(w, r, err)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	hxChanged(w)
 }
 
 func (s *Server) handleTagDelete(w http.ResponseWriter, r *http.Request) {

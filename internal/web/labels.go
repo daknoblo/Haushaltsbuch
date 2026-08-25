@@ -99,6 +99,26 @@ func FrequencyOptions(ctx context.Context) []Option {
 	}
 }
 
+// RecurringOptions returns the frequencies of a repeating booking. "Once" is
+// missing on purpose: the dialog offers a switch for that instead.
+func RecurringOptions(ctx context.Context) []Option {
+	return []Option{
+		{string(store.FreqMonthly), T(ctx, "freq.monthly")},
+		{string(store.FreqWeekly), T(ctx, "freq.weekly")},
+		{string(store.FreqQuarterly), T(ctx, "freq.quarterly")},
+		{string(store.FreqYearly), T(ctx, "freq.yearly")},
+	}
+}
+
+// DuePointOptions returns where inside the month a booking falls.
+func DuePointOptions(ctx context.Context) []Option {
+	return []Option{
+		{string(store.DueStart), T(ctx, "bookings.dueStart")},
+		{string(store.DueMiddle), T(ctx, "bookings.dueMid")},
+		{string(store.DueEnd), T(ctx, "bookings.dueEnd")},
+	}
+}
+
 // CostNatureOptions returns the selectable cost natures.
 func CostNatureOptions(ctx context.Context) []Option {
 	return []Option{

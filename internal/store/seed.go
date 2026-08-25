@@ -2,37 +2,36 @@ package store
 
 import "context"
 
-// seedCategory is a category created for every new household.
-type seedCategory struct {
-	name  string
-	class Direction
-	color string
+// SeedCategory is a category proposed for a household. The same list seeds a
+// new household and drives the suggestions shown in the settings.
+type SeedCategory struct {
+	Name  string
+	Class Direction
+	Color string
+	Icon  string
 }
 
-var (
-	defaultSections = []string{"Wohnen", "Versicherungen", "Lebenshaltung", "Freizeit", "Sparen"}
-
-	// Colors are reused by the category breakdowns and the Sankey diagram, so
-	// every seeded category carries one from the start.
-	defaultCategories = []seedCategory{
-		{"Gehalt", DirIncome, "#10b981"},
-		{"Sonstige Einnahmen", DirIncome, "#34d399"},
-		{"Miete", DirExpense, "#6366f1"},
-		{"Nebenkosten", DirExpense, "#818cf8"},
-		{"Strom", DirExpense, "#a78bfa"},
-		{"Versicherung", DirExpense, "#f59e0b"},
-		{"Lebensmittel", DirExpense, "#ef4444"},
-		{"Mobilität", DirExpense, "#f97316"},
-		{"Abo", DirExpense, "#ec4899"},
-		{"Freizeit", DirExpense, "#14b8a6"},
-		{"Sparrate", DirExpense, "#0ea5e9"},
-		{"Sonstiges", DirExpense, "#94a3b8"},
-	}
-)
+// DefaultCategories are created with every new household. Colors are reused by
+// the breakdowns and the Sankey diagram, so every category carries one.
+var DefaultCategories = []SeedCategory{
+	{"Gehalt", DirIncome, "#10b981", "wallet"},
+	{"Sonstige Einnahmen", DirIncome, "#34d399", "coins"},
+	{"Miete", DirExpense, "#6366f1", "home"},
+	{"Nebenkosten", DirExpense, "#818cf8", "droplet"},
+	{"Strom", DirExpense, "#a78bfa", "bolt"},
+	{"Internet", DirExpense, "#8b5cf6", "wifi"},
+	{"Versicherung", DirExpense, "#f59e0b", "shield"},
+	{"Lebensmittel", DirExpense, "#ef4444", "cart"},
+	{"Mobilität", DirExpense, "#f97316", "car"},
+	{"Abo", DirExpense, "#ec4899", "play"},
+	{"Freizeit", DirExpense, "#14b8a6", "ticket"},
+	{"Sparrate", DirExpense, "#0ea5e9", "piggy"},
+	{"Sonstiges", DirExpense, "#94a3b8", "tag"},
+}
 
 // CreateHouseholdSeeded creates a household pre-populated with one member and
-// the default sections and categories, so it is immediately usable. Either the
-// whole household is created or none of it.
+// the default categories, so it is immediately usable. Either the whole
+// household is created or none of it.
 func (s *Store) CreateHouseholdSeeded(ctx context.Context, name string) (Household, error) {
 	var out Household
 	err := s.withTx(ctx, func(tx *Store) error {
@@ -43,13 +42,9 @@ func (s *Store) CreateHouseholdSeeded(ctx context.Context, name string) (Househo
 		if _, err := tx.CreateMember(ctx, h.ID, "Ich", "#2563eb"); err != nil {
 			return err
 		}
-		for _, n := range defaultSections {
-			if _, err := tx.CreateSection(ctx, h.ID, n); err != nil {
-				return err
-			}
-		}
-		for _, c := range defaultCategories {
-			if _, err := tx.CreateCategory(ctx, h.ID, c.name, c.class, c.color); err != nil {
+		for _, c := range DefaultCategories {
+			cat := Category{Name: c.Name, Classification: c.Class, Color: c.Color, Icon: c.Icon}
+			if _, err := tx.CreateCategory(ctx, h.ID, cat); err != nil {
 				return err
 			}
 		}
@@ -62,9 +57,8 @@ func (s *Store) CreateHouseholdSeeded(ctx context.Context, name string) (Househo
 	return out, nil
 }
 
-// EnsureSeed creates a default household (with members, sections and
-// categories) when the database is empty and guarantees that an active
-// household is selected.
+// EnsureSeed creates a default household when the database is empty and
+// guarantees that an active household is selected.
 func (s *Store) EnsureSeed(ctx context.Context) error {
 	return s.withTx(ctx, func(tx *Store) error {
 		n, err := tx.CountHouseholds(ctx)

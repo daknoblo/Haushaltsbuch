@@ -19,7 +19,10 @@
     indicator = document.getElementById("save-indicator");
   });
 
-  // Theme toggle. The initial value is applied by theme.js in <head>.
+  function currentDialog() {
+    return document.querySelector("dialog[data-dialog]");
+  }
+
   document.addEventListener("click", function (e) {
     var toggle = e.target.closest("[data-theme-toggle]");
     if (toggle) {
@@ -30,6 +33,12 @@
       } catch (err) {
         // Ignore storage failures; the choice then lasts for this page only.
       }
+      return;
+    }
+
+    if (e.target.closest("[data-dialog-close]")) {
+      var dlg = currentDialog();
+      if (dlg) dlg.close();
       return;
     }
 
@@ -47,15 +56,25 @@
     }
   });
 
-  // Mirror the open state of an expense row into its form, so the server
-  // re-renders the row in the same state after an auto-save.
-  document.addEventListener("toggle", function (e) {
-    var details = e.target;
-    if (!details || details.tagName !== "DETAILS") return;
-    var form = details.closest("form");
-    if (!form) return;
-    var field = form.querySelector("[data-expanded-state]");
-    if (field) field.value = details.open ? "1" : "0";
+  // The booking dialog arrives as a fragment, so it has to be opened here.
+  // Doing it in JS rather than an inline handler keeps the CSP free of
+  // 'unsafe-eval'.
+  document.addEventListener("htmx:afterSwap", function (e) {
+    if (!e.target || e.target.id !== "booking-dialog") return;
+    var dlg = currentDialog();
+    if (!dlg) return;
+    if (!dlg.open) dlg.showModal();
+    var first = dlg.querySelector("input[name='name']");
+    if (first) first.focus();
+  });
+
+  // Closing empties the container, otherwise a stale dialog would linger in
+  // the DOM and its fields would keep posting.
+  document.addEventListener("close", function (e) {
+    if (!e.target || e.target.tagName !== "DIALOG") return;
+    var host = document.getElementById("booking-dialog");
+    if (host) host.innerHTML = "";
+    document.body.dispatchEvent(new CustomEvent("hb:changed"));
   }, true);
 
   document.body.addEventListener("htmx:afterRequest", function (e) {
@@ -73,7 +92,4 @@
       el.reset();
     }
   });
-
-  // Full page refresh when the server asks for it (e.g. after switching
-  // household), triggered via the HX-Refresh response header handled by htmx.
 })();

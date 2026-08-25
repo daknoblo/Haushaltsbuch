@@ -60,7 +60,7 @@ func TestMonthlyCentsSpreadsRecurringAmounts(t *testing.T) {
 		{"interval is ignored for one-offs", store.Booking{AmountCents: 59900, Frequency: store.FreqOnce, Interval: 4}, 59900},
 	}
 	for _, c := range cases {
-		if got := MonthlyCents(c.b); got != c.want {
+		if got := MonthlyCents(c.b, nil, "2026-05"); got != c.want {
 			t.Errorf("%s: MonthlyCents = %d, want %d", c.name, got, c.want)
 		}
 	}
@@ -98,7 +98,7 @@ func planData() Data {
 }
 
 func TestBuildMonthReport(t *testing.T) {
-	rep := BuildMonthReport(planData(), "2026-05")
+	rep := BuildMonthReport(planData(), "2026-05", Everyone)
 
 	if rep.IncomeCents != 500000 {
 		t.Errorf("income = %d, want 500000", rep.IncomeCents)
@@ -146,7 +146,7 @@ func TestBuildMonthReport(t *testing.T) {
 }
 
 func TestSavingsAndFixedCostRates(t *testing.T) {
-	rep := BuildMonthReport(planData(), "2026-05")
+	rep := BuildMonthReport(planData(), "2026-05", Everyone)
 
 	// (50000 saved + 240000 surplus) / 500000
 	if got := rep.SavingsRate(); math.Abs(got-58) > 0.01 {
@@ -156,7 +156,7 @@ func TestSavingsAndFixedCostRates(t *testing.T) {
 		t.Errorf("fixed cost rate = %.2f, want 40", got)
 	}
 
-	empty := BuildMonthReport(Data{}, "2026-05")
+	empty := BuildMonthReport(Data{}, "2026-05", Everyone)
 	if empty.SavingsRate() != 0 || empty.FixedCostRate() != 0 {
 		t.Error("rates without income must be 0, not NaN")
 	}
@@ -174,7 +174,7 @@ func TestUnassignedExpenseIsReported(t *testing.T) {
 		// Only 30 % is attributed, so 70 % has no owner.
 		Splits: map[int64][]store.BookingSplit{1: {{BookingID: 1, MemberID: 1, Value: 30}}},
 	}
-	rep := BuildMonthReport(d, "2026-05")
+	rep := BuildMonthReport(d, "2026-05", Everyone)
 	if rep.UnassignedCents != 7000 {
 		t.Errorf("unassigned = %d, want 7000", rep.UnassignedCents)
 	}
@@ -182,7 +182,7 @@ func TestUnassignedExpenseIsReported(t *testing.T) {
 
 func TestBuildSankeyBalances(t *testing.T) {
 	d := planData()
-	rep := BuildMonthReport(d, "2026-05")
+	rep := BuildMonthReport(d, "2026-05", Everyone)
 	s := BuildSankey(context.Background(), d, rep, month("2026-05"), 900, 460)
 
 	if s.Empty() {
@@ -230,7 +230,7 @@ func TestBuildSankeyBalances(t *testing.T) {
 // would double its value and draw it twice as tall as it belongs.
 func TestSankeyNodeValueIsThroughputNotSum(t *testing.T) {
 	d := planData()
-	rep := BuildMonthReport(d, "2026-05")
+	rep := BuildMonthReport(d, "2026-05", Everyone)
 	s := BuildSankey(context.Background(), d, rep, month("2026-05"), 900, 460)
 
 	byID := make(map[string]SankeyNode, len(s.Nodes))
@@ -268,7 +268,7 @@ func TestBuildSankeyDeficitGetsAWithdrawalNode(t *testing.T) {
 				CostNature: store.CostFix, BudgetClass: store.ClassNeed},
 		},
 	}
-	rep := BuildMonthReport(d, "2026-05")
+	rep := BuildMonthReport(d, "2026-05", Everyone)
 	s := BuildSankey(context.Background(), d, rep, month("2026-05"), 900, 460)
 
 	if !s.Deficit {
@@ -299,7 +299,7 @@ func TestBuildSankeyEmptyWithoutData(t *testing.T) {
 
 func TestSankeyLabelsFollowTheLanguage(t *testing.T) {
 	d := planData()
-	rep := BuildMonthReport(d, "2026-05")
+	rep := BuildMonthReport(d, "2026-05", Everyone)
 	ctx := i18n.WithLang(context.Background(), i18n.English)
 	s := BuildSankey(ctx, d, rep, month("2026-05"), 900, 460)
 
@@ -330,7 +330,7 @@ func TestPeriodReportAveragesTheRange(t *testing.T) {
 				SplitMode: store.SplitEqual, CostNature: store.CostFix, BudgetClass: store.ClassNeed},
 		},
 	}
-	rep := PeriodReport(d, []string{"2026-04", "2026-05", "2026-06"})
+	rep := PeriodReport(d, []string{"2026-04", "2026-05", "2026-06"}, Everyone)
 
 	if rep.Month != "2026-06" {
 		t.Errorf("month = %q, want the last month of the range", rep.Month)
@@ -353,7 +353,7 @@ func TestPeriodReportAveragesTheRange(t *testing.T) {
 	}
 
 	// A single month has to stay exactly BuildMonthReport.
-	if got, want := PeriodReport(d, month("2026-05")), BuildMonthReport(d, "2026-05"); got.ExpenseCents != want.ExpenseCents {
+	if got, want := PeriodReport(d, month("2026-05"), Everyone), BuildMonthReport(d, "2026-05", Everyone); got.ExpenseCents != want.ExpenseCents {
 		t.Errorf("single month = %d, want %d", got.ExpenseCents, want.ExpenseCents)
 	}
 }
@@ -369,7 +369,7 @@ func TestPeriodReportSkipsMonthsWithoutFigures(t *testing.T) {
 		}},
 	}
 	// The booking only exists in the last two months of the range.
-	rep := PeriodReport(d, []string{"2026-03", "2026-04", "2026-05", "2026-06"})
+	rep := PeriodReport(d, []string{"2026-03", "2026-04", "2026-05", "2026-06"}, Everyone)
 	if rep.ExpenseCents != 60000 {
 		t.Errorf("expenses = %d, want 60000 rather than a diluted average", rep.ExpenseCents)
 	}
@@ -377,21 +377,21 @@ func TestPeriodReportSkipsMonthsWithoutFigures(t *testing.T) {
 
 func TestFixedCostsAverageAndLimit(t *testing.T) {
 	d := planData()
-	got := FixedCosts(d, []string{"2026-04", "2026-05"}, 0)
+	got := FixedCosts(d, []string{"2026-04", "2026-05"}, Everyone, 0)
 	if len(got) != 2 {
 		t.Fatalf("got %d fixed bookings, want 2", len(got))
 	}
 	if got[0].Cents != 150000 || got[1].Cents != 50000 {
 		t.Errorf("fixed costs = %+v", got)
 	}
-	if limited := FixedCosts(d, month("2026-05"), 1); len(limited) != 1 {
+	if limited := FixedCosts(d, month("2026-05"), Everyone, 1); len(limited) != 1 {
 		t.Errorf("limit was ignored: %+v", limited)
 	}
 }
 
 func TestTrendKeepsMonthOrder(t *testing.T) {
 	d := planData()
-	reps := Trend(d, []string{"2026-04", "2026-05", "2026-06"})
+	reps := Trend(d, []string{"2026-04", "2026-05", "2026-06"}, Everyone)
 	if len(reps) != 3 {
 		t.Fatalf("got %d reports, want 3", len(reps))
 	}

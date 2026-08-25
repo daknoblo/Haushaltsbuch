@@ -17,36 +17,37 @@ type SplitInput struct {
 	Value    float64
 }
 
-const bookingColumns = `id, household_id, category_id, section_id, direction, name, note,
-	amount_cents, frequency, interval_n, starts_on, ends_on, cost_nature,
-	budget_class, split_mode, sort_order, created_at, updated_at`
+const bookingColumns = `id, household_id, category_id, payer_member_id, direction, name, note,
+	amount_cents, frequency, interval_n, due_point, starts_on, ends_on, cost_nature,
+	budget_class, split_mode, created_at, updated_at`
 
 func scanBooking(sc scanner) (Booking, error) {
 	var (
-		b         Booking
-		sectionID sql.NullInt64
+		b     Booking
+		payer sql.NullInt64
 	)
 	err := sc.Scan(
-		&b.ID, &b.HouseholdID, &b.CategoryID, &sectionID, &b.Direction, &b.Name, &b.Note,
-		&b.AmountCents, &b.Frequency, &b.Interval, &b.StartsOn, &b.EndsOn, &b.CostNature,
-		&b.BudgetClass, &b.SplitMode, &b.SortOrder, &b.CreatedAt, &b.UpdatedAt,
+		&b.ID, &b.HouseholdID, &b.CategoryID, &payer, &b.Direction, &b.Name, &b.Note,
+		&b.AmountCents, &b.Frequency, &b.Interval, &b.DuePoint, &b.StartsOn, &b.EndsOn,
+		&b.CostNature, &b.BudgetClass, &b.SplitMode, &b.CreatedAt, &b.UpdatedAt,
 	)
 	if err != nil {
 		return Booking{}, err
 	}
-	if sectionID.Valid {
-		v := sectionID.Int64
-		b.SectionID = &v
+	if payer.Valid {
+		v := payer.Int64
+		b.PayerMemberID = &v
 	}
 	return b, nil
 }
 
-// ListBookings returns all bookings of a household, ordered for display.
+// ListBookings returns all bookings of a household, largest first. Bookings are
+// grouped by category in the UI, which leaves no use for a manual order.
 func (s *Store) ListBookings(ctx context.Context, householdID int64) ([]Booking, error) {
 	rows, err := s.q.QueryContext(ctx,
 		`SELECT `+bookingColumns+` FROM bookings
 		 WHERE household_id = ?
-		 ORDER BY sort_order, id`, householdID)
+		 ORDER BY amount_cents DESC, name COLLATE NOCASE, id`, householdID)
 	if err != nil {
 		return nil, err
 	}
@@ -78,30 +79,27 @@ func (s *Store) GetBooking(ctx context.Context, householdID, id int64) (Booking,
 // same household, so a forged id cannot create a cross-household reference.
 // category_id is NOT NULL, so a forged category is rejected by the constraint.
 const (
-	sectionRef  = `(SELECT id FROM sections WHERE id = ? AND household_id = ?)`
 	categoryRef = `(SELECT id FROM categories WHERE id = ? AND household_id = ?)`
+	memberRef   = `(SELECT id FROM members WHERE id = ? AND household_id = ?)`
 )
 
 // CreateBooking inserts a booking with its splits and tags and returns it.
-// Timestamps and the sort order are assigned automatically.
 func (s *Store) CreateBooking(ctx context.Context, b Booking, splits []SplitInput, tagIDs []int64) (Booking, error) {
 	var created Booking
 	err := s.withTx(ctx, func(tx *Store) error {
 		ts := now()
 		res, err := tx.q.ExecContext(ctx,
 			`INSERT INTO bookings
-				(household_id, category_id, section_id, direction, name, note, amount_cents,
-				 frequency, interval_n, starts_on, ends_on, cost_nature, budget_class,
-				 split_mode, sort_order, created_at, updated_at)
-			 VALUES (?, `+categoryRef+`, `+sectionRef+`, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-				(SELECT COALESCE(MAX(sort_order)+1, 0) FROM bookings WHERE household_id = ?), ?, ?)`,
+				(household_id, category_id, payer_member_id, direction, name, note,
+				 amount_cents, frequency, interval_n, due_point, starts_on, ends_on,
+				 cost_nature, budget_class, split_mode, created_at, updated_at)
+			 VALUES (?, `+categoryRef+`, `+memberRef+`, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			b.HouseholdID,
 			b.CategoryID, b.HouseholdID,
-			nullInt(b.SectionID), b.HouseholdID,
+			nullInt(b.PayerMemberID), b.HouseholdID,
 			string(b.Direction), b.Name, b.Note, b.AmountCents,
-			string(b.Frequency), b.Interval, b.StartsOn, b.EndsOn,
-			string(b.CostNature), string(b.BudgetClass), string(b.SplitMode),
-			b.HouseholdID, ts, ts,
+			string(b.Frequency), b.Interval, string(b.DuePoint), b.StartsOn, b.EndsOn,
+			string(b.CostNature), string(b.BudgetClass), string(b.SplitMode), ts, ts,
 		)
 		if err != nil {
 			return err
@@ -131,15 +129,15 @@ func (s *Store) SaveBooking(ctx context.Context, b Booking, splits []SplitInput,
 	return s.withTx(ctx, func(tx *Store) error {
 		err := affected(tx.q.ExecContext(ctx,
 			`UPDATE bookings SET
-				category_id = `+categoryRef+`, section_id = `+sectionRef+`,
+				category_id = `+categoryRef+`, payer_member_id = `+memberRef+`,
 				direction = ?, name = ?, note = ?, amount_cents = ?, frequency = ?,
-				interval_n = ?, starts_on = ?, ends_on = ?, cost_nature = ?,
-				budget_class = ?, split_mode = ?, updated_at = ?
+				interval_n = ?, due_point = ?, starts_on = ?, ends_on = ?,
+				cost_nature = ?, budget_class = ?, split_mode = ?, updated_at = ?
 			 WHERE id = ? AND household_id = ?`,
 			b.CategoryID, b.HouseholdID,
-			nullInt(b.SectionID), b.HouseholdID,
+			nullInt(b.PayerMemberID), b.HouseholdID,
 			string(b.Direction), b.Name, b.Note, b.AmountCents, string(b.Frequency),
-			b.Interval, b.StartsOn, b.EndsOn, string(b.CostNature),
+			b.Interval, string(b.DuePoint), b.StartsOn, b.EndsOn, string(b.CostNature),
 			string(b.BudgetClass), string(b.SplitMode), now(), b.ID, b.HouseholdID,
 		))
 		if err != nil {
@@ -235,6 +233,113 @@ func (s *Store) ListSplitsForHousehold(ctx context.Context, householdID int64) (
 		out[sp.BookingID] = append(out[sp.BookingID], sp)
 	}
 	return out, rows.Err()
+}
+
+// ---- amount overrides ----
+
+const overrideColumns = `o.id, o.booking_id, o.starts_on, o.ends_on, o.amount_cents, o.note`
+
+func scanOverride(sc scanner) (BookingOverride, error) {
+	var o BookingOverride
+	err := sc.Scan(&o.ID, &o.BookingID, &o.StartsOn, &o.EndsOn, &o.AmountCents, &o.Note)
+	return o, err
+}
+
+// ListOverrides returns the amount overrides of a single booking, oldest first.
+func (s *Store) ListOverrides(ctx context.Context, householdID, bookingID int64) ([]BookingOverride, error) {
+	rows, err := s.q.QueryContext(ctx,
+		`SELECT `+overrideColumns+`
+		 FROM booking_overrides o
+		 JOIN bookings b ON b.id = o.booking_id
+		 WHERE b.id = ? AND b.household_id = ?
+		 ORDER BY o.starts_on, o.id`, bookingID, householdID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []BookingOverride
+	for rows.Next() {
+		o, err := scanOverride(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, o)
+	}
+	return out, rows.Err()
+}
+
+// ListOverridesForHousehold returns all overrides of a household keyed by
+// booking id, so a whole report is built from one query.
+func (s *Store) ListOverridesForHousehold(ctx context.Context, householdID int64) (map[int64][]BookingOverride, error) {
+	rows, err := s.q.QueryContext(ctx,
+		`SELECT `+overrideColumns+`
+		 FROM booking_overrides o
+		 JOIN bookings b ON b.id = o.booking_id
+		 WHERE b.household_id = ?
+		 ORDER BY o.booking_id, o.starts_on, o.id`, householdID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(map[int64][]BookingOverride)
+	for rows.Next() {
+		o, err := scanOverride(rows)
+		if err != nil {
+			return nil, err
+		}
+		out[o.BookingID] = append(out[o.BookingID], o)
+	}
+	return out, rows.Err()
+}
+
+// CreateOverride adds an amount override to a booking of a household.
+func (s *Store) CreateOverride(ctx context.Context, householdID int64, o BookingOverride) (BookingOverride, error) {
+	var out BookingOverride
+	err := s.withTx(ctx, func(tx *Store) error {
+		res, err := tx.q.ExecContext(ctx,
+			`INSERT INTO booking_overrides (booking_id, starts_on, ends_on, amount_cents, note)
+			 SELECT id, ?, ?, ?, ? FROM bookings WHERE id = ? AND household_id = ?`,
+			o.StartsOn, o.EndsOn, o.AmountCents, o.Note, o.BookingID, householdID)
+		if err != nil {
+			return err
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return ErrNotFound
+		}
+		id, err := res.LastInsertId()
+		if err != nil {
+			return err
+		}
+		out, err = scanOverride(tx.q.QueryRowContext(ctx,
+			`SELECT `+overrideColumns+` FROM booking_overrides o WHERE o.id = ?`, id))
+		return err
+	})
+	if err != nil {
+		return BookingOverride{}, err
+	}
+	return out, nil
+}
+
+// UpdateOverride changes an override of a household's booking.
+func (s *Store) UpdateOverride(ctx context.Context, householdID int64, o BookingOverride) error {
+	return affected(s.q.ExecContext(ctx,
+		`UPDATE booking_overrides SET starts_on = ?, ends_on = ?, amount_cents = ?, note = ?
+		 WHERE id = ? AND booking_id IN (SELECT id FROM bookings WHERE household_id = ?)`,
+		o.StartsOn, o.EndsOn, o.AmountCents, o.Note, o.ID, householdID))
+}
+
+// DeleteOverride removes an override of a household's booking.
+func (s *Store) DeleteOverride(ctx context.Context, householdID, id int64) error {
+	return affected(s.q.ExecContext(ctx,
+		`DELETE FROM booking_overrides
+		 WHERE id = ? AND booking_id IN (SELECT id FROM bookings WHERE household_id = ?)`,
+		id, householdID))
 }
 
 func nullInt(p *int64) any {

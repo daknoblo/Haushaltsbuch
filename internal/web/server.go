@@ -64,14 +64,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /members/{id}/delete", s.handleMemberDelete)
 	mux.HandleFunc("POST /members/{id}/move", s.handleMemberMove)
 
-	// Sections.
-	mux.HandleFunc("POST /sections", s.handleSectionCreate)
-	mux.HandleFunc("POST /sections/{id}", s.handleSectionRename)
-	mux.HandleFunc("POST /sections/{id}/delete", s.handleSectionDelete)
-	mux.HandleFunc("POST /sections/{id}/move", s.handleSectionMove)
-
 	// Categories.
 	mux.HandleFunc("POST /categories", s.handleCategoryCreate)
+	mux.HandleFunc("POST /categories/suggest", s.handleCategorySuggest)
 	mux.HandleFunc("POST /categories/{id}", s.handleCategoryUpdate)
 	mux.HandleFunc("POST /categories/{id}/delete", s.handleCategoryDelete)
 
@@ -80,11 +75,16 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /tags/{id}", s.handleTagUpdate)
 	mux.HandleFunc("POST /tags/{id}/delete", s.handleTagDelete)
 
-	// Bookings.
+	// Bookings. The list is fetched on its own so a saved edit can refresh the
+	// figures without reloading the page the dialog sits on.
+	mux.HandleFunc("GET /bookings/list", s.handleBookingList)
+	mux.HandleFunc("GET /bookings/{id}/edit", s.handleBookingEdit)
 	mux.HandleFunc("POST /bookings/new", s.handleBookingCreate)
 	mux.HandleFunc("POST /bookings/{id}", s.handleBookingUpdate)
 	mux.HandleFunc("POST /bookings/{id}/delete", s.handleBookingDelete)
-	mux.HandleFunc("POST /bookings/{id}/move", s.handleBookingMove)
+	mux.HandleFunc("POST /bookings/{id}/overrides", s.handleOverrideCreate)
+	mux.HandleFunc("POST /overrides/{id}", s.handleOverrideUpdate)
+	mux.HandleFunc("POST /overrides/{id}/delete", s.handleOverrideDelete)
 
 	// PDF export.
 	mux.HandleFunc("GET /export/overview.pdf", s.handleExportOverview)

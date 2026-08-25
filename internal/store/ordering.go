@@ -17,20 +17,8 @@ func membersScope(householdID int64) orderScope {
 	return orderScope{"members", "household_id = ?", []any{householdID}}
 }
 
-func sectionsScope(householdID int64) orderScope {
-	return orderScope{"sections", "household_id = ?", []any{householdID}}
-}
-
 func householdsScope() orderScope {
 	return orderScope{"households", "1 = 1", nil}
-}
-
-func bookingsScope(householdID, sectionID int64) orderScope {
-	return orderScope{
-		"bookings",
-		"household_id = ? AND COALESCE(section_id, 0) = ?",
-		[]any{householdID, sectionID},
-	}
 }
 
 // reorder moves the row with the given id one position up (delta -1) or down
@@ -101,14 +89,4 @@ func (s *Store) MoveHousehold(ctx context.Context, id int64, delta int) error {
 // MoveMember reorders a member within its household.
 func (s *Store) MoveMember(ctx context.Context, householdID, id int64, delta int) error {
 	return s.reorder(ctx, membersScope(householdID), id, delta)
-}
-
-// MoveSection reorders a section within its household.
-func (s *Store) MoveSection(ctx context.Context, householdID, id int64, delta int) error {
-	return s.reorder(ctx, sectionsScope(householdID), id, delta)
-}
-
-// MoveBooking reorders a booking within its household and section.
-func (s *Store) MoveBooking(ctx context.Context, householdID, sectionID, id int64, delta int) error {
-	return s.reorder(ctx, bookingsScope(householdID, sectionID), id, delta)
 }

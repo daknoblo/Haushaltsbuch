@@ -51,39 +51,18 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 					</form>
 				</div>
 			</div>
-			<div class="card-tight" id="areas">
-				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "settings.sections") }</h2></div>
-				<div class="card-body">
-					<div id="section-list" class="grid gap-2">
-						for _, s := range vm.Sections {
-							@SectionRowView(s)
-						}
-					</div>
-					<form
-						class="mt-3 flex gap-2"
-						hx-post="/sections"
-						hx-target="#section-list"
-						hx-swap="beforeend"
-						data-reset-on-success
-					>
-						<input class="input flex-1" type="text" name="name" placeholder={ T(ctx, "settings.newSection") } required/>
-						<button class="btn-primary shrink-0" type="submit">{ T(ctx, "action.add") }</button>
-					</form>
-				</div>
-			</div>
-			<div class="card-tight" id="categories">
+			<div class="card-tight lg:col-span-2" id="categories">
 				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "settings.categories") }</h2></div>
 				<div class="card-body">
 					<div id="category-list" class="grid gap-2">
 						for _, c := range vm.Categories {
-							@CategoryRowView(c, vm.UsageOf(c.ID))
+							@CategoryRowView(c, vm.UsageOf(c.ID), vm.Icons)
 						}
 					</div>
 					<form
 						class="mt-3 flex flex-wrap gap-2"
 						hx-post="/categories"
-						hx-target="#category-list"
-						hx-swap="beforeend"
+						hx-swap="none"
 						data-reset-on-success
 					>
 						<input class="input min-w-0 flex-1" type="text" name="name" placeholder={ T(ctx, "settings.newCategory") } required/>
@@ -95,12 +74,13 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 						<input class="input h-11 w-14 shrink-0 p-1" type="color" name="color" value="#6366f1" aria-label={ T(ctx, "settings.color") }/>
 						<button class="btn-primary shrink-0" type="submit">{ T(ctx, "action.add") }</button>
 					</form>
+					@categorySuggestions(vm)
 				</div>
 			</div>
-			<div class="card-tight" id="tags">
+			<div class="card-tight lg:col-span-2" id="tags">
 				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "settings.tags") }</h2></div>
 				<div class="card-body">
-					<div id="tag-list" class="grid gap-2">
+					<div id="tag-list" class="flex flex-wrap items-center gap-2">
 						for _, t := range vm.Tags {
 							@TagRowView(t)
 						}
@@ -122,16 +102,45 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 	}
 }
 
+// categorySuggestions offers what a household usually books but has not created
+// yet, so the list can be filled in without inventing names.
+templ categorySuggestions(vm SettingsVM) {
+	<div class="mt-5 border-t border-slate-200 pt-4 dark:border-slate-800">
+		<span class="field-label">{ T(ctx, "settings.suggestions") }</span>
+		if len(vm.Suggestions) == 0 {
+			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "settings.allSuggestions") }</p>
+		} else {
+			<p class="mb-2 text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "settings.suggestionsHint") }</p>
+			<div class="flex flex-wrap gap-2">
+				for _, s := range vm.Suggestions {
+					<button
+						type="button"
+						class="suggest-chip"
+						hx-post="/categories/suggest"
+						hx-vals={ `{"name":` + jsonString(s.Name) + `}` }
+						hx-swap="none"
+					>
+						<span class="cat-icon cat-icon-sm" style={ "color:" + ColorOr(s.Color) }>
+							@iconSVG(s.Icon)
+						</span>
+						{ s.Name }
+						<span aria-hidden="true">+</span>
+					</button>
+				}
+			</div>
+		}
+	</div>
+}
+
 templ HouseholdRowView(h store.Household, activeID int64) {
 	<div id={ "hh-" + strconv.FormatInt(h.ID, 10) } class="flex items-center gap-2 border-b border-slate-200/70 pb-2 last:border-0 last:pb-0 dark:border-slate-800/60">
 		<form
 			class="min-w-0 flex-1"
 			hx-post={ "/households/" + strconv.FormatInt(h.ID, 10) }
-			hx-trigger="change, keyup changed delay:700ms"
-			hx-target="this"
+			hx-trigger="change, keyup changed delay:600ms"
 			hx-swap="none"
 		>
-			<input class="input" type="text" name="name" value={ h.Name }/>
+			<input class="input" type="text" name="name" value={ h.Name } required/>
 		</form>
 		if h.ID == activeID {
 			<span class="badge badge-ok shrink-0">{ T(ctx, "settings.active") }</span>
@@ -158,12 +167,12 @@ templ MemberRowView(m store.Member) {
 		<form
 			class="flex min-w-0 flex-1 items-center gap-2"
 			hx-post={ "/members/" + strconv.FormatInt(m.ID, 10) }
-			hx-trigger="change, keyup changed delay:700ms"
-			hx-target="this"
+			hx-trigger="change, keyup changed delay:600ms"
 			hx-swap="none"
 		>
 			<input class="h-9 w-10 shrink-0 cursor-pointer rounded-md border border-slate-300 bg-transparent p-0.5 dark:border-slate-700" type="color" name="color" value={ ColorOr(m.Color) } aria-label={ T(ctx, "settings.color") }/>
-			<input class="input" type="text" name="name" value={ m.Name } aria-label={ T(ctx, "settings.name") }/>
+			// A person without a name cannot be told apart in a split.
+			<input class="input" type="text" name="name" value={ m.Name } aria-label={ T(ctx, "settings.name") } required/>
 		</form>
 		@moveButtons("/members/" + strconv.FormatInt(m.ID, 10))
 		<button
@@ -177,40 +186,22 @@ templ MemberRowView(m store.Member) {
 	</div>
 }
 
-templ SectionRowView(s store.Section) {
-	<div id={ "sec-" + strconv.FormatInt(s.ID, 10) } class="flex items-center gap-2 border-b border-slate-200/70 pb-2 last:border-0 last:pb-0 dark:border-slate-800/60">
-		<form
-			class="min-w-0 flex-1"
-			hx-post={ "/sections/" + strconv.FormatInt(s.ID, 10) }
-			hx-trigger="change, keyup changed delay:700ms"
-			hx-target="this"
-			hx-swap="none"
-		>
-			<input class="input" type="text" name="name" value={ s.Name }/>
-		</form>
-		@moveButtons("/sections/" + strconv.FormatInt(s.ID, 10))
-		<button
-			class="btn-icon shrink-0 no-print"
-			hx-post={ "/sections/" + strconv.FormatInt(s.ID, 10) + "/delete" }
-			hx-target={ "#sec-" + strconv.FormatInt(s.ID, 10) }
-			hx-swap="outerHTML"
-			hx-confirm={ T(ctx, "settings.confirmSection") }
-			aria-label={ T(ctx, "action.delete") }
-		>✕</button>
-	</div>
-}
-
-templ CategoryRowView(c store.Category, usage int) {
+templ CategoryRowView(c store.Category, usage int, icons []string) {
 	<div id={ "cat-" + strconv.FormatInt(c.ID, 10) } class="flex items-center gap-2 border-b border-slate-200/70 pb-2 last:border-0 last:pb-0 dark:border-slate-800/60">
 		<form
-			class="flex min-w-0 flex-1 items-center gap-2"
+			class="flex min-w-0 flex-1 flex-wrap items-center gap-2"
 			hx-post={ "/categories/" + strconv.FormatInt(c.ID, 10) }
-			hx-trigger="change, keyup changed delay:700ms"
-			hx-target="this"
+			hx-trigger="change, keyup changed delay:600ms"
 			hx-swap="none"
 		>
+			@categoryIcon(c)
+			<select class="input w-32 shrink-0" name="icon" aria-label={ T(ctx, "settings.icon") }>
+				for _, key := range icons {
+					<option value={ key } selected?={ key == IconOr(c) }>{ key }</option>
+				}
+			</select>
 			<input class="input h-11 w-12 shrink-0 p-1" type="color" name="color" value={ ColorOr(c.Color) } aria-label={ T(ctx, "settings.color") }/>
-			<input class="input min-w-0 flex-1" type="text" name="name" value={ c.Name }/>
+			<input class="input min-w-0 flex-1" type="text" name="name" value={ c.Name } required/>
 			<select class="input w-32 shrink-0" name="classification" aria-label={ T(ctx, "settings.kind") }>
 				for _, o := range DirectionOptions(ctx) {
 					<option value={ o.Value } selected?={ o.Value == string(c.Classification) }>{ o.Label }</option>
@@ -223,33 +214,34 @@ templ CategoryRowView(c store.Category, usage int) {
 		<button
 			class="btn-icon shrink-0 no-print"
 			hx-post={ "/categories/" + strconv.FormatInt(c.ID, 10) + "/delete" }
-			hx-target={ "#cat-" + strconv.FormatInt(c.ID, 10) }
-			hx-swap="outerHTML"
+			hx-swap="none"
 			hx-confirm={ T(ctx, "settings.confirmCategory") }
 			aria-label={ T(ctx, "action.delete") }
 		>✕</button>
 	</div>
 }
 
+// TagRowView renders a tag the way it appears everywhere else: as a label in
+// its own colour, editable in place.
 templ TagRowView(t store.Tag) {
-	<div id={ "tag-" + strconv.FormatInt(t.ID, 10) } class="flex items-center gap-2 border-b border-slate-200/70 pb-2 last:border-0 last:pb-0 dark:border-slate-800/60">
+	<span id={ "tag-" + strconv.FormatInt(t.ID, 10) } class="tag-chip" style={ tagStyle(t.Color) }>
 		<form
-			class="flex min-w-0 flex-1 items-center gap-2"
+			class="flex items-center gap-1.5"
 			hx-post={ "/tags/" + strconv.FormatInt(t.ID, 10) }
-			hx-trigger="change, keyup changed delay:700ms"
-			hx-target="this"
+			hx-trigger="change, keyup changed delay:600ms"
 			hx-swap="none"
 		>
-			<input class="input h-11 w-12 shrink-0 p-1" type="color" name="color" value={ ColorOr(t.Color) } aria-label={ T(ctx, "settings.color") }/>
-			<input class="input min-w-0 flex-1" type="text" name="name" value={ t.Name }/>
+			<input class="tag-color" type="color" name="color" value={ ColorOr(t.Color) } aria-label={ T(ctx, "settings.color") }/>
+			<input class="tag-name" type="text" name="name" value={ t.Name } size="10" aria-label={ T(ctx, "settings.name") } required/>
 		</form>
 		<button
-			class="btn-icon shrink-0 no-print"
+			type="button"
+			class="tag-remove no-print"
 			hx-post={ "/tags/" + strconv.FormatInt(t.ID, 10) + "/delete" }
 			hx-target={ "#tag-" + strconv.FormatInt(t.ID, 10) }
 			hx-swap="outerHTML"
 			hx-confirm={ T(ctx, "settings.confirmTag") }
 			aria-label={ T(ctx, "action.delete") }
 		>✕</button>
-	</div>
+	</span>
 }

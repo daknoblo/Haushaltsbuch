@@ -28,32 +28,44 @@ _Not captured yet._
 
 - **Multiple households**, exactly one of which is active at a time. Switch via
   the header dropdown; create, rename and delete them in the settings.
-- **Bookings** — income and expenses are maintained in one place, so a figure
-  never has to be kept in sync in two lists:
+- **Bookings** — income and expenses are maintained in one place, entered through
+  a single dialog, so a figure never has to be kept in sync in two lists:
   - a **one-off** dated booking or a **weekly / monthly / quarterly / yearly**
     rhythm with an interval ("every second month"), normalised to a monthly
-    amount,
+    amount, plus where in the month it falls (start, middle, end),
   - a **mandatory category** that knows whether it belongs to income or
-    expenses, plus free **tags** for anything that cuts across categories,
+    expenses and carries a colour and a symbol, plus free **tags** for anything
+    that cuts across categories,
   - **fixed/variable** and **need/want/saving** (50/30/20),
-  - a flexible **split** per booking: equal, percentage or fixed amounts –
-    e.g. rent 50/50, insurance 100 % on one person.
+  - **who fronts the bill** and a flexible **split**: equal, percentage or fixed
+    amounts – e.g. rent 50/50, life insurance 100 % on one person,
+  - **differing amounts for a period**, so an introductory price ("10 € for the
+    first six months, 49.99 € afterwards") needs no second booking.
 - **Overview** per month: income, expenses and balance – in total and per
-  person, broken down by area, category, cost nature and 50/30/20.
-- **Dashboard** with a selectable period (this month, last month, year to date,
-  last 12 months). Every figure describes a *typical month* of that period, so
-  the cards stay comparable no matter how long the range is:
+  person, broken down by category, cost nature and 50/30/20.
+- **Dashboard** with a selectable period (month, two months, quarter, half year,
+  year) and arrows that step by the length of that period. Every figure
+  describes a *typical month* of the range, so the cards stay comparable no
+  matter how long it is:
+  - a **bar chart** of income against expenses, with the period picker centred
+    above it,
+  - a **view switch** between the whole household and a single person, which
+    recomputes every card – your own view shows your half of the rent plus
+    whatever only you carry,
+  - a **settlement** that says who has to transfer how much to whom,
   - **fixed costs** with their share of income and the largest items,
   - **savings rate** — deliberate savings plus surplus against net income — and
     the 50/30/20 split against its targets,
   - a **Sankey diagram** of the money flow, from every income source through the
     budget classes down to the single category,
-  - spending **by category** and **by tag**, plus an income/expense trend.
-- **PDF export** of the overview, the dashboard and the booking list.
-- **Custom ordering**: households, people, areas and bookings can be moved up
-  and down with the arrow buttons.
+  - spending **by category** and **by tag**.
+- **PDF export** of the overview, the dashboard and the booking list, all
+  reachable from the dashboard.
+- **Custom ordering**: households and people can be moved up and down with the
+  arrow buttons; bookings sort themselves by amount inside their category.
 - **Automatic saving**: every input is persisted as soon as a field changes –
-  there is no save button.
+  there is no save button anywhere, and nothing you are typing in is ever
+  replaced under your cursor.
 
 ---
 

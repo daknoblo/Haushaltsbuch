@@ -111,6 +111,28 @@ func (m SplitMode) Valid() bool {
 	}
 }
 
+// DuePoint says where inside the month a recurring booking falls. It is a
+// coarse hint rather than a date, because a plan only needs to know whether the
+// money is gone at the start of the month or still there until the end.
+type DuePoint string
+
+// Due points of a recurring booking.
+const (
+	DueStart  DuePoint = "start"
+	DueMiddle DuePoint = "mid"
+	DueEnd    DuePoint = "end"
+)
+
+// Valid reports whether p is a known due point.
+func (p DuePoint) Valid() bool {
+	switch p {
+	case DueStart, DueMiddle, DueEnd:
+		return true
+	default:
+		return false
+	}
+}
+
 // Household is a single budget book. Exactly one household is active at a time.
 type Household struct {
 	ID        int64
@@ -128,14 +150,6 @@ type Member struct {
 	SortOrder   int
 }
 
-// Section groups bookings for a clearer overview.
-type Section struct {
-	ID          int64
-	HouseholdID int64
-	Name        string
-	SortOrder   int
-}
-
 // Category is the mandatory label of a booking (e.g. "Miete"). Its
 // classification keeps income categories out of expense pickers.
 type Category struct {
@@ -144,7 +158,9 @@ type Category struct {
 	Name           string
 	Classification Direction
 	Color          string
-	SortOrder      int
+	// Icon is a key into the built-in symbol set, empty for the fallback.
+	Icon      string
+	SortOrder int
 }
 
 // Tag is a free, cross-cutting label. A booking can carry any number of them.
@@ -162,21 +178,34 @@ type Booking struct {
 	ID          int64
 	HouseholdID int64
 	CategoryID  int64
-	SectionID   *int64
-	Direction   Direction
-	Name        string
-	Note        string
+	// PayerMemberID is who fronts the money, which is what makes a settlement
+	// between the members computable at all.
+	PayerMemberID *int64
+	Direction     Direction
+	Name          string
+	Note          string
+	AmountCents   int64
+	Frequency     Frequency
+	Interval      int
+	DuePoint      DuePoint
+	StartsOn      string // YYYY-MM-DD, the date itself when Frequency is once
+	EndsOn        string // YYYY-MM-DD, empty means open ended
+	CostNature    CostNature
+	BudgetClass   BudgetClass
+	SplitMode     SplitMode
+	CreatedAt     string
+	UpdatedAt     string
+}
+
+// BookingOverride replaces a recurring booking's amount for a while, e.g. an
+// introductory price for the first six months.
+type BookingOverride struct {
+	ID          int64
+	BookingID   int64
+	StartsOn    string // YYYY-MM-DD, empty means open start
+	EndsOn      string // YYYY-MM-DD, empty means open end
 	AmountCents int64
-	Frequency   Frequency
-	Interval    int
-	StartsOn    string // YYYY-MM-DD, the date itself when Frequency is once
-	EndsOn      string // YYYY-MM-DD, empty means open ended
-	CostNature  CostNature
-	BudgetClass BudgetClass
-	SplitMode   SplitMode
-	SortOrder   int
-	CreatedAt   string
-	UpdatedAt   string
+	Note        string
 }
 
 // BookingSplit records a member's share of a booking. The meaning of Value

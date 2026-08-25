@@ -5,7 +5,6 @@ import "github.com/daknoblo/Haushaltsbuch/internal/store"
 templ OverviewPage(nav Nav, vm OverviewVM) {
 	@Layout(nav) {
 		@pageHeading(T(ctx, "overview.title"), nav.CurrentMonthLabel(ctx)) {
-			<a class="btn-ghost ml-auto no-print" href={ templ.SafeURL("/export/overview.pdf?m=" + nav.Month) }>{ T(ctx, "action.exportPDF") }</a>
 		}
 		if nav.ActiveHousehold.ID == 0 {
 			@noHousehold()
@@ -59,27 +58,17 @@ templ OverviewPage(nav Nav, vm OverviewVM) {
 					</div>
 				</div>
 				<div class="card">
-					<h2 class="mb-3 text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "overview.bySection") }</h2>
-					if len(vm.Report.Sections) == 0 {
-						<p class="alert-info">{ T(ctx, "overview.noExpenses") }</p>
-					} else {
-						for _, s := range vm.Report.Sections {
-							@hbar(s.Label, s.Cents, MaxLabeled(vm.Report.Sections))
-						}
-					}
-				</div>
-			</div>
-			<div class="mt-4 grid gap-4 lg:grid-cols-3">
-				<div class="card">
-					<h3 class="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "overview.byCategory") }</h3>
+					<h2 class="mb-3 text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "overview.byCategory") }</h2>
 					if len(vm.Report.Categories) == 0 {
-						<p class="alert-info">{ T(ctx, "overview.noCategories") }</p>
+						<p class="alert-info">{ T(ctx, "overview.noExpenses") }</p>
 					} else {
 						for _, c := range vm.Report.Categories {
 							@hbar(c.Label, c.Cents, MaxLabeled(vm.Report.Categories))
 						}
 					}
 				</div>
+			</div>
+			<div class="mt-4 grid gap-4 lg:grid-cols-2">
 				<div class="card">
 					<h3 class="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "overview.costNature") }</h3>
 					@breakdownRow(T(ctx, "cost.fix"), "badge-info", vm.Report.ByCostNature[store.CostFix])

@@ -1,0 +1,301 @@
+package web
+
+import (
+	"strconv"
+
+	"github.com/daknoblo/Haushaltsbuch/internal/store"
+)
+
+// BookingDialog is the single place a booking is edited. There is no save
+// button: the draft already exists, every field posts itself and the server
+// answers without markup, so nothing the user is typing in is ever replaced.
+templ BookingDialog(f BookingFormVM) {
+	<dialog class="dlg" data-dialog aria-label={ f.Title(ctx) }>
+		<form
+			class="dlg-form"
+			hx-post={ f.Row.PostURL() }
+			hx-trigger="change, keyup changed delay:600ms"
+			hx-swap="none"
+		>
+			<input type="hidden" name="direction" value={ string(f.Row.Booking.Direction) }/>
+			<header class="dlg-head">
+				<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ f.Title(ctx) }</h2>
+				<span class="tnum ml-auto text-sm text-slate-500 dark:text-slate-400">
+					{ FormatEUR(f.Row.MonthlyCents()) } { T(ctx, "bookings.perMonthShort") }
+				</span>
+			</header>
+			<div class="dlg-body">
+				@bookingBasics(f)
+				@bookingRhythm(f)
+				@bookingSplit(f)
+				@bookingTags(f)
+				@bookingOverrides(f)
+			</div>
+			<footer class="dlg-foot">
+				<button
+					type="button"
+					class="btn-danger"
+					hx-post={ f.Row.DeleteURL() }
+					hx-swap="none"
+					hx-confirm={ T(ctx, "bookings.confirmDelete") }
+					data-dialog-close
+				>{ T(ctx, "action.delete") }</button>
+				<span class="text-xs text-slate-400 dark:text-slate-500" data-saved-hint>{ T(ctx, "status.saved") }</span>
+				<button type="button" class="btn-primary ml-auto" data-dialog-close>{ T(ctx, "action.close") }</button>
+			</footer>
+		</form>
+	</dialog>
+}
+
+templ bookingBasics(f BookingFormVM) {
+	<div class="grid gap-3 sm:grid-cols-2">
+		<div class="sm:col-span-2">
+			<label class="field-label" for={ "name-" + f.Row.IDStr() }>{ T(ctx, "bookings.name") }</label>
+			<input id={ "name-" + f.Row.IDStr() } class="input" type="text" name="name" value={ f.Row.Booking.Name } placeholder={ T(ctx, "bookings.namePlaceholder") } autocomplete="off"/>
+		</div>
+		<div>
+			<label class="field-label" for={ "amount-" + f.Row.IDStr() }>{ T(ctx, "bookings.amount") }</label>
+			<input id={ "amount-" + f.Row.IDStr() } class="input tnum" type="number" step="0.01" min="0" name="amount" value={ CentsToInput(f.Row.Booking.AmountCents) }/>
+		</div>
+		<div>
+			<label class="field-label" for={ "cat-" + f.Row.IDStr() }>{ T(ctx, "bookings.category") }</label>
+			<select id={ "cat-" + f.Row.IDStr() } class="input" name="category_id">
+				for _, c := range f.PickableCategories() {
+					<option value={ strconv.FormatInt(c.ID, 10) } selected?={ c.ID == f.Row.Booking.CategoryID }>{ c.Name }</option>
+				}
+			</select>
+		</div>
+		if !f.Row.IsIncome() {
+			<div>
+				<label class="field-label" for={ "cost-" + f.Row.IDStr() }>{ T(ctx, "bookings.costNature") }</label>
+				<select id={ "cost-" + f.Row.IDStr() } class="input" name="cost_nature">
+					for _, o := range CostNatureOptions(ctx) {
+						<option value={ o.Value } selected?={ o.Value == string(f.Row.Booking.CostNature) }>{ o.Label }</option>
+					}
+				</select>
+			</div>
+			<div>
+				<label class="field-label" for={ "class-" + f.Row.IDStr() }>{ T(ctx, "bookings.budgetClass") }</label>
+				<select id={ "class-" + f.Row.IDStr() } class="input" name="budget_class">
+					for _, o := range BudgetClassOptions(ctx) {
+						<option value={ o.Value } selected?={ o.Value == string(f.Row.Booking.BudgetClass) }>{ o.Label }</option>
+					}
+				</select>
+			</div>
+		}
+		<div class="sm:col-span-2">
+			<label class="field-label" for={ "note-" + f.Row.IDStr() }>{ T(ctx, "bookings.note") }</label>
+			<input id={ "note-" + f.Row.IDStr() } class="input" type="text" name="note" value={ f.Row.Booking.Note } autocomplete="off"/>
+		</div>
+	</div>
+}
+
+templ bookingRhythm(f BookingFormVM) {
+	<div class="dlg-section">
+		<label class="switch">
+			<input type="checkbox" name="recurring" value="1" checked?={ f.Row.Booking.Frequency.Recurring() }/>
+			<span class="switch-track"><span class="switch-knob"></span></span>
+			<span>
+				<span class="block text-sm font-medium text-slate-800 dark:text-slate-200">{ T(ctx, "bookings.recurring") }</span>
+				<span class="block text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.recurringHint") }</span>
+			</span>
+		</label>
+		if f.Row.Booking.Frequency.Recurring() {
+			<div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+				<div>
+					<label class="field-label" for={ "freq-" + f.Row.IDStr() }>{ T(ctx, "bookings.frequency") }</label>
+					<select id={ "freq-" + f.Row.IDStr() } class="input" name="frequency">
+						for _, o := range RecurringOptions(ctx) {
+							<option value={ o.Value } selected?={ o.Value == string(f.Row.Booking.Frequency) }>{ o.Label }</option>
+						}
+					</select>
+				</div>
+				<div>
+					<label class="field-label" for={ "interval-" + f.Row.IDStr() }>{ T(ctx, "bookings.interval") }</label>
+					<input id={ "interval-" + f.Row.IDStr() } class="input tnum" type="number" min="1" max="60" name="interval" value={ f.Row.IntervalInput() } title={ T(ctx, "bookings.intervalHint") }/>
+				</div>
+				<div>
+					<label class="field-label" for={ "due-" + f.Row.IDStr() }>{ T(ctx, "bookings.duePoint") }</label>
+					<select id={ "due-" + f.Row.IDStr() } class="input" name="due_point">
+						for _, o := range DuePointOptions(ctx) {
+							<option value={ o.Value } selected?={ o.Value == string(f.Row.Booking.DuePoint) }>{ o.Label }</option>
+						}
+					</select>
+				</div>
+				<div class="grid grid-cols-2 gap-2 sm:col-span-2 lg:col-span-1">
+					<div>
+						<label class="field-label" for={ "from-" + f.Row.IDStr() }>{ T(ctx, "bookings.activeFrom") }</label>
+						<input id={ "from-" + f.Row.IDStr() } class="input" type="month" name="active_from" value={ f.Row.StartMonth() }/>
+					</div>
+					<div>
+						<label class="field-label" for={ "until-" + f.Row.IDStr() }>{ T(ctx, "bookings.activeUntil") }</label>
+						<input id={ "until-" + f.Row.IDStr() } class="input" type="month" name="active_until" value={ f.Row.EndMonth() }/>
+					</div>
+				</div>
+			</div>
+		} else {
+			<div class="mt-3 sm:max-w-xs">
+				<label class="field-label" for={ "date-" + f.Row.IDStr() }>{ T(ctx, "bookings.date") }</label>
+				<input id={ "date-" + f.Row.IDStr() } class="input" type="date" name="occurred_on" value={ f.Row.Booking.StartsOn }/>
+			</div>
+		}
+	</div>
+}
+
+templ bookingSplit(f BookingFormVM) {
+	<div class="dlg-section">
+		<div class="grid gap-3 sm:grid-cols-2">
+			<div>
+				<label class="field-label" for={ "payer-" + f.Row.IDStr() }>{ T(ctx, "bookings.payer") }</label>
+				<select id={ "payer-" + f.Row.IDStr() } class="input" name="payer_member_id">
+					for _, m := range f.Members {
+						<option value={ strconv.FormatInt(m.ID, 10) } selected?={ f.Row.IsPayer(m.ID) }>{ m.Name }</option>
+					}
+				</select>
+				<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.payerHint") }</p>
+			</div>
+			<div>
+				<label class="field-label" for={ "split-" + f.Row.IDStr() }>{ T(ctx, "bookings.splitMode") }</label>
+				<select id={ "split-" + f.Row.IDStr() } class="input" name="split_mode">
+					for _, o := range SplitModeOptions(ctx) {
+						<option value={ o.Value } selected?={ o.Value == string(f.Row.Booking.SplitMode) }>{ o.Label }</option>
+					}
+				</select>
+			</div>
+		</div>
+		<div class="mt-3">
+			<span class="field-label">
+				if f.Row.IsIncome() {
+					{ T(ctx, "bookings.whoGets") }
+				} else {
+					{ T(ctx, "bookings.whoPays") }
+				}
+			</span>
+			<div class="flex flex-wrap items-center gap-2">
+				for _, m := range f.Members {
+					<label class={ chipClass(f.Row.HasMember(m.ID)) }>
+						<input class="sr-only" type="checkbox" name={ "m_" + strconv.FormatInt(m.ID, 10) } value="1" checked?={ f.Row.HasMember(m.ID) }/>
+						@memberDot(m.Color)
+						{ m.Name }
+					</label>
+					if f.Row.Booking.SplitMode == store.SplitPercent && f.Row.HasMember(m.ID) {
+						<input
+							class="input tnum w-24"
+							type="number"
+							min="0"
+							max="100"
+							step="1"
+							name={ "v_" + strconv.FormatInt(m.ID, 10) }
+							value={ f.Row.PercentInput(m.ID) }
+							aria-label={ Tf(ctx, "bookings.shareOf", m.Name) }
+						/>
+					}
+					if f.Row.Booking.SplitMode == store.SplitFixed && f.Row.HasMember(m.ID) {
+						<input
+							class="input tnum w-28"
+							type="number"
+							min="0"
+							step="0.01"
+							name={ "v_" + strconv.FormatInt(m.ID, 10) }
+							value={ f.Row.FixedInput(m.ID) }
+							aria-label={ Tf(ctx, "bookings.amountOf", m.Name) }
+						/>
+					}
+				}
+			</div>
+			if f.Row.Booking.SplitMode == store.SplitFixed {
+				<p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+					{ Tf(ctx, "bookings.fixedHint", FrequencyLabel(ctx, f.Row.Booking.Frequency)) }
+				</p>
+			}
+		</div>
+	</div>
+}
+
+templ bookingTags(f BookingFormVM) {
+	<div class="dlg-section">
+		<span class="field-label">{ T(ctx, "bookings.tags") }</span>
+		if len(f.Tags) == 0 {
+			<p class="text-sm text-slate-500 dark:text-slate-400">
+				{ T(ctx, "bookings.noTags") } <a class="underline" href="/settings#tags">{ T(ctx, "settings.newTag") }</a>
+			</p>
+		} else {
+			<div class="flex flex-wrap gap-2">
+				for _, t := range f.Tags {
+					<label class={ chipClass(f.Row.HasTag(t.ID)) }>
+						<input class="sr-only" type="checkbox" name="tag" value={ strconv.FormatInt(t.ID, 10) } checked?={ f.Row.HasTag(t.ID) }/>
+						@memberDot(t.Color)
+						{ t.Name }
+					</label>
+				}
+			</div>
+		}
+	</div>
+}
+
+// bookingOverrides is what makes "49.99 € but 10 € for the first six months"
+// expressible without a second booking.
+templ bookingOverrides(f BookingFormVM) {
+	if f.Row.Booking.Frequency.Recurring() {
+		<div class="dlg-section">
+			<span class="field-label">{ T(ctx, "bookings.overrides") }</span>
+			<p class="mb-2 text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.overridesHint") }</p>
+			if len(f.Row.Overrides) == 0 {
+				<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.noOverrides") }</p>
+			}
+			for _, o := range f.Row.Overrides {
+				@overrideRow(f, o)
+			}
+			@overrideAdd(f)
+		</div>
+	}
+}
+
+templ overrideRow(f BookingFormVM, o store.BookingOverride) {
+	<div class="override-row" id={ "ov-" + strconv.FormatInt(o.ID, 10) }>
+		<div
+			class="contents"
+			hx-post={ "/overrides/" + strconv.FormatInt(o.ID, 10) }
+			hx-trigger="change, keyup changed delay:600ms"
+			hx-include="closest .override-row"
+			hx-swap="none"
+		>
+			<label class="field-label sr-only" for={ "ovf-" + strconv.FormatInt(o.ID, 10) }>{ T(ctx, "bookings.overrideFrom") }</label>
+			<input id={ "ovf-" + strconv.FormatInt(o.ID, 10) } class="input" type="date" name="starts_on" value={ o.StartsOn }/>
+			<label class="field-label sr-only" for={ "ovu-" + strconv.FormatInt(o.ID, 10) }>{ T(ctx, "bookings.overrideUntil") }</label>
+			<input id={ "ovu-" + strconv.FormatInt(o.ID, 10) } class="input" type="date" name="ends_on" value={ o.EndsOn }/>
+			<label class="field-label sr-only" for={ "ova-" + strconv.FormatInt(o.ID, 10) }>{ T(ctx, "bookings.amount") }</label>
+			<input id={ "ova-" + strconv.FormatInt(o.ID, 10) } class="input tnum" type="number" step="0.01" min="0" name="amount" value={ CentsToInput(o.AmountCents) }/>
+		</div>
+		<button
+			type="button"
+			class="btn-icon text-rose-600 dark:text-rose-400"
+			title={ T(ctx, "action.delete") }
+			hx-post={ "/overrides/" + strconv.FormatInt(o.ID, 10) + "/delete" }
+			hx-vals={ `{"booking_id":"` + f.Row.IDStr() + `","m":"` + f.Row.Month + `"}` }
+			hx-target="#booking-dialog"
+			hx-swap="innerHTML"
+		>✕</button>
+	</div>
+}
+
+templ overrideAdd(f BookingFormVM) {
+	<div class="override-row mt-2">
+		<div
+			class="contents"
+			id={ "ov-new-" + f.Row.IDStr() }
+			hx-post={ "/bookings/" + f.Row.IDStr() + "/overrides" }
+			hx-include={ "#ov-new-" + f.Row.IDStr() }
+			hx-target="#booking-dialog"
+			hx-swap="innerHTML"
+		>
+			<input class="input" type="date" name="starts_on" aria-label={ T(ctx, "bookings.overrideFrom") }/>
+			<input class="input" type="date" name="ends_on" aria-label={ T(ctx, "bookings.overrideUntil") }/>
+			<input class="input tnum" type="number" step="0.01" min="0" name="amount" aria-label={ T(ctx, "bookings.amount") }/>
+			<input type="hidden" name="m" value={ f.Row.Month }/>
+			<button type="button" class="btn-ghost" hx-post={ "/bookings/" + f.Row.IDStr() + "/overrides" } hx-include={ "#ov-new-" + f.Row.IDStr() } hx-target="#booking-dialog" hx-swap="innerHTML">
+				{ T(ctx, "bookings.addOverride") }
+			</button>
+		</div>
+	</div>
+}

@@ -2,12 +2,22 @@ package web
 
 import (
 	"context"
+	"encoding/json"
 	"net/url"
 	"strconv"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/calc"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
+
+// jsonString quotes a value for an hx-vals attribute.
+func jsonString(s string) string {
+	b, err := json.Marshal(s)
+	if err != nil {
+		return `""`
+	}
+	return string(b)
+}
 
 // Option is a value/label pair for select inputs.
 type Option struct {
@@ -74,8 +84,8 @@ func balanceTone(cents int64) string {
 	return "text-slate-900 dark:text-slate-100"
 }
 
-// memberChipClass returns the classes of a member chip in the split editor.
-func memberChipClass(selected bool) string {
+// chipClass returns the classes of a selectable chip in the booking dialog.
+func chipClass(selected bool) string {
 	base := "inline-flex cursor-pointer select-none items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition "
 	if selected {
 		return base + "border-indigo-400 bg-indigo-500/10 text-indigo-700 dark:border-indigo-500/60 dark:text-indigo-200"
@@ -123,38 +133,20 @@ type OverviewVM struct {
 	Report calc.MonthReport
 }
 
-// BookingRow couples a booking with its splits and tags for display and
-// editing.
+// BookingRow couples a booking with everything needed to show and edit it.
 type BookingRow struct {
-	Booking store.Booking
-	Splits  []store.BookingSplit
-	TagIDs  []int64
-	// Expanded keeps the inline editor open across an auto-save round trip.
-	Expanded bool
-}
-
-// ExpandedValue renders the open state for the hidden form field.
-func (r BookingRow) ExpandedValue() string {
-	if r.Expanded {
-		return "1"
-	}
-	return "0"
+	Booking   store.Booking
+	Category  store.Category
+	Splits    []store.BookingSplit
+	TagIDs    []int64
+	Overrides []store.BookingOverride
+	// Month is the month the displayed amount is computed for, because a
+	// temporary override makes that amount depend on when you look.
+	Month string
 }
 
 // IsIncome reports whether the booking adds to the budget.
 func (r BookingRow) IsIncome() bool { return r.Booking.Direction == store.DirIncome }
-
-// BudgetClassBadge returns the badge modifier class for the budget class.
-func (r BookingRow) BudgetClassBadge() string {
-	switch r.Booking.BudgetClass {
-	case store.ClassWant:
-		return "badge-want"
-	case store.ClassSaving:
-		return "badge-saving"
-	default:
-		return "badge-need"
-	}
-}
 
 // HasMember reports whether a member participates in the split.
 func (r BookingRow) HasMember(id int64) bool {
@@ -164,6 +156,11 @@ func (r BookingRow) HasMember(id int64) bool {
 		}
 	}
 	return false
+}
+
+// IsPayer reports whether the member fronts this booking.
+func (r BookingRow) IsPayer(id int64) bool {
+	return r.Booking.PayerMemberID != nil && *r.Booking.PayerMemberID == id
 }
 
 // HasTag reports whether the booking carries the given tag.
@@ -186,16 +183,24 @@ func (r BookingRow) SplitValue(id int64) float64 {
 	return 0
 }
 
-// MonthlyCents returns the monthly-equivalent amount of the booking.
-func (r BookingRow) MonthlyCents() int64 { return calc.MonthlyCents(r.Booking) }
+// ShareCount is how many members carry the booking, which is the "divided by"
+// the summary line shows.
+func (r BookingRow) ShareCount() int { return len(r.Splits) }
 
-// SignedMonthlyCents is the monthly amount, negative for an expense, so the
-// summary line reads like a ledger.
-func (r BookingRow) SignedMonthlyCents() int64 {
-	if r.IsIncome() {
-		return r.MonthlyCents()
-	}
-	return -r.MonthlyCents()
+// MonthlyCents returns the monthly-equivalent amount, overrides applied.
+func (r BookingRow) MonthlyCents() int64 {
+	return calc.MonthlyCents(r.Booking, r.Overrides, r.Month)
+}
+
+// AmountCents returns the amount charged in the displayed month, which differs
+// from the stored one while an override is in force.
+func (r BookingRow) AmountCents() int64 {
+	return calc.AmountFor(r.Booking, r.Overrides, r.Month)
+}
+
+// Discounted reports whether an override currently replaces the base amount.
+func (r BookingRow) Discounted() bool {
+	return r.AmountCents() != r.Booking.AmountCents
 }
 
 // IDStr returns the booking id as a string.
@@ -206,6 +211,9 @@ func (r BookingRow) DOMID() string { return "bk-" + r.IDStr() }
 
 // PostURL returns the update endpoint for the booking.
 func (r BookingRow) PostURL() string { return "/bookings/" + r.IDStr() }
+
+// EditURL returns the endpoint that renders the booking dialog.
+func (r BookingRow) EditURL() string { return "/bookings/" + r.IDStr() + "/edit" }
 
 // DeleteURL returns the delete endpoint for the booking.
 func (r BookingRow) DeleteURL() string { return "/bookings/" + r.IDStr() + "/delete" }
@@ -251,68 +259,57 @@ func (r BookingRow) EndMonth() string {
 	return ""
 }
 
-// SectionGroup groups booking rows under a section (nil = no section).
-type SectionGroup struct {
-	Section    *store.Section
+// CategoryGroup collects the bookings of one category. Categories replaced the
+// former areas, so they are what the list is grouped by.
+type CategoryGroup struct {
+	Category   store.Category
 	Bookings   []BookingRow
 	TotalCents int64
-}
-
-// Title returns the section name or a placeholder for the ungrouped rows.
-func (g SectionGroup) Title(ctx context.Context) string {
-	if g.Section == nil {
-		return T(ctx, "bookings.noSection")
-	}
-	return g.Section.Name
-}
-
-// SectionID returns the section id or 0 for the ungrouped rows.
-func (g SectionGroup) SectionID() int64 {
-	if g.Section == nil {
-		return 0
-	}
-	return g.Section.ID
 }
 
 // BookingsVM is the view model of the bookings page, the single place where
 // every planned figure is maintained.
 type BookingsVM struct {
-	Groups     []SectionGroup
-	Income     []BookingRow
+	Month    string
+	Expenses []CategoryGroup
+	Income   []CategoryGroup
+	Report   calc.MonthReport
+	Form     BookingFormVM
+}
+
+// Empty reports whether the household has nothing recorded yet.
+func (v BookingsVM) Empty() bool { return len(v.Expenses) == 0 && len(v.Income) == 0 }
+
+// BookingFormVM carries the pickers the booking dialog needs.
+type BookingFormVM struct {
+	Row        BookingRow
 	Members    []store.Member
-	Sections   []store.Section
 	Categories []store.Category
 	Tags       []store.Tag
-	Report     calc.MonthReport
 }
 
-// ExpenseCategories returns only the categories bookable as an expense.
-func (v BookingsVM) ExpenseCategories() []store.Category {
-	return filterCategories(v.Categories, store.DirExpense)
-}
-
-// IncomeCategories returns only the categories bookable as income.
-func (v BookingsVM) IncomeCategories() []store.Category {
-	return filterCategories(v.Categories, store.DirIncome)
-}
-
-func filterCategories(in []store.Category, d store.Direction) []store.Category {
-	out := make([]store.Category, 0, len(in))
-	for _, c := range in {
-		if c.Classification == d {
+// PickableCategories returns the categories matching the booking's direction,
+// because an income cannot be filed under an expense category.
+func (f BookingFormVM) PickableCategories() []store.Category {
+	want := store.DirExpense
+	if f.Row.IsIncome() {
+		want = store.DirIncome
+	}
+	out := make([]store.Category, 0, len(f.Categories))
+	for _, c := range f.Categories {
+		if c.Classification == want {
 			out = append(out, c)
 		}
 	}
 	return out
 }
 
-// categoriesFor returns the categories a row may pick from, which depends on
-// whether the booking brings money in or takes it out.
-func categoriesFor(vm BookingsVM, income bool) []store.Category {
-	if income {
-		return vm.IncomeCategories()
+// Title names the dialog after what it edits.
+func (f BookingFormVM) Title(ctx context.Context) string {
+	if f.Row.IsIncome() {
+		return T(ctx, "bookings.editIncome")
 	}
-	return vm.ExpenseCategories()
+	return T(ctx, "bookings.editExpense")
 }
 
 // tagStyle tints a tag badge with the tag's own color.
@@ -339,54 +336,70 @@ func SankeyViewBox(s calc.Sankey) string {
 	return "0 0 " + Coord(s.Width) + " " + Coord(s.Height)
 }
 
+// ChartViewBox returns the SVG viewBox of the trend chart.
+func ChartViewBox(c calc.TrendChart) string {
+	return "0 0 " + Coord(c.Width) + " " + Coord(c.Height)
+}
+
 // Coord formats a layout coordinate for an SVG attribute.
 func Coord(v float64) string {
 	return strconv.FormatFloat(v, 'f', 2, 64)
 }
 
-// StatMonth is one data point in the trend timeline.
-type StatMonth struct {
-	Month        string
-	IncomeCents  int64
-	ExpenseCents int64
-	FixedCents   int64
-	BalanceCents int64
-}
-
-// Label returns the short month label.
-func (s StatMonth) Label(ctx context.Context) string { return MonthShort(ctx, s.Month) }
-
-// RangeOption is one entry of the period selector.
-type RangeOption struct {
+// PeriodOption is one entry of the period selector.
+type PeriodOption struct {
 	Key    string
 	Label  string
 	Active bool
+	URL    string
 }
 
-// DashboardVM is the view model of the dashboard page: the headline figures,
-// the breakdowns, the trend and the flow diagram for the selected period.
-// Report describes a typical month of that period, so every card answers for
-// the whole range rather than only its last month.
-type DashboardVM struct {
-	Report     calc.MonthReport
-	Months     []StatMonth
-	MaxCents   int64
-	Sankey     calc.Sankey
-	Ranges     []RangeOption
-	RangeKey   string
-	RangeLabel string
-	FixedTop   []calc.LabeledTotal
+// ViewOption is one entry of the household/person switch.
+type ViewOption struct {
+	Member int64
+	Label  string
+	Color  string
+	Active bool
+	URL    string
 }
+
+// DashboardVM is the view model of the dashboard page. Report describes a
+// typical month of the selected period, so every card answers for the whole
+// range rather than only its last month.
+type DashboardVM struct {
+	Report      calc.MonthReport
+	Trend       []calc.MonthReport
+	Chart       calc.TrendChart
+	Sankey      calc.Sankey
+	FixedTop    []calc.LabeledTotal
+	Periods     []PeriodOption
+	PeriodKey   string
+	PeriodLabel string
+	RangeLabel  string
+	PrevURL     string
+	NextURL     string
+	Views       []ViewOption
+	ViewMember  int64
+	Positions   []calc.MemberPosition
+	Transfers   []calc.Transfer
+}
+
+// ShowSettlement hides the settlement while there is nobody to settle with.
+func (v DashboardVM) ShowSettlement() bool { return len(v.Positions) > 1 }
+
+// SettlementEven reports whether nothing has to change hands.
+func (v DashboardVM) SettlementEven() bool { return len(v.Transfers) == 0 }
 
 // SettingsVM is the view model of the settings page.
 type SettingsVM struct {
-	Households []store.Household
-	ActiveID   int64
-	Members    []store.Member
-	Sections   []store.Section
-	Categories []store.Category
-	Tags       []store.Tag
-	CatUsage   map[int64]int
+	Households  []store.Household
+	ActiveID    int64
+	Members     []store.Member
+	Categories  []store.Category
+	Tags        []store.Tag
+	CatUsage    map[int64]int
+	Suggestions []store.SeedCategory
+	Icons       []string
 }
 
 // UsageOf returns how many bookings still reference a category.

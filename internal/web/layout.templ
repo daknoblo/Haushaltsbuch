@@ -1,6 +1,10 @@
 package web
 
-import "strconv"
+import (
+	"strconv"
+
+	"github.com/daknoblo/Haushaltsbuch/internal/store"
+)
 
 templ Layout(nav Nav) {
 	<!DOCTYPE html>
@@ -32,24 +36,10 @@ templ Layout(nav Nav) {
 templ topbar(nav Nav) {
 	<header class="border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/60">
 		<div class="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3">
-			<a href="/" class="flex items-center gap-2 text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+			<a href="/" class="flex items-center gap-2 text-lg font-semibold tracking-tight text-slate-900 transition hover:text-indigo-600 dark:text-slate-100 dark:hover:text-indigo-400">
 				<span class="grid h-7 w-7 place-items-center rounded-lg bg-indigo-500 text-sm font-bold text-white">H</span>
 				{ T(ctx, "app.name") }
 			</a>
-			if len(nav.Households) > 0 {
-				<select
-					class="select-filter max-w-[12rem]"
-					name="id"
-					aria-label={ T(ctx, "nav.household") }
-					hx-post="/households/activate"
-					hx-trigger="change"
-					hx-swap="none"
-				>
-					for _, h := range nav.Households {
-						<option value={ strconv.FormatInt(h.ID, 10) } selected?={ h.ID == nav.ActiveHousehold.ID }>{ h.Name }</option>
-					}
-				</select>
-			}
 			<button type="button" class="nav-toggle ml-auto" data-nav-toggle aria-label={ T(ctx, "nav.menu") } aria-expanded="false">
 				<span aria-hidden="true">☰</span>
 			</button>
@@ -63,6 +53,7 @@ templ topbar(nav Nav) {
 				if nav.ShowMonthNav {
 					@monthNav(nav)
 				}
+				@householdPicker(nav)
 				@themeToggle()
 			</div>
 			<div class="w-full md:hidden" data-nav-panel hidden>
@@ -72,15 +63,35 @@ templ topbar(nav Nav) {
 					@navLink(nav, "dashboard", "/dashboard", T(ctx, "nav.dashboard"))
 					@navLink(nav, "settings", "/settings", T(ctx, "nav.settings"))
 				</nav>
-				<div class="flex items-center gap-2 pb-2">
+				<div class="flex flex-wrap items-center gap-2 pb-2">
 					if nav.ShowMonthNav {
 						@monthNav(nav)
 					}
+					@householdPicker(nav)
 					@themeToggle()
 				</div>
 			</div>
 		</div>
 	</header>
+}
+
+// householdPicker sits at the far right next to the month navigation. A single
+// household needs no switch, so it only appears once there is a choice.
+templ householdPicker(nav Nav) {
+	if len(nav.Households) > 1 {
+		<select
+			class="select-filter max-w-[10rem]"
+			name="id"
+			aria-label={ T(ctx, "nav.household") }
+			hx-post="/households/activate"
+			hx-trigger="change"
+			hx-swap="none"
+		>
+			for _, h := range nav.Households {
+				<option value={ strconv.FormatInt(h.ID, 10) } selected?={ h.ID == nav.ActiveHousehold.ID }>{ h.Name }</option>
+			}
+		</select>
+	}
 }
 
 templ navLink(nav Nav, name string, href string, label string) {
@@ -137,5 +148,12 @@ templ moveButtons(baseURL string) {
 			hx-swap="none"
 			aria-label={ T(ctx, "action.moveDown") }
 		>↓</button>
+	</span>
+}
+
+// categoryIcon renders a category's symbol in its own colour.
+templ categoryIcon(c store.Category) {
+	<span class="cat-icon" style={ "color:" + ColorOr(c.Color) }>
+		@iconSVG(IconOr(c))
 	</span>
 }

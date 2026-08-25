@@ -62,6 +62,9 @@
   .btn-icon {
     @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-300 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100;
   }
+  .btn-danger {
+    @apply inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-lg border border-rose-300 px-3 py-1.5 text-sm text-rose-700 transition hover:bg-rose-500 hover:text-white sm:min-h-0 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500 dark:hover:text-white;
+  }
 
   /* text-base below sm: iOS zooms into any control with a font under 16px. */
   .input {
@@ -141,6 +144,118 @@
   }
   .save-indicator.show {
     @apply translate-y-0 opacity-100;
+  }
+
+  /* A category's symbol, tinted with the category's own colour. */
+  .cat-icon {
+    @apply grid h-8 w-8 shrink-0 place-items-center rounded-lg;
+    background-color: color-mix(in srgb, currentColor 14%, transparent);
+  }
+  .cat-icon svg {
+    @apply h-[18px] w-[18px];
+  }
+  .cat-icon-sm {
+    @apply h-6 w-6;
+  }
+  .cat-icon-sm svg {
+    @apply h-4 w-4;
+  }
+
+  /* One line per booking; everything editable lives in the dialog. */
+  .booking-row {
+    @apply flex w-full items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left transition hover:border-indigo-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900/40 dark:hover:border-indigo-500/50 dark:hover:bg-slate-800/50;
+  }
+
+  .dlg {
+    @apply w-[min(46rem,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white p-0 text-slate-800 shadow-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200;
+  }
+  .dlg::backdrop {
+    background: rgb(15 23 42 / 0.55);
+  }
+  .dlg-form {
+    @apply flex max-h-[85vh] flex-col;
+  }
+  .dlg-head {
+    @apply flex items-center gap-3 border-b border-slate-200 px-5 py-3 dark:border-slate-800;
+  }
+  .dlg-body {
+    @apply grid gap-4 overflow-y-auto px-5 py-4;
+  }
+  .dlg-foot {
+    @apply flex flex-wrap items-center gap-3 border-t border-slate-200 px-5 py-3 dark:border-slate-800;
+  }
+  .dlg-section {
+    @apply border-t border-slate-200 pt-4 dark:border-slate-800;
+  }
+
+  /* A switch reads as an on/off decision, which a checkbox does not. */
+  .switch {
+    @apply flex cursor-pointer items-center gap-3;
+  }
+  .switch input {
+    @apply sr-only;
+  }
+  .switch-track {
+    @apply relative block h-6 w-11 shrink-0 rounded-full bg-slate-300 transition dark:bg-slate-700;
+  }
+  .switch-knob {
+    @apply absolute left-0.5 top-0.5 block h-5 w-5 rounded-full bg-white shadow transition;
+  }
+  .switch input:checked + .switch-track {
+    @apply bg-indigo-500;
+  }
+  .switch input:checked + .switch-track .switch-knob {
+    @apply translate-x-5;
+  }
+  .switch input:focus-visible + .switch-track {
+    @apply ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-slate-900;
+  }
+
+  .override-row {
+    @apply grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2;
+  }
+
+  .period-chip {
+    @apply inline-flex min-h-[2.25rem] items-center rounded-lg px-3 text-sm text-slate-600 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800;
+  }
+  .period-chip-active {
+    @apply bg-indigo-500 text-white hover:bg-indigo-500 dark:text-white;
+  }
+
+  .settle-row {
+    @apply flex flex-wrap items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-sm dark:bg-slate-800/60;
+  }
+
+  .suggest-chip {
+    @apply inline-flex items-center gap-2 rounded-full border border-dashed border-slate-300 px-3 py-1.5 text-sm text-slate-600 transition hover:border-indigo-400 hover:text-indigo-600 dark:border-slate-700 dark:text-slate-400 dark:hover:border-indigo-500 dark:hover:text-indigo-300;
+  }
+
+  /* Tags look the same wherever they appear, including where they are edited. */
+  .tag-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm;
+  }
+  .tag-color {
+    @apply h-5 w-5 shrink-0 cursor-pointer rounded-full border-0 bg-transparent p-0;
+  }
+  .tag-name {
+    @apply min-w-0 border-0 bg-transparent p-0 text-sm text-current outline-none focus:ring-0;
+  }
+  .tag-remove {
+    @apply text-xs opacity-60 transition hover:opacity-100;
+  }
+
+  .chart-grid line {
+    @apply stroke-slate-200 dark:stroke-slate-800;
+    stroke-width: 1;
+  }
+  .chart-label {
+    @apply fill-slate-400 text-[10px] dark:fill-slate-500;
+  }
+  .chart-bar-income {
+    @apply fill-emerald-500;
+  }
+  .chart-bar-expense {
+    @apply fill-indigo-500;
   }
 }
 

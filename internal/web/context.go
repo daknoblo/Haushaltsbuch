@@ -99,9 +99,6 @@ func (s *Server) loadHouseholdData(ctx context.Context, householdID int64) (calc
 	if d.Members, err = s.store.ListMembers(ctx, householdID); err != nil {
 		return calc.Data{}, err
 	}
-	if d.Sections, err = s.store.ListSections(ctx, householdID); err != nil {
-		return calc.Data{}, err
-	}
 	if d.Categories, err = s.store.ListCategories(ctx, householdID); err != nil {
 		return calc.Data{}, err
 	}
@@ -117,38 +114,37 @@ func (s *Server) loadHouseholdData(ctx context.Context, householdID int64) (calc
 	if d.TagLinks, err = s.store.ListBookingTags(ctx, householdID); err != nil {
 		return calc.Data{}, err
 	}
+	if d.Overrides, err = s.store.ListOverridesForHousehold(ctx, householdID); err != nil {
+		return calc.Data{}, err
+	}
 	return d, nil
 }
 
-// buildMonthReport loads all data for a household/month and aggregates it.
+// buildMonthReport aggregates one month for the whole household, which is the
+// only scope the overview shows.
 func (s *Server) buildMonthReport(ctx context.Context, householdID int64, month string) (calc.MonthReport, error) {
 	data, err := s.loadHouseholdData(ctx, householdID)
 	if err != nil {
 		return calc.MonthReport{}, err
 	}
-	return calc.BuildMonthReport(data, month), nil
+	return calc.BuildMonthReport(data, month, calc.Everyone), nil
 }
 
-// bookingContext returns the members, sections, categories and tags needed to
-// render a single booking row.
-func (s *Server) bookingContext(ctx context.Context, householdID int64) (BookingsVM, error) {
+// bookingForm returns the pickers a booking dialog needs.
+func (s *Server) bookingForm(ctx context.Context, householdID int64) (BookingFormVM, error) {
 	members, err := s.store.ListMembers(ctx, householdID)
 	if err != nil {
-		return BookingsVM{}, err
-	}
-	sections, err := s.store.ListSections(ctx, householdID)
-	if err != nil {
-		return BookingsVM{}, err
+		return BookingFormVM{}, err
 	}
 	categories, err := s.store.ListCategories(ctx, householdID)
 	if err != nil {
-		return BookingsVM{}, err
+		return BookingFormVM{}, err
 	}
 	tags, err := s.store.ListTags(ctx, householdID)
 	if err != nil {
-		return BookingsVM{}, err
+		return BookingFormVM{}, err
 	}
-	return BookingsVM{Members: members, Sections: sections, Categories: categories, Tags: tags}, nil
+	return BookingFormVM{Members: members, Categories: categories, Tags: tags}, nil
 }
 
 // parseID parses a decimal id, returning 0 on failure.
@@ -232,5 +228,13 @@ func cleanDate(d string) string {
 // hxRefresh instructs htmx to perform a full page refresh.
 func hxRefresh(w http.ResponseWriter) {
 	w.Header().Set("HX-Refresh", "true")
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// hxChanged acknowledges an auto-save without touching the DOM. The event lets
+// the page refresh its derived figures while the fields the user is typing in
+// stay exactly as they are.
+func hxChanged(w http.ResponseWriter) {
+	w.Header().Set("HX-Trigger", "hb:changed")
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -188,18 +188,24 @@ func newExpenseBooking(t *testing.T, srv *Server, householdID int64) store.Booki
 	if catID == 0 {
 		t.Fatalf("no %s category available", dir)
 	}
+	members, err := srv.store.ListMembers(ctx, householdID)
+	if err != nil {
+		t.Fatalf("members: %v", err)
+	}
 	b, err := srv.store.CreateBooking(ctx, store.Booking{
-		HouseholdID: householdID,
-		CategoryID:  catID,
-		Direction:   dir,
-		Name:        "Miete",
-		AmountCents: 120000,
-		Frequency:   store.FreqMonthly,
-		Interval:    1,
-		StartsOn:    "2026-01-01",
-		CostNature:  store.CostFix,
-		BudgetClass: store.ClassNeed,
-		SplitMode:   store.SplitEqual,
+		HouseholdID:   householdID,
+		CategoryID:    catID,
+		PayerMemberID: &members[0].ID,
+		Direction:     dir,
+		Name:          "Miete",
+		AmountCents:   120000,
+		Frequency:     store.FreqMonthly,
+		Interval:      1,
+		DuePoint:      store.DueStart,
+		StartsOn:      "2026-01-01",
+		CostNature:    store.CostFix,
+		BudgetClass:   store.ClassNeed,
+		SplitMode:     store.SplitEqual,
 	}, nil, nil)
 	if err != nil {
 		t.Fatalf("create booking: %v", err)
@@ -237,7 +243,7 @@ func TestBookingMutationsAreHouseholdScoped(t *testing.T) {
 	}
 }
 
-func TestBookingUpdateIgnoresForeignSection(t *testing.T) {
+func TestBookingUpdateIgnoresForeignPayer(t *testing.T) {
 	srv, h, active := newTestServer(t)
 	ctx := t.Context()
 
@@ -245,24 +251,24 @@ func TestBookingUpdateIgnoresForeignSection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create other household: %v", err)
 	}
-	foreignSections, _ := srv.store.ListSections(ctx, other.ID)
+	foreignMembers, _ := srv.store.ListMembers(ctx, other.ID)
 	own := newExpenseBooking(t, srv, active.ID)
 
 	w := post(t, h, "/bookings/"+strconv.FormatInt(own.ID, 10), url.Values{
-		"name":       {"Miete"},
-		"amount":     {"100"},
-		"section_id": {strconv.FormatInt(foreignSections[0].ID, 10)},
+		"name":            {"Miete"},
+		"amount":          {"100"},
+		"payer_member_id": {strconv.FormatInt(foreignMembers[0].ID, 10)},
 	})
-	if w.Code != http.StatusOK {
-		t.Fatalf("update = %d, want 200", w.Code)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("update = %d, want 204", w.Code)
 	}
 
 	updated, err := srv.store.GetBooking(ctx, active.ID, own.ID)
 	if err != nil {
 		t.Fatalf("get booking: %v", err)
 	}
-	if updated.SectionID != nil {
-		t.Errorf("foreign section was stored: %d", *updated.SectionID)
+	if updated.PayerMemberID != nil {
+		t.Errorf("a payer of another household was stored: %d", *updated.PayerMemberID)
 	}
 }
 
@@ -280,8 +286,8 @@ func TestBookingUpdateRejectsOutOfRangeAmount(t *testing.T) {
 	}
 
 	// A partially typed amount keeps the stored value instead of zeroing it.
-	if got := post(t, h, path, url.Values{"name": {"Miete"}, "amount": {"-"}}).Code; got != http.StatusOK {
-		t.Fatalf("partial amount = %d, want 200", got)
+	if got := post(t, h, path, url.Values{"name": {"Miete"}, "amount": {"-"}}).Code; got != http.StatusNoContent {
+		t.Fatalf("partial amount = %d, want 204", got)
 	}
 	after, _ := srv.store.GetBooking(ctx, active.ID, b.ID)
 	if after.AmountCents != 120000 {
@@ -335,8 +341,8 @@ func TestBookingTagsRoundTrip(t *testing.T) {
 		"amount": {"1200"},
 		"tag":    {strconv.FormatInt(tag.ID, 10)},
 	})
-	if w.Code != http.StatusOK {
-		t.Fatalf("update = %d, want 200", w.Code)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("update = %d, want 204", w.Code)
 	}
 	links, _ := srv.store.ListBookingTags(ctx, active.ID)
 	if len(links[b.ID]) != 1 || links[b.ID][0] != tag.ID {
@@ -354,12 +360,26 @@ func TestBookingTagsRoundTrip(t *testing.T) {
 	}
 }
 
-func TestDashboardRendersForEveryRange(t *testing.T) {
+func TestDashboardRendersForEveryPeriod(t *testing.T) {
 	_, h, _ := newTestServer(t)
-	for _, key := range []string{"", "month", "last", "ytd", "12m", "bogus"} {
-		if got := get(t, h, "/dashboard?range="+key).Code; got != http.StatusOK {
-			t.Errorf("range %q = %d, want 200", key, got)
+	for _, key := range []string{"", "1m", "2m", "3m", "6m", "12m", "bogus"} {
+		if got := get(t, h, "/dashboard?p="+key).Code; got != http.StatusOK {
+			t.Errorf("period %q = %d, want 200", key, got)
 		}
+	}
+}
+
+func TestDashboardPersonViewNarrowsTheFigures(t *testing.T) {
+	srv, h, active := newTestServer(t)
+	ctx := t.Context()
+	members, _ := srv.store.ListMembers(ctx, active.ID)
+
+	// A stale link to somebody else's household falls back to the household view.
+	if got := get(t, h, "/dashboard?view=999999").Code; got != http.StatusOK {
+		t.Errorf("unknown member = %d, want 200", got)
+	}
+	if got := get(t, h, "/dashboard?view="+strconv.FormatInt(members[0].ID, 10)).Code; got != http.StatusOK {
+		t.Errorf("person view = %d, want 200", got)
 	}
 }
 
@@ -429,12 +449,15 @@ func TestExportFilenameIsEncoded(t *testing.T) {
 	}
 }
 
-func TestReorderSectionViaHTTP(t *testing.T) {
+func TestReorderMemberViaHTTP(t *testing.T) {
 	srv, h, active := newTestServer(t)
 	ctx := t.Context()
-	before, _ := srv.store.ListSections(ctx, active.ID)
+	before, _ := srv.store.ListMembers(ctx, active.ID)
+	if len(before) < 2 {
+		t.Fatalf("need at least 2 members, got %d", len(before))
+	}
 
-	w := post(t, h, "/sections/"+strconv.FormatInt(before[1].ID, 10)+"/move?dir=up", nil)
+	w := post(t, h, "/members/"+strconv.FormatInt(before[1].ID, 10)+"/move?dir=up", nil)
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("move = %d, want 204", w.Code)
 	}
@@ -442,12 +465,12 @@ func TestReorderSectionViaHTTP(t *testing.T) {
 		t.Errorf("missing HX-Refresh header")
 	}
 
-	after, _ := srv.store.ListSections(ctx, active.ID)
+	after, _ := srv.store.ListMembers(ctx, active.ID)
 	if after[0].ID != before[1].ID {
-		t.Errorf("section was not moved: %d stays first", after[0].ID)
+		t.Errorf("member was not moved: %d stays first", after[0].ID)
 	}
 
-	if got := post(t, h, "/sections/"+strconv.FormatInt(before[1].ID, 10)+"/move?dir=sideways", nil).Code; got != http.StatusBadRequest {
+	if got := post(t, h, "/members/"+strconv.FormatInt(before[1].ID, 10)+"/move?dir=sideways", nil).Code; got != http.StatusBadRequest {
 		t.Errorf("invalid direction = %d, want 400", got)
 	}
 }
@@ -468,18 +491,77 @@ func TestAssetsCacheHeader(t *testing.T) {
 	}
 }
 
-func TestBookingRowKeepsExpandedState(t *testing.T) {
+// The dialog is what the user edits in, so creating a booking has to hand one
+// back rather than a row that would need a second round trip to open.
+func TestBookingCreateOpensADialog(t *testing.T) {
+	_, h, _ := newTestServer(t)
+	w := post(t, h, "/bookings/new?direction=expense", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("create = %d, want 200", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "<dialog") {
+		t.Error("the response carries no dialog")
+	}
+	// Auto-save must not swap the form, otherwise typing would be interrupted.
+	if !strings.Contains(body, `hx-swap="none"`) {
+		t.Error("the dialog form would replace itself on save")
+	}
+	if strings.Contains(body, `type="submit"`) {
+		t.Error("the dialog must not carry a save button")
+	}
+}
+
+func TestBookingEditRendersStoredState(t *testing.T) {
 	srv, h, active := newTestServer(t)
 	b := newExpenseBooking(t, srv, active.ID)
-	path := "/bookings/" + strconv.FormatInt(b.ID, 10)
 
-	open := post(t, h, path, url.Values{"name": {"Miete"}, "amount": {"1200"}, "expanded": {"1"}})
-	if !strings.Contains(open.Body.String(), "<details class=\"exp\" open") {
-		t.Error("expanded row was rendered collapsed")
+	w := get(t, h, "/bookings/"+strconv.FormatInt(b.ID, 10)+"/edit")
+	if w.Code != http.StatusOK {
+		t.Fatalf("edit = %d, want 200", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), `value="Miete"`) {
+		t.Error("the dialog does not show the stored name")
+	}
+}
+
+func TestOverrideChangesTheAmountForItsRange(t *testing.T) {
+	srv, h, active := newTestServer(t)
+	ctx := t.Context()
+	b := newExpenseBooking(t, srv, active.ID)
+	id := strconv.FormatInt(b.ID, 10)
+
+	w := post(t, h, "/bookings/"+id+"/overrides", url.Values{
+		"starts_on": {"2026-02-01"},
+		"ends_on":   {"2026-04-30"},
+		"amount":    {"10"},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("create override = %d, want 200", w.Code)
 	}
 
-	closed := post(t, h, path, url.Values{"name": {"Miete"}, "amount": {"1200"}, "expanded": {"0"}})
-	if strings.Contains(closed.Body.String(), "<details class=\"exp\" open") {
-		t.Error("collapsed row was rendered expanded")
+	overrides, err := srv.store.ListOverrides(ctx, active.ID, b.ID)
+	if err != nil {
+		t.Fatalf("list overrides: %v", err)
+	}
+	if len(overrides) != 1 || overrides[0].AmountCents != 1000 {
+		t.Fatalf("overrides = %+v", overrides)
+	}
+
+	rep, err := srv.buildMonthReport(ctx, active.ID, "2026-03")
+	if err != nil {
+		t.Fatalf("report: %v", err)
+	}
+	if rep.ExpenseCents != 1000 {
+		t.Errorf("March = %d, want the override amount 1000", rep.ExpenseCents)
+	}
+	rep, _ = srv.buildMonthReport(ctx, active.ID, "2026-06")
+	if rep.ExpenseCents != 120000 {
+		t.Errorf("June = %d, want the base amount 120000", rep.ExpenseCents)
+	}
+
+	if got := post(t, h, "/overrides/"+strconv.FormatInt(overrides[0].ID, 10)+"/delete",
+		url.Values{"booking_id": {id}}).Code; got != http.StatusOK {
+		t.Errorf("delete override = %d, want 200", got)
 	}
 }

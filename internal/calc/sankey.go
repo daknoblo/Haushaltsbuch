@@ -142,7 +142,6 @@ func BuildSankey(ctx context.Context, d Data, rep MonthReport, months []string, 
 	if rep.IncomeCents <= 0 && rep.ExpenseCents <= 0 {
 		return Sankey{}
 	}
-
 	var b sankeyBuilder
 	b.node("trunk", i18n.C(ctx, "overview.income"), "#10b981", layerTrunk)
 
@@ -161,7 +160,7 @@ func BuildSankey(ctx context.Context, d Data, rep MonthReport, months []string, 
 	}
 
 	// Categories are grouped under the budget class their bookings carry.
-	perClass := classCategoryTotals(ctx, d, months)
+	perClass := classCategoryTotals(ctx, d, months, rep.Member)
 	threshold := int64(float64(max64(rep.IncomeCents, rep.ExpenseCents)) * sankeySmallShare)
 
 	for _, c := range sankeyClasses {
@@ -204,7 +203,7 @@ func BuildSankey(ctx context.Context, d Data, rep MonthReport, months []string, 
 // classCategoryTotals splits the per-category totals across budget classes,
 // because one category may carry bookings of more than one class. The result
 // is the monthly average over the period, matching PeriodReport.
-func classCategoryTotals(ctx context.Context, d Data, months []string) map[store.BudgetClass][]LabeledTotal {
+func classCategoryTotals(ctx context.Context, d Data, months []string, member int64) map[store.BudgetClass][]LabeledTotal {
 	active := activeMonths(d, months)
 	n := int64(len(active))
 	if n == 0 {
@@ -221,7 +220,16 @@ func classCategoryTotals(ctx context.Context, d Data, months []string) map[store
 			if bk.Direction != store.DirExpense || !ActiveIn(bk, m) {
 				continue
 			}
-			sums[key{bk.BudgetClass, bk.CategoryID}] += MonthlyCents(bk)
+			amount := float64(AmountFor(bk, d.Overrides[bk.ID], m)) * monthlyFactor(bk)
+			if member != Everyone {
+				shares, _ := allocate(amount, bk, d.Splits[bk.ID], d.Members)
+				share, ok := shares[member]
+				if !ok {
+					continue
+				}
+				amount = share
+			}
+			sums[key{bk.BudgetClass, bk.CategoryID}] += round(amount)
 		}
 	}
 
