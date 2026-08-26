@@ -119,6 +119,7 @@ var german = Catalog{
 	"bookings.sortCategory":        "Kategorie",
 	"bookings.sortPayer":           "Zahler",
 	"bookings.sortFrequency":       "Rhythmus",
+	"bookings.sortDue":             "Fälligkeit",
 	"bookings.sortNature":          "Kostenart",
 	"bookings.sortClass":           "Klasse",
 	"bookings.sortCarriers":        "Aufteilung",

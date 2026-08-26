@@ -119,6 +119,7 @@ var english = Catalog{
 	"bookings.sortCategory":        "Category",
 	"bookings.sortPayer":           "Payer",
 	"bookings.sortFrequency":       "Frequency",
+	"bookings.sortDue":             "Due",
 	"bookings.sortNature":          "Cost nature",
 	"bookings.sortClass":           "Class",
 	"bookings.sortCarriers":        "Split",

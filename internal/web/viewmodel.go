@@ -221,6 +221,13 @@ func FrequencyBadgeClass(f store.Frequency) string {
 	}
 }
 
+// ShowDuePoint reports whether the row has to name when in the month the money
+// moves. Almost everything falls due at the start, so only the exceptions are
+// worth a badge — naming the rule on every row would drown them out.
+func (r BookingRow) ShowDuePoint() bool {
+	return r.Booking.Frequency.Recurring() && r.Booking.DuePoint != store.DueStart
+}
+
 // MonthlyCents returns the monthly-equivalent amount, overrides applied.
 func (r BookingRow) MonthlyCents() int64 {
 	return calc.MonthlyCents(r.Booking, r.Overrides, r.Month)
@@ -418,6 +425,7 @@ const (
 	SortNature    = "nature"
 	SortClass     = "class"
 	SortCarriers  = "carriers"
+	SortDue       = "due"
 	SortUpdated   = "updated"
 )
 
@@ -430,6 +438,7 @@ var sortOrder = []struct{ key, label string }{
 	{SortPayer, "bookings.sortPayer"},
 	{SortCarriers, "bookings.sortCarriers"},
 	{SortFrequency, "bookings.sortFrequency"},
+	{SortDue, "bookings.sortDue"},
 	{SortNature, "bookings.sortNature"},
 	{SortClass, "bookings.sortClass"},
 	{SortUpdated, "bookings.sortUpdated"},

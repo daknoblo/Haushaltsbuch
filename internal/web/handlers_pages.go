@@ -197,6 +197,8 @@ func sortBookings(rows []BookingRow, key string) {
 		less = groupBy(func(r BookingRow) int { return len(r.Carriers) })
 	case SortFrequency:
 		less = groupBy(func(r BookingRow) int { return frequencyRank(r.Booking.Frequency) })
+	case SortDue:
+		less = groupBy(func(r BookingRow) int { return duePointRank(r.Booking) })
 	case SortNature:
 		less = groupBy(func(r BookingRow) int {
 			if r.Booking.CostNature == store.CostFix {
@@ -250,6 +252,22 @@ func classRank(c store.BudgetClass) int {
 		return 1
 	default:
 		return 2
+	}
+}
+
+// duePointRank walks the month from front to back, so the list reads in the
+// order the money actually leaves. A one-off has no due point and goes last.
+func duePointRank(b store.Booking) int {
+	if !b.Frequency.Recurring() {
+		return 3
+	}
+	switch b.DuePoint {
+	case store.DueMiddle:
+		return 1
+	case store.DueEnd:
+		return 2
+	default:
+		return 0
 	}
 }
 

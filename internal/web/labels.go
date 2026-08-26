@@ -119,6 +119,18 @@ func DuePointOptions(ctx context.Context) []Option {
 	}
 }
 
+// DuePointLabel names where inside the month a booking falls.
+func DuePointLabel(ctx context.Context, p store.DuePoint) string {
+	switch p {
+	case store.DueMiddle:
+		return T(ctx, "bookings.dueMid")
+	case store.DueEnd:
+		return T(ctx, "bookings.dueEnd")
+	default:
+		return T(ctx, "bookings.dueStart")
+	}
+}
+
 // CostNatureOptions returns the selectable cost natures.
 func CostNatureOptions(ctx context.Context) []Option {
 	return []Option{

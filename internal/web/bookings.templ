@@ -130,6 +130,9 @@ templ bookingRow(b BookingRow) {
 				<span class="badge badge-ok">{ FormatEUR(b.AmountCents()) }</span>
 			}
 			<span class={ "badge", FrequencyBadgeClass(b.Booking.Frequency) }>{ RhythmLabel(ctx, b.Booking) }</span>
+			if b.ShowDuePoint() {
+				<span class="badge badge-muted">{ DuePointLabel(ctx, b.Booking.DuePoint) }</span>
+			}
 			if !b.IsIncome() && !b.Booking.Settle {
 				<span class="badge badge-muted">{ T(ctx, "bookings.noSettle") }</span>
 			}
