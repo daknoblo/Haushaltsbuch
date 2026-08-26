@@ -157,6 +157,17 @@ func carriers(members []store.Member, splits []store.BookingSplit) []store.Membe
 // monthly amount, so equal names or categories still read largest first.
 func sortBookings(rows []BookingRow, key string) {
 	byAmount := func(i, j int) bool { return rows[i].MonthlyCents() > rows[j].MonthlyCents() }
+	// A grouping key only says which bucket a row lands in, so the amount
+	// decides inside the bucket.
+	groupBy := func(rank func(BookingRow) int) func(i, j int) bool {
+		return func(i, j int) bool {
+			if a, b := rank(rows[i]), rank(rows[j]); a != b {
+				return a < b
+			}
+			return byAmount(i, j)
+		}
+	}
+
 	var less func(i, j int) bool
 	switch cleanSort(key) {
 	case SortAmount:
@@ -177,6 +188,26 @@ func sortBookings(rows []BookingRow, key string) {
 			}
 			return byAmount(i, j)
 		}
+	case SortCarriers:
+		less = groupBy(func(r BookingRow) int { return len(r.Carriers) })
+	case SortFrequency:
+		less = groupBy(func(r BookingRow) int { return frequencyRank(r.Booking.Frequency) })
+	case SortNature:
+		less = groupBy(func(r BookingRow) int {
+			if r.Booking.CostNature == store.CostFix {
+				return 0
+			}
+			return 1
+		})
+	case SortClass:
+		less = groupBy(func(r BookingRow) int { return classRank(r.Booking.BudgetClass) })
+	case SortUpdated:
+		less = func(i, j int) bool {
+			if a, b := rows[i].Booking.UpdatedAt, rows[j].Booking.UpdatedAt; a != b {
+				return a > b
+			}
+			return byAmount(i, j)
+		}
 	default:
 		less = func(i, j int) bool {
 			if rows[i].IsIncome() != rows[j].IsIncome() {
@@ -186,6 +217,35 @@ func sortBookings(rows []BookingRow, key string) {
 		}
 	}
 	sort.SliceStable(rows, less)
+}
+
+// frequencyRank orders rhythms from the most frequent to the rarest, which is
+// how often the money actually moves.
+func frequencyRank(f store.Frequency) int {
+	switch f {
+	case store.FreqWeekly:
+		return 0
+	case store.FreqMonthly:
+		return 1
+	case store.FreqQuarterly:
+		return 2
+	case store.FreqYearly:
+		return 3
+	default:
+		return 4
+	}
+}
+
+// classRank keeps the 50/30/20 classes in the order the rule names them.
+func classRank(c store.BudgetClass) int {
+	switch c {
+	case store.ClassNeed:
+		return 0
+	case store.ClassWant:
+		return 1
+	default:
+		return 2
+	}
 }
 
 // lessName compares captions the way a reader would: case is irrelevant and a
@@ -269,6 +329,12 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 		PrevURL:    dashboardURL(ShiftMonth(month, -span), period, member),
 		NextURL:    dashboardURL(ShiftMonth(month, span), period, member),
 		RangeLabel: rangeLabel(ctx, months),
+	}
+	// In the household view both scopes are the same figure, so it is only
+	// aggregated a second time when a person is selected.
+	vm.HouseholdReport = vm.Report
+	if member != calc.Everyone {
+		vm.HouseholdReport = calc.PeriodReport(data, months, calc.Everyone)
 	}
 
 	for _, p := range periodOrder {

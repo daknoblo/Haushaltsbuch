@@ -74,16 +74,16 @@ templ sortBar(vm BookingsVM) {
 templ balanceStrip(vm BookingsVM) {
 	<div class="card-tight">
 		<div class="grid grid-cols-3 divide-x divide-slate-200 dark:divide-slate-800">
-			<div class="px-4 py-3">
+			<div class="px-4 py-3 text-center">
 				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "overview.income") }</div>
 				<div class="tnum mt-1 text-lg font-semibold text-emerald-600 dark:text-emerald-400">{ FormatEUR(vm.Report.IncomeCents) }</div>
 			</div>
-			<div class="px-4 py-3">
-				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "overview.expenses") }</div>
+			<div class="px-4 py-3 text-center">
+				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.allExpenses") }</div>
 				<div class="tnum mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(vm.Report.ExpenseCents) }</div>
 			</div>
-			<div class="px-4 py-3">
-				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "overview.balance") }</div>
+			<div class="px-4 py-3 text-center">
+				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.left") }</div>
 				<div class="tnum mt-1 text-lg font-semibold">
 					@signedMoney(vm.Report.BalanceCents)
 				</div>

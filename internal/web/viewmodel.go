@@ -335,6 +335,11 @@ const (
 	SortName      = "name"
 	SortCategory  = "category"
 	SortPayer     = "payer"
+	SortFrequency = "frequency"
+	SortNature    = "nature"
+	SortClass     = "class"
+	SortCarriers  = "carriers"
+	SortUpdated   = "updated"
 )
 
 // sortOrder keeps the selector in a fixed order, which a map cannot.
@@ -344,6 +349,11 @@ var sortOrder = []struct{ key, label string }{
 	{SortName, "bookings.sortName"},
 	{SortCategory, "bookings.sortCategory"},
 	{SortPayer, "bookings.sortPayer"},
+	{SortCarriers, "bookings.sortCarriers"},
+	{SortFrequency, "bookings.sortFrequency"},
+	{SortNature, "bookings.sortNature"},
+	{SortClass, "bookings.sortClass"},
+	{SortUpdated, "bookings.sortUpdated"},
 }
 
 // cleanSort falls back to the default order for anything unknown.
@@ -485,20 +495,23 @@ type ViewOption struct {
 // typical month of the selected period, so every card answers for the whole
 // range rather than only its last month.
 type DashboardVM struct {
-	Report      calc.MonthReport
-	Trend       []calc.MonthReport
-	Chart       calc.TrendChart
-	Sankey      calc.Sankey
-	FixedTop    []calc.LabeledTotal
-	Periods     []PeriodOption
-	PeriodKey   string
-	PeriodLabel string
-	RangeLabel  string
-	PrevURL     string
-	NextURL     string
-	Views       []ViewOption
-	ViewMember  int64
-	Settlement  calc.SettlementReport
+	Report calc.MonthReport
+	// HouseholdReport is always the whole household, so a person view can put
+	// its own share next to what the household spends in total.
+	HouseholdReport calc.MonthReport
+	Trend           []calc.MonthReport
+	Chart           calc.TrendChart
+	Sankey          calc.Sankey
+	FixedTop        []calc.LabeledTotal
+	Periods         []PeriodOption
+	PeriodKey       string
+	PeriodLabel     string
+	RangeLabel      string
+	PrevURL         string
+	NextURL         string
+	Views           []ViewOption
+	ViewMember      int64
+	Settlement      calc.SettlementReport
 }
 
 // Positions is every member's paid/owed position of the period.

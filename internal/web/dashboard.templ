@@ -130,11 +130,13 @@ templ trendChart(c calc.TrendChart) {
 	</svg>
 }
 
+// headlineTiles put the household's fixed costs next to the share the selected
+// view carries of them, which is the difference a person view is opened for.
 templ headlineTiles(vm DashboardVM) {
 	<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 		@statTile(T(ctx, "overview.income"), FormatEUR(vm.Report.IncomeCents), T(ctx, "dash.perMonth"), "text-emerald-600 dark:text-emerald-400")
-		@statTile(T(ctx, "overview.expenses"), FormatEUR(vm.Report.ExpenseCents), T(ctx, "dash.perMonth"), "text-slate-900 dark:text-slate-100")
-		@statTile(T(ctx, "dash.fixedCosts"), FormatEUR(vm.Report.FixedCents), FormatPercent(vm.Report.FixedCostRate())+" "+T(ctx, "dash.fixedShare"), "text-indigo-600 dark:text-indigo-400")
+		@statTile(T(ctx, "dash.fixedCosts"), FormatEUR(vm.HouseholdReport.FixedCents), FormatPercent(vm.HouseholdReport.FixedCostRate())+" "+T(ctx, "dash.fixedShare"), "text-indigo-600 dark:text-indigo-400")
+		@statTile(T(ctx, "dash.ownFixedCosts"), FormatEUR(vm.Report.FixedCents), T(ctx, "dash.ownFixedHint"), "text-violet-600 dark:text-violet-400")
 		@statTile(T(ctx, "dash.savingsRate"), FormatPercent(vm.Report.SavingsRate()), T(ctx, "dash.perMonth"), "text-sky-600 dark:text-sky-400")
 	</div>
 }
@@ -259,7 +261,7 @@ templ shareCard(vm DashboardVM) {
 			<span class="badge ml-auto">{ vm.RangeLabel }</span>
 		</div>
 		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.sharesHint") }</p>
-		<div class="mb-4 grid gap-3 sm:grid-cols-2">
+		<div class="mb-4 grid gap-3 sm:mx-auto sm:max-w-xl sm:grid-cols-2">
 			@shareTotal(T(ctx, "dash.sharedTotal"), vm.Carried().SharedCents, "badge-info")
 			@shareTotal(T(ctx, "dash.soleTotal"), vm.Carried().SoleCents, "badge-muted")
 		</div>
@@ -320,7 +322,7 @@ templ shareCard(vm DashboardVM) {
 }
 
 templ shareTotal(label string, cents int64, badge string) {
-	<div class="rounded-lg border border-slate-200 px-4 py-3 dark:border-slate-800">
+	<div class="rounded-lg border border-slate-200 px-4 py-3 text-center dark:border-slate-800">
 		<span class={ "badge", badge }>{ label }</span>
 		<div class="tnum mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
 			{ FormatEUR(cents) } <span class="text-sm font-normal text-slate-400 dark:text-slate-500">{ T(ctx, "bookings.perMonth") }</span>
