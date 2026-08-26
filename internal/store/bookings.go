@@ -19,7 +19,7 @@ type SplitInput struct {
 
 const bookingColumns = `id, household_id, category_id, payer_member_id, direction, name, note,
 	amount_cents, frequency, interval_n, due_point, starts_on, ends_on, cost_nature,
-	budget_class, split_mode, created_at, updated_at`
+	budget_class, split_mode, settle, created_at, updated_at`
 
 func scanBooking(sc scanner) (Booking, error) {
 	var (
@@ -29,7 +29,7 @@ func scanBooking(sc scanner) (Booking, error) {
 	err := sc.Scan(
 		&b.ID, &b.HouseholdID, &b.CategoryID, &payer, &b.Direction, &b.Name, &b.Note,
 		&b.AmountCents, &b.Frequency, &b.Interval, &b.DuePoint, &b.StartsOn, &b.EndsOn,
-		&b.CostNature, &b.BudgetClass, &b.SplitMode, &b.CreatedAt, &b.UpdatedAt,
+		&b.CostNature, &b.BudgetClass, &b.SplitMode, &b.Settle, &b.CreatedAt, &b.UpdatedAt,
 	)
 	if err != nil {
 		return Booking{}, err
@@ -92,14 +92,14 @@ func (s *Store) CreateBooking(ctx context.Context, b Booking, splits []SplitInpu
 			`INSERT INTO bookings
 				(household_id, category_id, payer_member_id, direction, name, note,
 				 amount_cents, frequency, interval_n, due_point, starts_on, ends_on,
-				 cost_nature, budget_class, split_mode, created_at, updated_at)
-			 VALUES (?, `+categoryRef+`, `+memberRef+`, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				 cost_nature, budget_class, split_mode, settle, created_at, updated_at)
+			 VALUES (?, `+categoryRef+`, `+memberRef+`, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			b.HouseholdID,
 			b.CategoryID, b.HouseholdID,
 			nullInt(b.PayerMemberID), b.HouseholdID,
 			string(b.Direction), b.Name, b.Note, b.AmountCents,
 			string(b.Frequency), b.Interval, string(b.DuePoint), b.StartsOn, b.EndsOn,
-			string(b.CostNature), string(b.BudgetClass), string(b.SplitMode), ts, ts,
+			string(b.CostNature), string(b.BudgetClass), string(b.SplitMode), b.Settle, ts, ts,
 		)
 		if err != nil {
 			return err
@@ -132,13 +132,13 @@ func (s *Store) SaveBooking(ctx context.Context, b Booking, splits []SplitInput,
 				category_id = `+categoryRef+`, payer_member_id = `+memberRef+`,
 				direction = ?, name = ?, note = ?, amount_cents = ?, frequency = ?,
 				interval_n = ?, due_point = ?, starts_on = ?, ends_on = ?,
-				cost_nature = ?, budget_class = ?, split_mode = ?, updated_at = ?
+				cost_nature = ?, budget_class = ?, split_mode = ?, settle = ?, updated_at = ?
 			 WHERE id = ? AND household_id = ?`,
 			b.CategoryID, b.HouseholdID,
 			nullInt(b.PayerMemberID), b.HouseholdID,
 			string(b.Direction), b.Name, b.Note, b.AmountCents, string(b.Frequency),
 			b.Interval, string(b.DuePoint), b.StartsOn, b.EndsOn, string(b.CostNature),
-			string(b.BudgetClass), string(b.SplitMode), now(), b.ID, b.HouseholdID,
+			string(b.BudgetClass), string(b.SplitMode), b.Settle, now(), b.ID, b.HouseholdID,
 		))
 		if err != nil {
 			return err

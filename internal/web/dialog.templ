@@ -155,24 +155,28 @@ templ bookingSplit(f BookingFormVM) {
 	<div class="dlg-section">
 		<h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200">{ T(ctx, "bookings.splitSection") }</h3>
 		<p class="mb-3 text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.splitHint") }</p>
-		<div class="grid gap-3 sm:grid-cols-2">
-			<div>
-				<label class="field-label" for={ "payer-" + f.Row.IDStr() }>{ T(ctx, "bookings.payer") }</label>
-				<select id={ "payer-" + f.Row.IDStr() } class="input" name="payer_member_id">
-					for _, m := range f.Members {
-						<option value={ strconv.FormatInt(m.ID, 10) } selected?={ f.Row.IsPayer(m.ID) }>{ m.Name }</option>
-					}
-				</select>
-				<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.payerHint") }</p>
+		<div>
+			<span class="field-label">
+				if f.Row.IsIncome() {
+					{ T(ctx, "bookings.receiver") }
+				} else {
+					{ T(ctx, "bookings.payer") }
+				}
+			</span>
+			<div class="flex flex-wrap items-center gap-2">
+				for _, m := range f.Members {
+					// Radio and checkbox share the chip styling, so picking the payer
+					// and picking who carries it read as one and the same control.
+					<label class="chip">
+						<input type="radio" name="payer_member_id" value={ strconv.FormatInt(m.ID, 10) } checked?={ f.Row.IsPayer(m.ID) }/>
+						<span class="chip-body">
+							@memberDot(m.Color)
+							{ m.Name }
+						</span>
+					</label>
+				}
 			</div>
-			<div>
-				<label class="field-label" for={ "split-" + f.Row.IDStr() }>{ T(ctx, "bookings.splitMode") }</label>
-				<select id={ "split-" + f.Row.IDStr() } class="input" name="split_mode">
-					for _, o := range SplitModeOptions(ctx) {
-						<option value={ o.Value } selected?={ o.Value == string(f.Row.Booking.SplitMode) }>{ o.Label }</option>
-					}
-				</select>
-			</div>
+			<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.payerHint") }</p>
 		</div>
 		<div class="mt-3">
 			<span class="field-label">
@@ -228,6 +232,24 @@ templ bookingSplit(f BookingFormVM) {
 				</p>
 			}
 		</div>
+		<div class="mt-3 sm:max-w-xs">
+			<label class="field-label" for={ "split-" + f.Row.IDStr() }>{ T(ctx, "bookings.splitMode") }</label>
+			<select id={ "split-" + f.Row.IDStr() } class="input" name="split_mode">
+				for _, o := range SplitModeOptions(ctx) {
+					<option value={ o.Value } selected?={ o.Value == string(f.Row.Booking.SplitMode) }>{ o.Label }</option>
+				}
+			</select>
+		</div>
+		if !f.Row.IsIncome() {
+			<label class="switch mt-4">
+				<input type="checkbox" name="settle" value="1" checked?={ f.Row.Booking.Settle }/>
+				<span class="switch-track"><span class="switch-knob"></span></span>
+				<span>
+					<span class="block text-sm font-medium text-slate-800 dark:text-slate-200">{ T(ctx, "bookings.settle") }</span>
+					<span class="block text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.settleHint") }</span>
+				</span>
+			</label>
+		}
 	</div>
 }
 

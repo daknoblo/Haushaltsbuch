@@ -256,6 +256,7 @@ func newExpenseBooking(t *testing.T, srv *Server, householdID int64) store.Booki
 		CostNature:    store.CostFix,
 		BudgetClass:   store.ClassNeed,
 		SplitMode:     store.SplitEqual,
+		Settle:        true,
 	}, nil, nil)
 	if err != nil {
 		t.Fatalf("create booking: %v", err)

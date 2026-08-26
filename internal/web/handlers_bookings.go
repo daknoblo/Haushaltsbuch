@@ -84,6 +84,7 @@ func (s *Server) handleBookingCreate(w http.ResponseWriter, r *http.Request) {
 		CostNature:    store.CostFix,
 		BudgetClass:   store.ClassNeed,
 		SplitMode:     store.SplitEqual,
+		Settle:        true,
 	}
 
 	// Everyone participates by default, which is what a shared household bill
@@ -243,6 +244,7 @@ func (s *Server) handleBookingUpdate(w http.ResponseWriter, r *http.Request) {
 	if !b.SplitMode.Valid() {
 		b.SplitMode = store.SplitEqual
 	}
+	b.Settle = r.FormValue("settle") != ""
 
 	if b.Frequency.Recurring() {
 		b.StartsOn = monthToDate(cleanMonth(r.FormValue("active_from")))

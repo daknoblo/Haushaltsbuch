@@ -63,11 +63,11 @@ func sharedPlan() Data {
 			{ID: 1, CategoryID: 20, Direction: store.DirExpense, AmountCents: 100000,
 				Frequency: store.FreqMonthly, Interval: 1, SplitMode: store.SplitEqual,
 				CostNature: store.CostFix, BudgetClass: store.ClassNeed,
-				PayerMemberID: memberRef(1)},
+				PayerMemberID: memberRef(1), Settle: true},
 			{ID: 2, CategoryID: 21, Direction: store.DirExpense, AmountCents: 5000,
 				Frequency: store.FreqMonthly, Interval: 1, SplitMode: store.SplitPercent,
 				CostNature: store.CostFix, BudgetClass: store.ClassNeed,
-				PayerMemberID: memberRef(1)},
+				PayerMemberID: memberRef(1), Settle: true},
 		},
 		Splits: map[int64][]store.BookingSplit{
 			1: {{BookingID: 1, MemberID: 1}, {BookingID: 1, MemberID: 2}},
@@ -202,7 +202,7 @@ func TestLedgerAddsUpToThePosition(t *testing.T) {
 		ID: 3, CategoryID: 22, Direction: store.DirExpense, AmountCents: 25000,
 		Frequency: store.FreqMonthly, Interval: 1, SplitMode: store.SplitEqual,
 		CostNature: store.CostVariable, BudgetClass: store.ClassNeed,
-		PayerMemberID: memberRef(2),
+		PayerMemberID: memberRef(2), Settle: true,
 	})
 	d.Splits[3] = []store.BookingSplit{{BookingID: 3, MemberID: 1}, {BookingID: 3, MemberID: 2}}
 
@@ -252,6 +252,27 @@ func TestSettlementIgnoresBookingsWithoutPayer(t *testing.T) {
 	}
 	if len(rep.Lines) != 1 || rep.Lines[0].Booking.ID != 2 {
 		t.Errorf("lines = %+v, want only the policy", rep.Lines)
+	}
+}
+
+// A shared cost the two never square between them still belongs in the budget,
+// but not in the settlement.
+func TestSettlementSkipsWhatIsNotToBeSettled(t *testing.T) {
+	d := sharedPlan()
+	d.Bookings[0].Settle = false
+
+	rep := Settlement(d, month("2026-05"))
+	if len(rep.Transfers) != 0 {
+		t.Errorf("transfers = %+v, want none once the rent is left out", rep.Transfers)
+	}
+	for _, l := range rep.Lines {
+		if l.Booking.ID == 1 {
+			t.Error("the rent leaked into the settlement")
+		}
+	}
+	// The budget still knows the rent, only the settlement does not.
+	if got := BuildMonthReport(d, "2026-05", Everyone).ExpenseCents; got != 105000 {
+		t.Errorf("expenses = %d, want the rent to keep counting", got)
 	}
 }
 

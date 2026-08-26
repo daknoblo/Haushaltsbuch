@@ -193,8 +193,11 @@ type Booking struct {
 	CostNature    CostNature
 	BudgetClass   BudgetClass
 	SplitMode     SplitMode
-	CreatedAt     string
-	UpdatedAt     string
+	// Settle keeps the booking out of the settlement when false, for costs that
+	// are shared on paper but never squared between the members.
+	Settle    bool
+	CreatedAt string
+	UpdatedAt string
 }
 
 // BookingOverride replaces a recurring booking's amount for a while, e.g. an

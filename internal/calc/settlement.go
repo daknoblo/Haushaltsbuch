@@ -123,8 +123,9 @@ func (r SettlementReport) Ledger(member int64) []LedgerLine {
 
 // Settlement reports who owes whom after a period. Whoever fronts a bill pays
 // it in full, so anyone who paid more than their own share gets the difference
-// back. Only expenses count: income is nobody's debt to the household, and a
-// booking without a payer is left out because there is no one to reimburse.
+// back. Only expenses count: income is nobody's debt to the household, a
+// booking without a payer has no one to reimburse and one marked as not to be
+// settled is deliberately left out.
 func Settlement(d Data, months []string) SettlementReport {
 	active := activeMonths(d, months)
 	n := int64(len(active))
@@ -140,7 +141,7 @@ func Settlement(d Data, months []string) SettlementReport {
 
 	for _, m := range active {
 		for _, b := range d.Bookings {
-			if b.Direction != store.DirExpense || b.PayerMemberID == nil || !ActiveIn(b, m) {
+			if b.Direction != store.DirExpense || !b.Settle || b.PayerMemberID == nil || !ActiveIn(b, m) {
 				continue
 			}
 			amount := float64(AmountFor(b, d.Overrides[b.ID], m)) * monthlyFactor(b)
