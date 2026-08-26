@@ -65,6 +65,27 @@ func TestOverrideIsIgnoredForAOneOff(t *testing.T) {
 	}
 }
 
+// A bill nobody carries settles nothing: counting what was fronted for it would
+// report the payer as owed money by no one, next to "everything settled".
+func TestUncarriedBookingSettlesNothing(t *testing.T) {
+	d := sharedPlan()
+	d.Splits = map[int64][]store.BookingSplit{}
+
+	rep := Settlement(d, []string{"2026-03"})
+	for _, p := range rep.Positions {
+		if p.PaidCents != 0 || p.OwedCents != 0 || p.NetCents != 0 {
+			t.Errorf("%s = paid %d, owed %d, net %d, want a flat position",
+				p.Member.Name, p.PaidCents, p.OwedCents, p.NetCents)
+		}
+	}
+	if len(rep.Transfers) != 0 {
+		t.Errorf("transfers = %d, want none", len(rep.Transfers))
+	}
+	if got := rep.CarriedBy(Everyone); got.SharedCents != 0 || got.SoleCents != 0 {
+		t.Errorf("carried = %+v, want nothing carried", got)
+	}
+}
+
 // sharedPlan is the case the person view exists for: a rent both share and a
 // policy only Anna carries.
 func sharedPlan() Data {

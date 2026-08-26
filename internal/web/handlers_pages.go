@@ -131,7 +131,7 @@ func (s *Server) buildBookingsVM(ctx context.Context, householdID int64, month, 
 		if b.PayerMemberID != nil {
 			row.Payer = members[*b.PayerMemberID]
 		}
-		row.Carriers = carriers(data.Members, row.Splits)
+		row.Carriers = carriers(b, data.Members, row.Splits)
 		vm.Bookings = append(vm.Bookings, row)
 	}
 	sortBookings(vm.Bookings, vm.Sort)
@@ -139,15 +139,20 @@ func (s *Server) buildBookingsVM(ctx context.Context, householdID int64, month, 
 }
 
 // carriers names the members a booking is split between, keeping the household
-// order. Nobody picked means nobody carries it.
-func carriers(members []store.Member, splits []store.BookingSplit) []store.Member {
+// order. Nobody picked means nobody carries it, and so does a share of zero:
+// the row must not name someone the report then leaves out.
+func carriers(b store.Booking, members []store.Member, splits []store.BookingSplit) []store.Member {
 	out := make([]store.Member, 0, len(splits))
 	for _, m := range members {
 		for _, s := range splits {
-			if s.MemberID == m.ID {
-				out = append(out, m)
+			if s.MemberID != m.ID {
+				continue
+			}
+			if b.SplitMode != store.SplitEqual && s.Value == 0 {
 				break
 			}
+			out = append(out, m)
+			break
 		}
 	}
 	return out
