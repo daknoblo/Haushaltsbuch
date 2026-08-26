@@ -116,9 +116,15 @@ func coversMonth(from, until, month string) bool {
 
 // AmountFor returns the amount a booking carries in a month. A temporary
 // override — an introductory price, say — wins over the base amount; the last
-// matching one does, so a later correction beats an earlier one.
+// matching one does, so a later correction beats an earlier one. Only a
+// recurring amount can be overridden: a booking that happens once has a single
+// amount, and the dialog hides the overrides along with the rhythm, so honoring
+// them would apply a discount nobody can see or delete.
 func AmountFor(b store.Booking, overrides []store.BookingOverride, month string) int64 {
 	amount := b.AmountCents
+	if !b.Frequency.Recurring() {
+		return amount
+	}
 	for _, o := range overrides {
 		if coversMonth(o.StartsOn, o.EndsOn, month) {
 			amount = o.AmountCents

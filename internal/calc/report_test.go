@@ -53,6 +53,18 @@ func TestLaterOverrideWins(t *testing.T) {
 	}
 }
 
+// A booking that happens once has a single amount, and the dialog hides the
+// overrides along with the rhythm. Honoring one left behind by an earlier
+// rhythm would be a discount nobody can see or delete.
+func TestOverrideIsIgnoredForAOneOff(t *testing.T) {
+	d := internetPlan()
+	d.Bookings[0].Frequency = store.FreqOnce
+	d.Bookings[0].StartsOn = "2026-03-15"
+	if got := BuildMonthReport(d, "2026-03", Everyone).ExpenseCents; got != 4999 {
+		t.Errorf("one-off with a leftover override = %d, want the stored 4999", got)
+	}
+}
+
 // sharedPlan is the case the person view exists for: a rent both share and a
 // policy only Anna carries.
 func sharedPlan() Data {
