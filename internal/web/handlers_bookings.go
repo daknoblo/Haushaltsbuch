@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
@@ -254,7 +255,10 @@ func (s *Server) handleBookingUpdate(w http.ResponseWriter, r *http.Request) {
 		b.EndsOn = ""
 	}
 
-	if catID := parseID(r.FormValue("category_id")); catID != 0 {
+	if catID, err := s.categoryFromName(ctx, active, b, r.FormValue("category")); err != nil {
+		s.serverError(w, r, err)
+		return
+	} else if catID != 0 {
 		b.CategoryID = catID
 	}
 	if payer := parseID(r.FormValue("payer_member_id")); payer != 0 {
@@ -271,6 +275,44 @@ func (s *Server) handleBookingUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hxChanged(w)
+}
+
+// categoryFromName resolves what was typed into the category field. The field
+// saves itself on every keystroke, so a half-typed name has to leave the
+// stored category alone; "geh" already picks Gehalt once nothing else starts
+// like it. Returns 0 when nothing matches.
+func (s *Server) categoryFromName(ctx context.Context, householdID int64, b store.Booking, typed string) (int64, error) {
+	typed = strings.ToLower(strings.TrimSpace(typed))
+	if typed == "" {
+		return 0, nil
+	}
+	cats, err := s.store.ListCategories(ctx, householdID)
+	if err != nil {
+		return 0, err
+	}
+
+	var prefix, contains []int64
+	for _, c := range cats {
+		if c.Classification != b.Direction {
+			continue
+		}
+		name := strings.ToLower(c.Name)
+		switch {
+		case name == typed:
+			return c.ID, nil
+		case strings.HasPrefix(name, typed):
+			prefix = append(prefix, c.ID)
+		case strings.Contains(name, typed):
+			contains = append(contains, c.ID)
+		}
+	}
+	if len(prefix) == 1 {
+		return prefix[0], nil
+	}
+	if len(prefix) == 0 && len(contains) == 1 {
+		return contains[0], nil
+	}
+	return 0, nil
 }
 
 // clampInterval keeps a submitted recurrence interval sane.

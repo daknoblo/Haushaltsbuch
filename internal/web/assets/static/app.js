@@ -29,7 +29,26 @@
   // otherwise count as an edit.
   var dialogTouched = false;
 
+  // A click on the backdrop reports the dialog itself as its target, because
+  // everything visible sits in a child element.
+  function isBackdrop(el) {
+    return el && el.tagName === "DIALOG" && el.hasAttribute("data-dialog");
+  }
+
+  // Selecting text inside the dialog and releasing outside of it must not
+  // count as a click on the backdrop, so the press has to start there too.
+  var pressedBackdrop = false;
+
+  document.addEventListener("mousedown", function (e) {
+    pressedBackdrop = isBackdrop(e.target);
+  });
+
   document.addEventListener("click", function (e) {
+    if (pressedBackdrop && isBackdrop(e.target)) {
+      e.target.close();
+      return;
+    }
+
     var toggle = e.target.closest("[data-theme-toggle]");
     if (toggle) {
       var root = document.documentElement;
@@ -99,6 +118,34 @@
   }
 
   document.addEventListener("input", markDialogTouched);
+
+  // While a booking is still a draft, its name proposes the category: the
+  // longest option of the list that appears in the name wins. Typing into the
+  // category field yourself ends the guessing.
+  document.addEventListener("input", function (e) {
+    var el = e.target;
+    if (!el || !el.name) return;
+    if (el.hasAttribute("data-category")) {
+      el.removeAttribute("data-suggest");
+      return;
+    }
+    if (el.name !== "name") return;
+
+    var dlg = currentDialog();
+    if (!dlg) return;
+    var cat = dlg.querySelector("input[data-category][data-suggest]");
+    if (!cat) return;
+
+    var typed = el.value.toLowerCase();
+    var best = "";
+    dlg.querySelectorAll("datalist option").forEach(function (o) {
+      var name = o.value.toLowerCase();
+      if (typed.indexOf(name) !== -1 && o.value.length > best.length) best = o.value;
+    });
+    if (best && best !== cat.value) {
+      cat.value = best;
+    }
+  });
 
   // Closing empties the container, otherwise a stale dialog would linger in
   // the DOM and its fields would keep posting.
