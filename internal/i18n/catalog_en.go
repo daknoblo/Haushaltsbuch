@@ -103,6 +103,12 @@ var english = Catalog{
 	"bookings.overrideUntil":   "Until",
 	"bookings.noOverrides":     "No differing range set.",
 	"bookings.empty":           "No bookings recorded yet.",
+	"bookings.sort":            "Sort by",
+	"bookings.sortDefault":     "Default",
+	"bookings.sortAmount":      "Amount",
+	"bookings.sortName":        "Label",
+	"bookings.sortCategory":    "Category",
+	"bookings.sortPayer":       "Payer",
 
 	// Dashboard
 	"dash.title":           "Insights",

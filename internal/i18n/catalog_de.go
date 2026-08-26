@@ -103,6 +103,12 @@ var german = Catalog{
 	"bookings.overrideUntil":   "Bis",
 	"bookings.noOverrides":     "Kein abweichender Zeitraum hinterlegt.",
 	"bookings.empty":           "Noch keine Buchung erfasst.",
+	"bookings.sort":            "Sortierung",
+	"bookings.sortDefault":     "Standard",
+	"bookings.sortAmount":      "Betrag",
+	"bookings.sortName":        "Bezeichnung",
+	"bookings.sortCategory":    "Kategorie",
+	"bookings.sortPayer":       "Zahler",
 
 	// Dashboard
 	"dash.title":           "Auswertung",

@@ -202,7 +202,7 @@ func (s *Server) handleExportExpenses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	month := NormalizeMonth(r.URL.Query().Get("m"))
-	vm, err := s.buildBookingsVM(r.Context(), hh.ID, month)
+	vm, err := s.buildBookingsVM(r.Context(), hh.ID, month, r.URL.Query().Get("s"))
 	if err != nil {
 		s.serverError(w, r, err)
 		return

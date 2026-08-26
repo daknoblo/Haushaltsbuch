@@ -319,6 +319,7 @@ type CategoryGroup struct {
 // marker on each row says what it is, so no grouping has to.
 type BookingsVM struct {
 	Month    string
+	Sort     string
 	Bookings []BookingRow
 	Report   calc.MonthReport
 	Form     BookingFormVM
@@ -326,6 +327,54 @@ type BookingsVM struct {
 
 // Empty reports whether the household has nothing recorded yet.
 func (v BookingsVM) Empty() bool { return len(v.Bookings) == 0 }
+
+// Sort keys of the bookings list.
+const (
+	SortDirection = "dir"
+	SortAmount    = "amount"
+	SortName      = "name"
+	SortCategory  = "category"
+	SortPayer     = "payer"
+)
+
+// sortOrder keeps the selector in a fixed order, which a map cannot.
+var sortOrder = []struct{ key, label string }{
+	{SortDirection, "bookings.sortDefault"},
+	{SortAmount, "bookings.sortAmount"},
+	{SortName, "bookings.sortName"},
+	{SortCategory, "bookings.sortCategory"},
+	{SortPayer, "bookings.sortPayer"},
+}
+
+// cleanSort falls back to the default order for anything unknown.
+func cleanSort(key string) string {
+	for _, o := range sortOrder {
+		if o.key == key {
+			return key
+		}
+	}
+	return SortDirection
+}
+
+// SortOptions returns the selectable orders with the active one marked.
+func (v BookingsVM) SortOptions(ctx context.Context) []PeriodOption {
+	out := make([]PeriodOption, 0, len(sortOrder))
+	for _, o := range sortOrder {
+		out = append(out, PeriodOption{
+			Key:    o.key,
+			Label:  T(ctx, o.label),
+			Active: o.key == cleanSort(v.Sort),
+			URL:    "/bookings?m=" + v.Month + "&s=" + o.key,
+		})
+	}
+	return out
+}
+
+// ListURL is what the list re-fetches itself from, sort included so an
+// auto-save does not throw the chosen order away.
+func (v BookingsVM) ListURL() string {
+	return "/bookings/list?m=" + v.Month + "&s=" + cleanSort(v.Sort)
+}
 
 // BookingFormVM carries the pickers the booking dialog needs.
 type BookingFormVM struct {

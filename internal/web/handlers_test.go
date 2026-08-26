@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -166,6 +167,55 @@ func TestCrossOriginPostIsRejected(t *testing.T) {
 
 	if w.Code != http.StatusForbidden {
 		t.Errorf("cross-site POST = %d, want 403", w.Code)
+	}
+}
+
+// The order the list is read in is a question of the moment, so every key has
+// to hold — including the tie-breaker that keeps the largest figure on top.
+func TestSortBookingsOrdersByTheChosenKey(t *testing.T) {
+	row := func(name, category, payer string, dir store.Direction, cents int64) BookingRow {
+		return BookingRow{
+			Booking: store.Booking{
+				Name: name, Direction: dir, AmountCents: cents,
+				Frequency: store.FreqMonthly, Interval: 1,
+			},
+			Category: store.Category{Name: category},
+			Payer:    store.Member{Name: payer},
+			Month:    "2026-05",
+		}
+	}
+	rows := []BookingRow{
+		row("miete", "Wohnen", "Nina", store.DirExpense, 100000),
+		row("", "Wohnen", "Jonas", store.DirExpense, 20000),
+		row("Gehalt", "Arbeit", "Jonas", store.DirIncome, 300000),
+		row("Abo", "Freizeit", "Nina", store.DirExpense, 5000),
+	}
+
+	names := func(rows []BookingRow) []string {
+		out := make([]string, 0, len(rows))
+		for _, r := range rows {
+			out = append(out, r.Booking.Name)
+		}
+		return out
+	}
+
+	for _, tc := range []struct {
+		key  string
+		want []string
+	}{
+		{SortDirection, []string{"Gehalt", "miete", "", "Abo"}},
+		{SortAmount, []string{"Gehalt", "miete", "", "Abo"}},
+		// Case is irrelevant and the nameless booking belongs at the end.
+		{SortName, []string{"Abo", "Gehalt", "miete", ""}},
+		{SortCategory, []string{"Gehalt", "Abo", "miete", ""}},
+		{SortPayer, []string{"Gehalt", "", "miete", "Abo"}},
+		{"nonsense", []string{"Gehalt", "miete", "", "Abo"}},
+	} {
+		got := append([]BookingRow(nil), rows...)
+		sortBookings(got, tc.key)
+		if diff := names(got); !slices.Equal(diff, tc.want) {
+			t.Errorf("sort %q = %v, want %v", tc.key, diff, tc.want)
+		}
 	}
 }
 

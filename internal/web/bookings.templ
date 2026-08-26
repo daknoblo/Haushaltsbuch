@@ -15,7 +15,7 @@ templ BookingsPage(nav Nav, vm BookingsVM) {
 		} else {
 			// The list reloads itself whenever the dialog reports a change, so an
 			// edit never costs a page reload.
-			<div id="booking-list" hx-get={ "/bookings/list?m=" + nav.Month } hx-trigger="hb:changed from:body" hx-swap="outerHTML">
+			<div id="booking-list" hx-get={ vm.ListURL() } hx-trigger="hb:changed from:body" hx-swap="outerHTML">
 				@BookingList(vm)
 			</div>
 			<div id="booking-dialog"></div>
@@ -33,7 +33,7 @@ templ newBookingButton(month string, dir store.Direction, label string) {
 }
 
 templ BookingList(vm BookingsVM) {
-	<div id="booking-list" hx-get={ "/bookings/list?m=" + vm.Month } hx-trigger="hb:changed from:body" hx-swap="outerHTML">
+	<div id="booking-list" hx-get={ vm.ListURL() } hx-trigger="hb:changed from:body" hx-swap="outerHTML">
 		<div class="grid gap-4">
 			@balanceStrip(vm)
 			if vm.Empty() {
@@ -42,12 +42,29 @@ templ BookingList(vm BookingsVM) {
 				</div>
 			} else {
 				<div class="card-tight">
+					@sortBar(vm)
 					<div class="card-body grid gap-1.5">
 						for _, b := range vm.Bookings {
 							@bookingRow(b)
 						}
 					</div>
 				</div>
+			}
+		</div>
+	</div>
+}
+
+// sortBar lets the list be read the way the question of the moment needs it.
+templ sortBar(vm BookingsVM) {
+	<div class="card-head no-print">
+		<span class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.sort") }</span>
+		<div class="flex flex-wrap items-center gap-1">
+			for _, o := range vm.SortOptions(ctx) {
+				if o.Active {
+					<span class="period-chip period-chip-active">{ o.Label }</span>
+				} else {
+					<a class="period-chip" href={ templ.SafeURL(o.URL) }>{ o.Label }</a>
+				}
 			}
 		</div>
 	</div>

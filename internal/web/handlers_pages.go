@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/calc"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
@@ -36,7 +37,8 @@ func (s *Server) handleBookings(w http.ResponseWriter, r *http.Request) {
 	}
 	var vm BookingsVM
 	if nav.ActiveHousehold.ID != 0 {
-		vm, err = s.buildBookingsVM(r.Context(), nav.ActiveHousehold.ID, nav.Month)
+		vm, err = s.buildBookingsVM(r.Context(), nav.ActiveHousehold.ID, nav.Month,
+			r.URL.Query().Get("s"))
 		if err != nil {
 			s.serverError(w, r, err)
 			return
@@ -52,7 +54,8 @@ func (s *Server) handleBookingList(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	vm, err := s.buildBookingsVM(r.Context(), active, NormalizeMonth(r.URL.Query().Get("m")))
+	vm, err := s.buildBookingsVM(r.Context(), active,
+		NormalizeMonth(r.URL.Query().Get("m")), r.URL.Query().Get("s"))
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -94,7 +97,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 
 // ---- view-model builders ----
 
-func (s *Server) buildBookingsVM(ctx context.Context, householdID int64, month string) (BookingsVM, error) {
+func (s *Server) buildBookingsVM(ctx context.Context, householdID int64, month, sortKey string) (BookingsVM, error) {
 	data, err := s.loadHouseholdData(ctx, householdID)
 	if err != nil {
 		return BookingsVM{}, err
@@ -111,6 +114,7 @@ func (s *Server) buildBookingsVM(ctx context.Context, householdID int64, month s
 
 	vm := BookingsVM{
 		Month:    month,
+		Sort:     cleanSort(sortKey),
 		Report:   calc.BuildMonthReport(data, month, calc.Everyone),
 		Bookings: make([]BookingRow, 0, len(data.Bookings)),
 	}
@@ -130,7 +134,7 @@ func (s *Server) buildBookingsVM(ctx context.Context, householdID int64, month s
 		row.Carriers = carriers(data.Members, row.Splits)
 		vm.Bookings = append(vm.Bookings, row)
 	}
-	sortBookings(vm.Bookings)
+	sortBookings(vm.Bookings, vm.Sort)
 	return vm, nil
 }
 
@@ -152,15 +156,53 @@ func carriers(members []store.Member, splits []store.BookingSplit) []store.Membe
 	return out
 }
 
-// sortBookings puts income first and the biggest figures on top, so the list
-// reads from what comes in down to what it is spent on.
-func sortBookings(rows []BookingRow) {
-	sort.SliceStable(rows, func(i, j int) bool {
-		if rows[i].IsIncome() != rows[j].IsIncome() {
-			return rows[i].IsIncome()
+// sortBookings orders the list by the chosen key. Every key falls back to the
+// monthly amount, so equal names or categories still read largest first.
+func sortBookings(rows []BookingRow, key string) {
+	byAmount := func(i, j int) bool { return rows[i].MonthlyCents() > rows[j].MonthlyCents() }
+	var less func(i, j int) bool
+	switch cleanSort(key) {
+	case SortAmount:
+		less = byAmount
+	case SortName:
+		less = func(i, j int) bool { return lessName(rows[i].Booking.Name, rows[j].Booking.Name) }
+	case SortCategory:
+		less = func(i, j int) bool {
+			if a, b := rows[i].Category.Name, rows[j].Category.Name; a != b {
+				return lessName(a, b)
+			}
+			return byAmount(i, j)
 		}
-		return rows[i].MonthlyCents() > rows[j].MonthlyCents()
-	})
+	case SortPayer:
+		less = func(i, j int) bool {
+			if a, b := rows[i].Payer.Name, rows[j].Payer.Name; a != b {
+				return lessName(a, b)
+			}
+			return byAmount(i, j)
+		}
+	default:
+		less = func(i, j int) bool {
+			if rows[i].IsIncome() != rows[j].IsIncome() {
+				return rows[i].IsIncome()
+			}
+			return byAmount(i, j)
+		}
+	}
+	sort.SliceStable(rows, less)
+}
+
+// lessName compares captions the way a reader would: case is irrelevant and a
+// booking without a name belongs at the end rather than at the top.
+func lessName(a, b string) bool {
+	switch {
+	case a == b:
+		return false
+	case a == "":
+		return false
+	case b == "":
+		return true
+	}
+	return strings.ToLower(a) < strings.ToLower(b)
 }
 
 // periodMonths is how many months each period key spans.
