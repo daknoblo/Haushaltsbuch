@@ -323,6 +323,46 @@ func TestBookingUpdateIgnoresForeignPayer(t *testing.T) {
 	}
 }
 
+// The dialog renders cost nature, budget class and the settlement switch only
+// for an expense, so an income never submits them. Reading them anyway would
+// reset all three on every keystroke, because an absent field arrives empty.
+func TestIncomeUpdateKeepsFieldsItsDialogNeverShows(t *testing.T) {
+	srv, h, active := newTestServer(t)
+	ctx := t.Context()
+
+	b := newExpenseBooking(t, srv, active.ID)
+	b.Direction = store.DirIncome
+	b.CostNature = store.CostVariable
+	b.BudgetClass = store.ClassSaving
+	b.Settle = true
+	if err := srv.store.SaveBooking(ctx, b, nil, nil); err != nil {
+		t.Fatalf("prepare income: %v", err)
+	}
+
+	w := post(t, h, "/bookings/"+strconv.FormatInt(b.ID, 10), url.Values{
+		"direction": {string(store.DirIncome)},
+		"name":      {"Gehalt"},
+		"amount":    {"3000"},
+	})
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("update = %d, want 204", w.Code)
+	}
+
+	got, err := srv.store.GetBooking(ctx, active.ID, b.ID)
+	if err != nil {
+		t.Fatalf("get booking: %v", err)
+	}
+	if got.CostNature != store.CostVariable {
+		t.Errorf("cost nature = %q, want it kept as %q", got.CostNature, store.CostVariable)
+	}
+	if got.BudgetClass != store.ClassSaving {
+		t.Errorf("budget class = %q, want it kept as %q", got.BudgetClass, store.ClassSaving)
+	}
+	if !got.Settle {
+		t.Error("settle was reset although the dialog never showed the switch")
+	}
+}
+
 func TestBookingUpdateRejectsOutOfRangeAmount(t *testing.T) {
 	srv, h, active := newTestServer(t)
 	ctx := t.Context()

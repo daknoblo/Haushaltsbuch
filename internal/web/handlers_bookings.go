@@ -227,19 +227,25 @@ func (s *Server) handleBookingUpdate(w http.ResponseWriter, r *http.Request) {
 	if !b.DuePoint.Valid() {
 		b.DuePoint = store.DueStart
 	}
-	b.CostNature = store.CostNature(r.FormValue("cost_nature"))
-	if !b.CostNature.Valid() {
-		b.CostNature = store.CostFix
-	}
-	b.BudgetClass = store.BudgetClass(r.FormValue("budget_class"))
-	if !b.BudgetClass.Valid() {
-		b.BudgetClass = store.ClassNeed
+	// Cost nature, budget class and the settlement switch are only rendered for
+	// an expense. Reading them for an income would reset all three to their
+	// defaults on every keystroke, because a field that is not in the form
+	// arrives empty and empty is not a valid value.
+	if b.Direction == store.DirExpense {
+		b.CostNature = store.CostNature(r.FormValue("cost_nature"))
+		if !b.CostNature.Valid() {
+			b.CostNature = store.CostFix
+		}
+		b.BudgetClass = store.BudgetClass(r.FormValue("budget_class"))
+		if !b.BudgetClass.Valid() {
+			b.BudgetClass = store.ClassNeed
+		}
+		b.Settle = r.FormValue("settle") != ""
 	}
 	b.SplitMode = store.SplitMode(r.FormValue("split_mode"))
 	if !b.SplitMode.Valid() {
 		b.SplitMode = store.SplitEqual
 	}
-	b.Settle = r.FormValue("settle") != ""
 
 	if b.Frequency.Recurring() {
 		b.StartsOn = monthToDate(cleanMonth(r.FormValue("active_from")))
