@@ -1,10 +1,6 @@
 package web
 
-import (
-	"strconv"
-
-	"github.com/daknoblo/Haushaltsbuch/internal/store"
-)
+import "github.com/daknoblo/Haushaltsbuch/internal/store"
 
 templ BookingsPage(nav Nav, vm BookingsVM) {
 	@Layout(nav) {
@@ -45,22 +41,13 @@ templ BookingList(vm BookingsVM) {
 					<p class="text-slate-600 dark:text-slate-400">{ T(ctx, "bookings.empty") }</p>
 				</div>
 			} else {
-				if len(vm.Income) > 0 {
-					<h2 class="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-						{ T(ctx, "bookings.incomeHeading") }
-					</h2>
-					for _, g := range vm.Income {
-						@categoryGroup(g)
-					}
-				}
-				if len(vm.Expenses) > 0 {
-					<h2 class="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-						{ T(ctx, "bookings.expenseHeading") }
-					</h2>
-					for _, g := range vm.Expenses {
-						@categoryGroup(g)
-					}
-				}
+				<div class="card-tight">
+					<div class="card-body grid gap-1.5">
+						for _, b := range vm.Bookings {
+							@bookingRow(b)
+						}
+					</div>
+				</div>
 			}
 		</div>
 	</div>
@@ -88,22 +75,9 @@ templ balanceStrip(vm BookingsVM) {
 	</div>
 }
 
-templ categoryGroup(g CategoryGroup) {
-	<div class="card-tight">
-		<div class="card-head">
-			@categoryIcon(g.Category)
-			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ g.Category.Name }</h2>
-			<span class="badge ml-auto">{ FormatEUR(g.TotalCents) } { T(ctx, "bookings.perMonth") }</span>
-		</div>
-		<div class="card-body grid gap-1.5">
-			for _, b := range g.Bookings {
-				@bookingRow(b)
-			}
-		</div>
-	</div>
-}
-
-// bookingRow is a summary; every edit happens in the dialog it opens.
+// bookingRow is a summary; every edit happens in the dialog it opens. The
+// marker, the icon and the two badges are what makes a booking recognisable
+// without reading a single word.
 templ bookingRow(b BookingRow) {
 	<button
 		type="button"
@@ -113,6 +87,17 @@ templ bookingRow(b BookingRow) {
 		hx-target="#booking-dialog"
 		hx-swap="innerHTML"
 	>
+		<span
+			class={ "dir-mark", templ.KV("dir-in", b.IsIncome()), templ.KV("dir-out", !b.IsIncome()) }
+			title={ DirectionLabel(ctx, b.Booking.Direction) }
+		>
+			if b.IsIncome() {
+				↑
+			} else {
+				↓
+			}
+		</span>
+		@categoryIcon(b.Category)
 		<span class="min-w-0 flex-1 truncate text-left font-medium text-slate-900 dark:text-slate-100">
 			if b.Booking.Name == "" {
 				<span class="italic text-slate-400 dark:text-slate-500">{ T(ctx, "bookings.unnamed") }</span>
@@ -121,19 +106,20 @@ templ bookingRow(b BookingRow) {
 			}
 		</span>
 		<span class="hidden items-center gap-1.5 sm:flex">
-			<span class="badge">{ RhythmLabel(ctx, b.Booking) }</span>
 			if b.Discounted() {
 				<span class="badge badge-ok">{ FormatEUR(b.AmountCents()) }</span>
 			}
-			if !b.IsIncome() && b.MemberCount > 1 {
-				if b.ShareCount() > 1 {
-					<span class="badge badge-info">÷ { strconv.Itoa(b.ShareCount()) }</span>
-				} else {
-					<span class="badge badge-muted">{ T(ctx, "dash.splitAlone") }</span>
+			<span class={ "badge", FrequencyBadgeClass(b.Booking.Frequency) }>{ RhythmLabel(ctx, b.Booking) }</span>
+			if b.MemberCount > 1 {
+				for _, m := range b.Carriers {
+					@memberChip(m, b.IsPayer(m.ID))
+				}
+				if b.PayerCarriesNothing() {
+					@memberChip(b.Payer, true)
 				}
 			}
 		</span>
-		<span class="tnum shrink-0 text-right text-sm font-semibold">
+		<span class="tnum w-[8.5rem] shrink-0 text-right text-sm font-semibold">
 			if b.IsIncome() {
 				<span class="text-emerald-600 dark:text-emerald-400">{ FormatEUR(b.MonthlyCents()) }</span>
 			} else {
@@ -142,4 +128,19 @@ templ bookingRow(b BookingRow) {
 			<span class="font-normal text-slate-400 dark:text-slate-500">{ T(ctx, "bookings.perMonthShort") }</span>
 		</span>
 	</button>
+}
+
+// memberChip names one person in their own colour; the one who fronts the
+// money is marked, because a name alone does not say who paid.
+templ memberChip(m store.Member, pays bool) {
+	<span
+		class={ "member-chip", templ.KV("member-chip-payer", pays) }
+		style={ tagStyle(m.Color) }
+		title={ MemberRoleTitle(ctx, m, pays) }
+	>
+		if pays {
+			<span aria-hidden="true">€</span>
+		}
+		{ m.Name }
+	</span>
 }

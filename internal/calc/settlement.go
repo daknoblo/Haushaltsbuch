@@ -91,41 +91,32 @@ func (r SettlementReport) LinesFor(member int64) []ShareLine {
 	return out
 }
 
-// DebtLine is one booking's contribution to what one member owes another, seen
-// from the debtor: positive for a share the other one fronted, negative for
-// what the debtor fronted on the other's behalf.
-type DebtLine struct {
+// LedgerLine is what one booking does to a member's balance: what they fronted
+// for it, less the share they carry themselves.
+type LedgerLine struct {
 	Booking store.Booking
-	Payer   store.Member
-	Cents   int64
+	// PaidCents is 0 unless the member fronted this booking.
+	PaidCents int64
+	// OwedCents is the share the member carries.
+	OwedCents int64
+	NetCents  int64
 }
 
-// DebtBreakdown is what a payment is made of.
-type DebtBreakdown struct {
-	Lines []DebtLine
-	// TotalCents is what the lines add up to, i.e. the plain balance between
-	// the two. It equals the transfer unless the household has more than two
-	// members and the payment was netted across all of them.
-	TotalCents int64
-}
-
-// Between explains the balance between two members booking by booking, so a
-// payment can be checked instead of believed.
-func (r SettlementReport) Between(debtor, creditor int64) DebtBreakdown {
-	var out DebtBreakdown
+// Ledger lists every booking a member is involved in, so their balance can be
+// followed line by line instead of taken on faith. The lines add up to that
+// member's position.
+func (r SettlementReport) Ledger(member int64) []LedgerLine {
+	out := make([]LedgerLine, 0, len(r.Lines))
 	for _, l := range r.Lines {
-		var cents int64
-		switch l.Payer.ID {
-		case creditor:
-			cents = l.ShareOf(debtor)
-		case debtor:
-			cents = -l.ShareOf(creditor)
+		line := LedgerLine{Booking: l.Booking, OwedCents: l.ShareOf(member)}
+		if l.Payer.ID == member {
+			line.PaidCents = l.MonthlyCents
 		}
-		if cents == 0 {
+		if line.PaidCents == 0 && line.OwedCents == 0 {
 			continue
 		}
-		out.Lines = append(out.Lines, DebtLine{Booking: l.Booking, Payer: l.Payer, Cents: cents})
-		out.TotalCents += cents
+		line.NetCents = line.PaidCents - line.OwedCents
+		out = append(out, line)
 	}
 	return out
 }

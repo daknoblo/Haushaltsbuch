@@ -156,6 +156,14 @@ func RhythmLabel(ctx context.Context, b store.Booking) string {
 	return FrequencyLabel(ctx, b.Frequency)
 }
 
+// MemberRoleTitle says what a name on a booking row means.
+func MemberRoleTitle(ctx context.Context, m store.Member, pays bool) string {
+	if pays {
+		return Tf(ctx, "bookings.paysTitle", m.Name)
+	}
+	return Tf(ctx, "bookings.carriesTitle", m.Name)
+}
+
 // PageTitle returns the localized title of the active page.
 func PageTitle(ctx context.Context, active string) string {
 	switch active {

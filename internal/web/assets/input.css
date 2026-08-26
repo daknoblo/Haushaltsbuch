@@ -99,6 +99,33 @@
   .badge-muted {
     @apply bg-slate-500/10 text-slate-500 ring-1 ring-inset ring-slate-500/20 dark:text-slate-400;
   }
+  .badge-sky {
+    @apply bg-sky-500/15 text-sky-700 ring-1 ring-inset ring-sky-500/30 dark:text-sky-300;
+  }
+  .badge-violet {
+    @apply bg-violet-500/15 text-violet-700 ring-1 ring-inset ring-violet-500/30 dark:text-violet-300;
+  }
+
+  /* Income or expense, readable before a single word is. */
+  .dir-mark {
+    @apply grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold leading-none;
+  }
+  .dir-in {
+    @apply bg-emerald-500/15 text-emerald-600 dark:text-emerald-400;
+  }
+  .dir-out {
+    @apply bg-rose-500/15 text-rose-600 dark:text-rose-400;
+  }
+
+  /* Who pays, in that member's own colour. */
+  .member-chip {
+    @apply inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium;
+  }
+  /* The one who fronts the money is filled in, the others stay outlined. */
+  .member-chip-payer {
+    @apply font-semibold;
+    background-color: color-mix(in srgb, currentColor 14%, transparent);
+  }
 
   .table-head {
     @apply border-b border-slate-200 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400;
@@ -253,6 +280,10 @@
   /* A payment, expandable into the bookings it is made of. */
   .settle {
     @apply overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800/60;
+  }
+  /* The answer to "who transfers what", stated rather than implied. */
+  .settle-result {
+    @apply flex flex-wrap items-center gap-2 rounded-lg border border-indigo-300 bg-indigo-500/10 px-3 py-2.5 text-sm dark:border-indigo-500/40;
   }
   .settle-summary {
     @apply flex cursor-pointer list-none flex-wrap items-center gap-2 px-3 py-2 text-sm;

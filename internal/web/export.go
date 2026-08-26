@@ -221,7 +221,7 @@ func (s *Server) handleExportExpenses(w http.ResponseWriter, r *http.Request) {
 	pdfHeader(ctx, m, T(ctx, "pdf.expenseList"), hh.Name, MonthLabel(ctx, month))
 
 	var grand int64
-	for _, g := range append(append([]CategoryGroup{}, vm.Income...), vm.Expenses...) {
+	for _, g := range groupByCategory(vm.Bookings) {
 		pdfHeading(m, g.Category.Name+"  ("+FormatEUR(g.TotalCents)+" "+T(ctx, "bookings.perMonth")+")")
 		pdfRow4(m, T(ctx, "pdf.label"), T(ctx, "pdf.amount"), T(ctx, "pdf.rhythm"), T(ctx, "pdf.monthly"), true)
 		for _, row := range g.Bookings {
@@ -240,6 +240,24 @@ func (s *Server) handleExportExpenses(w http.ResponseWriter, r *http.Request) {
 	pdfKV(m, T(ctx, "pdf.total"), FormatEUR(grand))
 
 	s.writePDF(w, r, m, T(ctx, "pdf.fileBookingList")+"-"+pdfSlug(hh.Name)+".pdf")
+}
+
+// groupByCategory rebuilds the category grouping the printed list is laid out
+// by; the page itself shows one flat list.
+func groupByCategory(rows []BookingRow) []CategoryGroup {
+	at := make(map[int64]int, len(rows))
+	out := make([]CategoryGroup, 0, len(rows))
+	for _, r := range rows {
+		i, ok := at[r.Category.ID]
+		if !ok {
+			i = len(out)
+			at[r.Category.ID] = i
+			out = append(out, CategoryGroup{Category: r.Category})
+		}
+		out[i].Bookings = append(out[i].Bookings, r)
+		out[i].TotalCents += r.MonthlyCents()
+	}
+	return out
 }
 
 func splitNames(ctx context.Context, row BookingRow, names map[int64]string) string {

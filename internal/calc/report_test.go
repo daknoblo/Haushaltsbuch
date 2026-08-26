@@ -193,9 +193,9 @@ func TestCarriedByMemberMatchesTheirExpenses(t *testing.T) {
 	}
 }
 
-// A payment has to be checkable: what Ben owes is the rent share Anna fronted,
-// less whatever he fronted for her.
-func TestBetweenExplainsTheTransfer(t *testing.T) {
+// A payment has to be checkable: every member's ledger lists what they fronted
+// less their own share and has to end on their position.
+func TestLedgerAddsUpToThePosition(t *testing.T) {
 	d := sharedPlan()
 	// Ben fronts the groceries both of them share.
 	d.Bookings = append(d.Bookings, store.Booking{
@@ -207,27 +207,38 @@ func TestBetweenExplainsTheTransfer(t *testing.T) {
 	d.Splits[3] = []store.BookingSplit{{BookingID: 3, MemberID: 1}, {BookingID: 3, MemberID: 2}}
 
 	rep := Settlement(d, month("2026-05"))
+	for _, p := range rep.Positions {
+		var net int64
+		for _, l := range rep.Ledger(p.Member.ID) {
+			if l.NetCents != l.PaidCents-l.OwedCents {
+				t.Errorf("%s: line %+v does not net out", p.Member.Name, l)
+			}
+			net += l.NetCents
+		}
+		if net != p.NetCents {
+			t.Errorf("%s: ledger = %d, position = %d", p.Member.Name, net, p.NetCents)
+		}
+	}
+
+	// Ben's ledger holds the rent he only carries and the groceries he fronted,
+	// never the policy Anna keeps to herself.
+	ben := rep.Ledger(2)
+	if len(ben) != 2 {
+		t.Fatalf("Ben's ledger = %+v", ben)
+	}
+	if ben[0].PaidCents != 0 || ben[0].OwedCents != 50000 {
+		t.Errorf("rent line = %+v, want carried only", ben[0])
+	}
+	if ben[1].PaidCents != 25000 || ben[1].OwedCents != 12500 {
+		t.Errorf("groceries line = %+v, want fronted 25000 and carried 12500", ben[1])
+	}
+
+	// With two members the payment is exactly what the debtor's ledger says.
 	if len(rep.Transfers) != 1 {
 		t.Fatalf("transfers = %+v", rep.Transfers)
 	}
-	tr := rep.Transfers[0]
-
-	b := rep.Between(tr.From.ID, tr.To.ID)
-	if b.TotalCents != tr.Cents {
-		t.Errorf("breakdown = %d, but the payment is %d", b.TotalCents, tr.Cents)
-	}
-	if len(b.Lines) != 2 {
-		t.Fatalf("lines = %+v, want the rent and the groceries", b.Lines)
-	}
-	// Ben carries 500 € of the rent Anna fronted and 125 € of his own groceries.
-	if b.Lines[0].Cents != 50000 || b.Lines[1].Cents != -12500 {
-		t.Errorf("lines = %+v, want +50000 and -12500", b.Lines)
-	}
-	// The policy Anna carries alone never shows up between the two.
-	for _, l := range b.Lines {
-		if l.Booking.ID == 2 {
-			t.Error("a booking only Anna carries leaked into the breakdown")
-		}
+	if rep.Transfers[0].From.ID != 2 || rep.Transfers[0].Cents != 37500 {
+		t.Errorf("transfer = %+v, want Ben paying 37500", rep.Transfers[0])
 	}
 }
 

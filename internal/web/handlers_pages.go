@@ -100,43 +100,67 @@ func (s *Server) buildBookingsVM(ctx context.Context, householdID int64, month s
 		return BookingsVM{}, err
 	}
 
-	byCategory := make(map[int64][]BookingRow, len(data.Categories))
+	categories := make(map[int64]store.Category, len(data.Categories))
+	for _, c := range data.Categories {
+		categories[c.ID] = c
+	}
+	members := make(map[int64]store.Member, len(data.Members))
+	for _, m := range data.Members {
+		members[m.ID] = m
+	}
+
+	vm := BookingsVM{
+		Month:    month,
+		Report:   calc.BuildMonthReport(data, month, calc.Everyone),
+		Bookings: make([]BookingRow, 0, len(data.Bookings)),
+	}
 	for _, b := range data.Bookings {
-		byCategory[b.CategoryID] = append(byCategory[b.CategoryID], BookingRow{
+		row := BookingRow{
 			Booking:     b,
+			Category:    categories[b.CategoryID],
 			Splits:      data.Splits[b.ID],
 			TagIDs:      data.TagLinks[b.ID],
 			Overrides:   data.Overrides[b.ID],
 			Month:       month,
 			MemberCount: len(data.Members),
-		})
+		}
+		if b.PayerMemberID != nil {
+			row.Payer = members[*b.PayerMemberID]
+		}
+		row.Carriers = carriers(data.Members, row.Splits)
+		vm.Bookings = append(vm.Bookings, row)
 	}
-
-	vm := BookingsVM{Month: month, Report: calc.BuildMonthReport(data, month, calc.Everyone)}
-	for _, c := range data.Categories {
-		rows := byCategory[c.ID]
-		if len(rows) == 0 {
-			continue
-		}
-		group := CategoryGroup{Category: c, Bookings: rows}
-		for i := range rows {
-			rows[i].Category = c
-			group.TotalCents += rows[i].MonthlyCents()
-		}
-		if c.Classification == store.DirIncome {
-			vm.Income = append(vm.Income, group)
-		} else {
-			vm.Expenses = append(vm.Expenses, group)
-		}
-	}
-	sortGroups(vm.Expenses)
-	sortGroups(vm.Income)
+	sortBookings(vm.Bookings)
 	return vm, nil
 }
 
-// sortGroups puts the categories that move the most money first.
-func sortGroups(g []CategoryGroup) {
-	sort.SliceStable(g, func(i, j int) bool { return g[i].TotalCents > g[j].TotalCents })
+// carriers names the members a booking is split between, keeping the household
+// order. No split at all means everyone, which is how the allocation reads it.
+func carriers(members []store.Member, splits []store.BookingSplit) []store.Member {
+	if len(splits) == 0 {
+		return members
+	}
+	out := make([]store.Member, 0, len(splits))
+	for _, m := range members {
+		for _, s := range splits {
+			if s.MemberID == m.ID {
+				out = append(out, m)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// sortBookings puts income first and the biggest figures on top, so the list
+// reads from what comes in down to what it is spent on.
+func sortBookings(rows []BookingRow) {
+	sort.SliceStable(rows, func(i, j int) bool {
+		if rows[i].IsIncome() != rows[j].IsIncome() {
+			return rows[i].IsIncome()
+		}
+		return rows[i].MonthlyCents() > rows[j].MonthlyCents()
+	})
 }
 
 // periodMonths is how many months each period key spans.
@@ -159,12 +183,15 @@ func cleanPeriod(key string) string {
 	return "1m"
 }
 
-// rangeMonths returns the months a period covers, ending at the anchor month.
+// rangeMonths returns the months a period covers, centered on the anchor month
+// so the month you picked stays in the middle of the chart. An even span puts
+// the extra month after it, because a plan looks forward rather than back.
 func rangeMonths(key, anchor string) []string {
 	n := periodMonths[cleanPeriod(key)]
 	out := make([]string, n)
+	back := (n - 1) / 2
 	for i := range out {
-		out[i] = ShiftMonth(anchor, i-n+1)
+		out[i] = ShiftMonth(anchor, i-back)
 	}
 	return out
 }

@@ -131,8 +131,11 @@ type OverviewVM struct {
 
 // BookingRow couples a booking with everything needed to show and edit it.
 type BookingRow struct {
-	Booking   store.Booking
-	Category  store.Category
+	Booking  store.Booking
+	Category store.Category
+	Payer    store.Member
+	// Carriers are the members who carry the booking, in household order.
+	Carriers  []store.Member
 	Splits    []store.BookingSplit
 	TagIDs    []int64
 	Overrides []store.BookingOverride
@@ -185,6 +188,37 @@ func (r BookingRow) SplitValue(id int64) float64 {
 // ShareCount is how many members carry the booking, which is the "divided by"
 // the summary line shows.
 func (r BookingRow) ShareCount() int { return len(r.Splits) }
+
+// PayerCarriesNothing reports whether the one who fronts the money has no
+// share in it, so the row has to name them on their own.
+func (r BookingRow) PayerCarriesNothing() bool {
+	if r.Payer.ID == 0 {
+		return false
+	}
+	for _, m := range r.Carriers {
+		if m.ID == r.Payer.ID {
+			return false
+		}
+	}
+	return true
+}
+
+// FrequencyBadgeClass tints a rhythm badge, so a monthly booking is told from
+// a yearly one before the label is read.
+func FrequencyBadgeClass(f store.Frequency) string {
+	switch f {
+	case store.FreqMonthly:
+		return "badge-info"
+	case store.FreqYearly:
+		return "badge-warn"
+	case store.FreqQuarterly:
+		return "badge-sky"
+	case store.FreqWeekly:
+		return "badge-violet"
+	default:
+		return "badge-muted"
+	}
+}
 
 // MonthlyCents returns the monthly-equivalent amount, overrides applied.
 func (r BookingRow) MonthlyCents() int64 {
@@ -272,8 +306,8 @@ func (r BookingRow) EndMonth() string {
 	return ""
 }
 
-// CategoryGroup collects the bookings of one category. Categories replaced the
-// former areas, so they are what the list is grouped by.
+// CategoryGroup collects the bookings of one category. The page lists every
+// booking on its own, so this only serves the printed list.
 type CategoryGroup struct {
 	Category   store.Category
 	Bookings   []BookingRow
@@ -281,17 +315,17 @@ type CategoryGroup struct {
 }
 
 // BookingsVM is the view model of the bookings page, the single place where
-// every planned figure is maintained.
+// every planned figure is maintained. Bookings are one flat list: the colored
+// marker on each row says what it is, so no grouping has to.
 type BookingsVM struct {
 	Month    string
-	Expenses []CategoryGroup
-	Income   []CategoryGroup
+	Bookings []BookingRow
 	Report   calc.MonthReport
 	Form     BookingFormVM
 }
 
 // Empty reports whether the household has nothing recorded yet.
-func (v BookingsVM) Empty() bool { return len(v.Expenses) == 0 && len(v.Income) == 0 }
+func (v BookingsVM) Empty() bool { return len(v.Bookings) == 0 }
 
 // BookingFormVM carries the pickers the booking dialog needs.
 type BookingFormVM struct {
@@ -440,9 +474,9 @@ func (v DashboardVM) ShareLines() []calc.ShareLine {
 // the part it carries alone; the two add up to the expenses shown above.
 func (v DashboardVM) Carried() calc.Carried { return v.Settlement.CarriedBy(v.ViewMember) }
 
-// Explain lists the bookings a payment is made of.
-func (v DashboardVM) Explain(tr calc.Transfer) calc.DebtBreakdown {
-	return v.Settlement.Between(tr.From.ID, tr.To.ID)
+// Ledger lists what one member fronted and carries, booking by booking.
+func (v DashboardVM) Ledger(member int64) []calc.LedgerLine {
+	return v.Settlement.Ledger(member)
 }
 
 // HouseholdView reports whether the dashboard shows the whole household.

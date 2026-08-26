@@ -140,7 +140,8 @@ templ headlineTiles(vm DashboardVM) {
 }
 
 // settlementCard answers "who owes whom", which only the payer of a booking
-// makes computable.
+// makes computable. The payment comes first; every member's own ledger is one
+// click away, so the figure can be followed line by line.
 templ settlementCard(vm DashboardVM) {
 	<div class="card">
 		<div class="card-head">
@@ -156,82 +157,94 @@ templ settlementCard(vm DashboardVM) {
 		} else {
 			<div class="grid gap-2">
 				for _, tr := range vm.Transfers() {
-					@transferRow(tr, vm.Explain(tr))
+					<div class="settle-result">
+						@memberDot(tr.From.Color)
+						<span class="font-semibold text-slate-900 dark:text-slate-100">{ tr.From.Name }</span>
+						<span class="text-slate-500 dark:text-slate-400">{ T(ctx, "dash.transfersTo") }</span>
+						@memberDot(tr.To.Color)
+						<span class="font-semibold text-slate-900 dark:text-slate-100">{ tr.To.Name }</span>
+						<span class="tnum ml-auto text-lg font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(tr.Cents) }</span>
+					</div>
 				}
 			</div>
 		}
-		<div class="mt-4 overflow-x-auto">
-			<table class="w-full">
-				<thead>
-					<tr>
-						<th class="table-head">{ T(ctx, "overview.person") }</th>
-						<th class="table-head text-right">{ T(ctx, "dash.paid") }</th>
-						<th class="table-head text-right">{ T(ctx, "dash.owed") }</th>
-						<th class="table-head text-right">{ T(ctx, "overview.balance") }</th>
-					</tr>
-				</thead>
-				<tbody>
-					for _, p := range vm.Positions() {
-						<tr>
-							<td class="table-cell">
-								<span class="flex items-center gap-2">
-									@memberDot(p.Member.Color)
-									{ p.Member.Name }
-								</span>
-							</td>
-							<td class="table-cell tnum text-right">{ FormatEUR(p.PaidCents) }</td>
-							<td class="table-cell tnum text-right">{ FormatEUR(p.OwedCents) }</td>
-							<td class="table-cell text-right">
-								@signedMoney(p.NetCents)
-							</td>
-						</tr>
-					}
-				</tbody>
-			</table>
+		<p class="mb-2 mt-4 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "dash.ledgerTitle") }</p>
+		<div class="grid gap-2">
+			for _, p := range vm.Positions() {
+				@memberLedger(p, vm.Ledger(p.Member.ID))
+			}
 		</div>
 	</div>
 }
 
-// transferRow shows a payment and, on demand, the bookings it is made of, so
-// the figure can be checked instead of believed.
-templ transferRow(tr calc.Transfer, b calc.DebtBreakdown) {
+// memberLedger is one person's side of the settlement: what they fronted, what
+// they carry and what that leaves them with.
+templ memberLedger(p calc.MemberPosition, lines []calc.LedgerLine) {
 	<details class="settle">
 		<summary class="settle-summary">
 			<span class="settle-caret" aria-hidden="true">›</span>
-			@memberDot(tr.From.Color)
-			<span class="font-medium text-slate-900 dark:text-slate-100">{ tr.From.Name }</span>
-			<span class="text-slate-400" aria-hidden="true">→</span>
-			@memberDot(tr.To.Color)
-			<span class="font-medium text-slate-900 dark:text-slate-100">{ tr.To.Name }</span>
-			<span class="tnum ml-auto font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(tr.Cents) }</span>
+			@memberDot(p.Member.Color)
+			<span class="font-medium text-slate-900 dark:text-slate-100">{ p.Member.Name }</span>
+			<span class="hidden gap-1.5 sm:flex">
+				<span class="badge">{ T(ctx, "dash.paid") } { FormatEUR(p.PaidCents) }</span>
+				<span class="badge">{ T(ctx, "dash.owed") } { FormatEUR(p.OwedCents) }</span>
+			</span>
+			<span class="ml-auto">
+				@signedMoney(p.NetCents)
+			</span>
 		</summary>
 		<div class="settle-body">
-			<p class="text-xs text-slate-500 dark:text-slate-400">
-				{ Tf(ctx, "dash.transferHint", tr.From.Name, tr.To.Name) } { T(ctx, "dash.transferPayerHint") }
-			</p>
-			for _, l := range b.Lines {
-				<div class="settle-line">
-					<span class="min-w-0 flex-1 truncate text-slate-700 dark:text-slate-300">
-						if l.Booking.Name == "" {
-							<span class="italic text-slate-400 dark:text-slate-500">{ T(ctx, "bookings.unnamed") }</span>
-						} else {
-							{ l.Booking.Name }
+			<p class="text-xs text-slate-500 dark:text-slate-400">{ Tf(ctx, "dash.ledgerHint", p.Member.Name) }</p>
+			<div class="overflow-x-auto">
+				<table class="w-full">
+					<thead>
+						<tr>
+							<th class="table-head">{ T(ctx, "dash.booking") }</th>
+							<th class="table-head whitespace-nowrap text-right">{ T(ctx, "dash.paid") }</th>
+							<th class="table-head whitespace-nowrap text-right">{ T(ctx, "dash.owed") }</th>
+							<th class="table-head whitespace-nowrap text-right">{ T(ctx, "overview.balance") }</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, l := range lines {
+							<tr>
+								<td class="table-cell">
+									if l.Booking.Name == "" {
+										<span class="italic text-slate-400 dark:text-slate-500">{ T(ctx, "bookings.unnamed") }</span>
+									} else {
+										{ l.Booking.Name }
+									}
+								</td>
+								<td class="table-cell tnum whitespace-nowrap text-right">
+									if l.PaidCents == 0 {
+										<span class="text-slate-400 dark:text-slate-600">–</span>
+									} else {
+										{ FormatEUR(l.PaidCents) }
+									}
+								</td>
+								<td class="table-cell tnum whitespace-nowrap text-right">
+									if l.OwedCents == 0 {
+										<span class="text-slate-400 dark:text-slate-600">–</span>
+									} else {
+										{ FormatEUR(l.OwedCents) }
+									}
+								</td>
+								<td class="table-cell whitespace-nowrap text-right">
+									@signedMoney(l.NetCents)
+								</td>
+							</tr>
 						}
-					</span>
-					<span class="badge">
-						@memberDot(l.Payer.Color)
-						{ l.Payer.Name }
-					</span>
-					<span class="tnum w-24 text-right text-slate-700 dark:text-slate-300">{ FormatEUR(l.Cents) }</span>
-				</div>
-			}
-			<div class="settle-line border-t border-slate-200 pt-1.5 font-semibold text-slate-900 dark:border-slate-700/60 dark:text-slate-100">
-				<span class="flex-1">{ T(ctx, "dash.sum") }</span>
-				<span class="tnum w-24 text-right">{ FormatEUR(b.TotalCents) }</span>
+						<tr>
+							<td class="table-cell font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.sum") }</td>
+							<td class="table-cell tnum whitespace-nowrap text-right font-semibold">{ FormatEUR(p.PaidCents) }</td>
+							<td class="table-cell tnum whitespace-nowrap text-right font-semibold">{ FormatEUR(p.OwedCents) }</td>
+							<td class="table-cell whitespace-nowrap text-right">
+								@signedMoney(p.NetCents)
+							</td>
+						</tr>
+					</tbody>
+				</table>
 			</div>
-			if b.TotalCents != tr.Cents {
-				<p class="text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "dash.transferNetted") }</p>
-			}
 		</div>
 	</details>
 }
