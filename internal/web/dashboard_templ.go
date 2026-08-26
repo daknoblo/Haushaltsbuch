@@ -880,11 +880,11 @@ func headlineTiles(vm DashboardVM) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = statTile(T(ctx, "dash.fixedCosts"), FormatEUR(vm.HouseholdReport.FixedCents), FormatPercent(vm.HouseholdReport.FixedCostRate())+" "+T(ctx, "dash.fixedShare"), "text-indigo-600 dark:text-indigo-400").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = statTile(T(ctx, "dash.fixedCosts"), FormatEUR(vm.HouseholdReport.FixedCents()), FormatPercent(vm.HouseholdReport.FixedCostRate())+" "+T(ctx, "dash.fixedShare"), "text-indigo-600 dark:text-indigo-400").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = statTile(T(ctx, "dash.ownFixedCosts"), FormatEUR(vm.Report.FixedCents), T(ctx, "dash.ownFixedHint"), "text-violet-600 dark:text-violet-400").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = statTile(T(ctx, "dash.ownFixedCosts"), FormatEUR(vm.Report.FixedCents()), T(ctx, "dash.ownFixedHint"), "text-violet-600 dark:text-violet-400").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1913,9 +1913,9 @@ func fixedCostCard(vm DashboardVM) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var105 string
-		templ_7745c5c3_Var105, templ_7745c5c3_Err = templ.JoinStringErrs(FormatEUR(vm.Report.FixedCents))
+		templ_7745c5c3_Var105, templ_7745c5c3_Err = templ.JoinStringErrs(FormatEUR(vm.Report.FixedCents()))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dashboard.templ`, Line: 341, Col: 113}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dashboard.templ`, Line: 341, Col: 115}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var105))
 		if templ_7745c5c3_Err != nil {
@@ -1939,9 +1939,9 @@ func fixedCostCard(vm DashboardVM) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var107 string
-		templ_7745c5c3_Var107, templ_7745c5c3_Err = templ.JoinStringErrs(FormatEUR(vm.Report.VariableCents))
+		templ_7745c5c3_Var107, templ_7745c5c3_Err = templ.JoinStringErrs(FormatEUR(vm.Report.VariableCents()))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dashboard.templ`, Line: 343, Col: 74}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dashboard.templ`, Line: 343, Col: 76}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var107))
 		if templ_7745c5c3_Err != nil {

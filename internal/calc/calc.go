@@ -59,8 +59,6 @@ type MonthReport struct {
 	Member           int64
 	IncomeCents      int64
 	ExpenseCents     int64
-	FixedCents       int64
-	VariableCents    int64
 	UnassignedCents  int64
 	BalanceCents     int64
 	Members          []MemberBalance
@@ -70,6 +68,14 @@ type MonthReport struct {
 	ByCostNature     map[store.CostNature]int64
 	ByBudgetClass    map[store.BudgetClass]int64
 }
+
+// FixedCents is everything that leaves reliably every month. It is read off the
+// cost-nature breakdown rather than summed a second time, so the tile and the
+// breakdown below it cannot disagree.
+func (r MonthReport) FixedCents() int64 { return r.ByCostNature[store.CostFix] }
+
+// VariableCents is everything that is not a fixed cost.
+func (r MonthReport) VariableCents() int64 { return r.ByCostNature[store.CostVariable] }
 
 // SavingCents is the amount deliberately put aside, i.e. everything classified
 // as a saving in the 50/30/20 breakdown.
@@ -89,7 +95,7 @@ func (r MonthReport) FixedCostRate() float64 {
 	if r.IncomeCents <= 0 {
 		return 0
 	}
-	return float64(r.FixedCents) / float64(r.IncomeCents) * 100
+	return float64(r.FixedCents()) / float64(r.IncomeCents) * 100
 }
 
 // ActiveIn reports whether a booking contributes to the given YYYY-MM month.
@@ -204,8 +210,6 @@ func BuildMonthReport(d Data, month string, member int64) MonthReport {
 	var (
 		income        float64
 		expense       float64
-		fixed         float64
-		variable      float64
 		unassigned    float64
 		memIncome     = make(map[int64]float64)
 		memExpense    = make(map[int64]float64)
@@ -253,17 +257,10 @@ func BuildMonthReport(d Data, month string, member int64) MonthReport {
 		}
 		byCostNature[b.CostNature] += amount
 		byBudgetClass[b.BudgetClass] += amount
-		if b.CostNature == store.CostFix {
-			fixed += amount
-		} else {
-			variable += amount
-		}
 	}
 
 	rep.IncomeCents = round(income)
 	rep.ExpenseCents = round(expense)
-	rep.FixedCents = round(fixed)
-	rep.VariableCents = round(variable)
 	rep.UnassignedCents = round(unassigned)
 	rep.BalanceCents = rep.IncomeCents - rep.ExpenseCents
 
@@ -367,8 +364,6 @@ func average(reps []MonthReport) MonthReport {
 	for _, r := range reps {
 		out.IncomeCents += r.IncomeCents
 		out.ExpenseCents += r.ExpenseCents
-		out.FixedCents += r.FixedCents
-		out.VariableCents += r.VariableCents
 		out.UnassignedCents += r.UnassignedCents
 		for k, v := range r.ByCostNature {
 			out.ByCostNature[k] += v
@@ -390,8 +385,6 @@ func average(reps []MonthReport) MonthReport {
 
 	out.IncomeCents /= n
 	out.ExpenseCents /= n
-	out.FixedCents /= n
-	out.VariableCents /= n
 	out.UnassignedCents /= n
 	out.BalanceCents = out.IncomeCents - out.ExpenseCents
 	for k := range out.ByCostNature {

@@ -111,11 +111,11 @@ func TestBuildMonthReport(t *testing.T) {
 	if rep.BalanceCents != 240000 {
 		t.Errorf("balance = %d, want 240000", rep.BalanceCents)
 	}
-	if rep.FixedCents != 200000 {
-		t.Errorf("fixed = %d, want 200000", rep.FixedCents)
+	if rep.FixedCents() != 200000 {
+		t.Errorf("fixed = %d, want 200000", rep.FixedCents())
 	}
-	if rep.VariableCents != 60000 {
-		t.Errorf("variable = %d, want 60000", rep.VariableCents)
+	if rep.VariableCents() != 60000 {
+		t.Errorf("variable = %d, want 60000", rep.VariableCents())
 	}
 	if rep.SavingCents() != 50000 {
 		t.Errorf("savings = %d, want 50000", rep.SavingCents())

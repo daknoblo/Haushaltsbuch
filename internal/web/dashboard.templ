@@ -135,8 +135,8 @@ templ trendChart(c calc.TrendChart) {
 templ headlineTiles(vm DashboardVM) {
 	<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 		@statTile(T(ctx, "overview.income"), FormatEUR(vm.Report.IncomeCents), T(ctx, "dash.perMonth"), "text-emerald-600 dark:text-emerald-400")
-		@statTile(T(ctx, "dash.fixedCosts"), FormatEUR(vm.HouseholdReport.FixedCents), FormatPercent(vm.HouseholdReport.FixedCostRate())+" "+T(ctx, "dash.fixedShare"), "text-indigo-600 dark:text-indigo-400")
-		@statTile(T(ctx, "dash.ownFixedCosts"), FormatEUR(vm.Report.FixedCents), T(ctx, "dash.ownFixedHint"), "text-violet-600 dark:text-violet-400")
+		@statTile(T(ctx, "dash.fixedCosts"), FormatEUR(vm.HouseholdReport.FixedCents()), FormatPercent(vm.HouseholdReport.FixedCostRate())+" "+T(ctx, "dash.fixedShare"), "text-indigo-600 dark:text-indigo-400")
+		@statTile(T(ctx, "dash.ownFixedCosts"), FormatEUR(vm.Report.FixedCents()), T(ctx, "dash.ownFixedHint"), "text-violet-600 dark:text-violet-400")
 		@statTile(T(ctx, "dash.savingsRate"), FormatPercent(vm.Report.SavingsRate()), T(ctx, "dash.perMonth"), "text-sky-600 dark:text-sky-400")
 	</div>
 }
@@ -338,9 +338,9 @@ templ fixedCostCard(vm DashboardVM) {
 		</div>
 		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.fixedHint") }</p>
 		<div class="mb-4 flex items-baseline gap-3">
-			<span class="tnum text-2xl font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(vm.Report.FixedCents) }</span>
+			<span class="tnum text-2xl font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(vm.Report.FixedCents()) }</span>
 			<span class="text-sm text-slate-500 dark:text-slate-400">
-				{ T(ctx, "dash.variableCosts") }: { FormatEUR(vm.Report.VariableCents) }
+				{ T(ctx, "dash.variableCosts") }: { FormatEUR(vm.Report.VariableCents()) }
 			</span>
 		</div>
 		if len(vm.FixedTop) == 0 {
