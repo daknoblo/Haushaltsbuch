@@ -76,6 +76,7 @@ var german = Catalog{
 	"bookings.activeFrom":          "Gültig ab",
 	"bookings.activeUntil":         "Gültig bis (optional)",
 	"bookings.splitMode":           "Aufteilung",
+	"bookings.percentAllocated":    "vergeben",
 	"bookings.splitSection":        "Bezahlt & aufgeteilt",
 	"bookings.splitHint":           "Erst wählen, wer die Rechnung bezahlt, dann wer sie mitträgt.",
 	"bookings.whoPays":             "Wer trägt die Ausgabe?",

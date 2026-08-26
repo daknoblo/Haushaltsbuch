@@ -205,50 +205,54 @@ templ bookingSplit(f BookingFormVM) {
 				</span>
 				<div class="flex flex-wrap items-center gap-2">
 					for _, m := range f.Members {
-						// The checked state is styled in CSS, because auto-save answers
-						// without markup and would never repaint a server-side class.
-						<label class="chip">
-							<input type="checkbox" name={ "m_" + strconv.FormatInt(m.ID, 10) } value="1" checked?={ f.Row.HasMember(m.ID) }/>
-							<span class="chip-body">
-								@memberDot(m.Color)
-								{ m.Name }
-							</span>
-						</label>
-						if f.Row.Booking.SplitMode == store.SplitPercent && f.Row.HasMember(m.ID) {
+						// Every mode keeps its own field, because what a value means
+						// depends on the mode and both are submitted together: a shared
+						// field would read 60 % as 60,00 € the moment the mode changes.
+						// Both are rendered and CSS picks one, since auto-save answers
+						// without markup and would never add a missing field.
+						<div class="split-member">
+							<label class="chip">
+								<input type="checkbox" name={ "m_" + strconv.FormatInt(m.ID, 10) } value="1" checked?={ f.Row.HasMember(m.ID) }/>
+								<span class="chip-body">
+									@memberDot(m.Color)
+									{ m.Name }
+								</span>
+							</label>
 							<input
-								class="input tnum w-24"
+								class="input tnum split-value split-percent w-20"
 								type="number"
 								min="0"
 								max="100"
 								step="1"
-								name={ "v_" + strconv.FormatInt(m.ID, 10) }
+								name={ "p_" + strconv.FormatInt(m.ID, 10) }
 								value={ f.Row.PercentInput(m.ID) }
 								aria-label={ Tf(ctx, "bookings.shareOf", m.Name) }
+								data-percent
 							/>
-						}
-						if f.Row.Booking.SplitMode == store.SplitFixed && f.Row.HasMember(m.ID) {
 							<input
-								class="input tnum w-28"
+								class="input tnum split-value split-fixed w-28"
 								type="number"
 								min="0"
 								step="0.01"
-								name={ "v_" + strconv.FormatInt(m.ID, 10) }
+								name={ "f_" + strconv.FormatInt(m.ID, 10) }
 								value={ f.Row.FixedInput(m.ID) }
 								aria-label={ Tf(ctx, "bookings.amountOf", m.Name) }
 								data-cents
 							/>
-						}
+						</div>
 					}
 				</div>
 				// Both columns read label, chips, hint, so the two chip rows line up.
 				if !f.Row.IsIncome() {
 					<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.whoPaysHint") }</p>
 				}
-				if f.Row.Booking.SplitMode == store.SplitFixed {
-					<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-						{ Tf(ctx, "bookings.fixedHint", FrequencyLabel(ctx, f.Row.Booking.Frequency)) }
-					</p>
-				}
+				<p class="split-percent mt-1 text-xs text-slate-500 dark:text-slate-400" data-split-hint>
+					<span data-split-total>{ f.Row.PercentAllocated() }</span>
+					{ " % " + T(ctx, "bookings.percentAllocated") }
+				</p>
+				<p class="split-fixed mt-1 text-xs text-slate-500 dark:text-slate-400">
+					{ Tf(ctx, "bookings.fixedHint", FrequencyLabel(ctx, f.Row.Booking.Frequency)) }
+				</p>
 			</div>
 		</div>
 		<div class="mt-3 sm:max-w-xs">

@@ -76,6 +76,7 @@ var english = Catalog{
 	"bookings.activeFrom":          "Valid from",
 	"bookings.activeUntil":         "Valid until (optional)",
 	"bookings.splitMode":           "Split",
+	"bookings.percentAllocated":    "allocated",
 	"bookings.splitSection":        "Paid & split",
 	"bookings.splitHint":           "First pick who pays the bill, then who carries it.",
 	"bookings.whoPays":             "Who pays for this?",

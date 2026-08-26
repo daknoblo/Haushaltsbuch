@@ -187,4 +187,26 @@
       el.value = el.value.replace(/\.00$/, "");
     }
   });
+
+  // Percentages that do not add up to a hundred leave part of a booking on
+  // nobody's tab. The report would show that much later, so the dialog counts
+  // along while the shares are typed.
+  function refreshSplitTotal() {
+    var dlg = currentDialog();
+    if (!dlg) return;
+    var out = dlg.querySelector("[data-split-total]");
+    if (!out) return;
+    var sum = 0;
+    dlg.querySelectorAll(".split-member").forEach(function (row) {
+      var on = row.querySelector('input[type="checkbox"]');
+      var val = row.querySelector("input[data-percent]");
+      if (on && on.checked && val) sum += parseFloat(val.value) || 0;
+    });
+    out.textContent = String(Math.round(sum * 10) / 10);
+    var hint = dlg.querySelector("[data-split-hint]");
+    if (hint) hint.classList.toggle("split-off", Math.abs(sum - 100) > 0.05);
+  }
+
+  document.addEventListener("input", refreshSplitTotal);
+  document.addEventListener("change", refreshSplitTotal);
 })();

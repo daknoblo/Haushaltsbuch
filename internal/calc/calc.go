@@ -151,7 +151,7 @@ func allocate(amount float64, b store.Booking, splits []store.BookingSplit) (map
 	switch b.SplitMode {
 	case store.SplitPercent:
 		for _, s := range splits {
-			res[s.MemberID] += amount * clampPercent(s.Value) / 100.0
+			res[s.MemberID] += amount * ClampPercent(s.Value) / 100.0
 		}
 	case store.SplitFixed:
 		factor := monthlyFactor(b)
@@ -489,7 +489,9 @@ func round(f float64) int64 {
 	return int64(math.Round(f))
 }
 
-func clampPercent(v float64) float64 {
+// ClampPercent keeps a percentage within 0-100 and rejects NaN, so a single
+// rule decides what a share may be for both the input layer and the report.
+func ClampPercent(v float64) float64 {
 	switch {
 	case math.IsNaN(v), v < 0:
 		return 0

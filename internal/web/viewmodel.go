@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"net/url"
 	"strconv"
 	"strings"
@@ -263,20 +264,78 @@ func (r BookingRow) DeleteURL() string { return "/bookings/" + r.IDStr() + "/del
 func (r BookingRow) DiscardURL() string { return "/bookings/" + r.IDStr() + "/discard" }
 
 // PercentInput returns the percent split value for a member as an input string.
+// It is the stored value only while percent is the active mode: the value
+// column means something different in every mode, so any other mode falls back
+// to an even share. That is what the mode says anyway, and it means switching
+// modes lands on a sane figure instead of a reinterpreted one.
 func (r BookingRow) PercentInput(id int64) string {
-	if !r.HasMember(id) {
-		return ""
+	if r.Booking.SplitMode == store.SplitPercent && r.HasMember(id) {
+		return strconv.FormatFloat(r.SplitValue(id), 'f', -1, 64)
 	}
-	return strconv.FormatFloat(r.SplitValue(id), 'f', -1, 64)
+	return strconv.FormatFloat(r.evenPercent(id), 'f', -1, 64)
 }
 
 // FixedInput returns the fixed split value (cents) for a member as a Euro input
-// string.
+// string, falling back to an even share for the same reason as PercentInput.
 func (r BookingRow) FixedInput(id int64) string {
-	if !r.HasMember(id) {
-		return ""
+	if r.Booking.SplitMode == store.SplitFixed && r.HasMember(id) {
+		return CentsToInput(int64(r.SplitValue(id)))
 	}
-	return CentsToInput(int64(r.SplitValue(id)))
+	return CentsToInput(r.evenCents(id))
+}
+
+// carrierIndex is a member's position among those carrying the booking, -1 for
+// anyone who carries none of it.
+func (r BookingRow) carrierIndex(id int64) int {
+	for i, s := range r.Splits {
+		if s.MemberID == id {
+			return i
+		}
+	}
+	return -1
+}
+
+// evenPercent is one member's share of an even split. The remainder goes to the
+// first carrier so the shares still add up to a hundred.
+func (r BookingRow) evenPercent(id int64) float64 {
+	n := len(r.Splits)
+	i := r.carrierIndex(id)
+	if n == 0 || i < 0 {
+		return 0
+	}
+	base := math.Trunc(100 / float64(n))
+	if i == 0 {
+		return 100 - base*float64(n-1)
+	}
+	return base
+}
+
+// evenCents is one member's share of the monthly amount, split evenly.
+func (r BookingRow) evenCents(id int64) int64 {
+	n := int64(len(r.Splits))
+	i := r.carrierIndex(id)
+	if n == 0 || i < 0 {
+		return 0
+	}
+	base := r.Booking.AmountCents / n
+	if i == 0 {
+		return r.Booking.AmountCents - base*(n-1)
+	}
+	return base
+}
+
+// PercentAllocated is how much of the booking the percent shares hand out. It
+// is the figure the dialog warns about when it is not a hundred.
+func (r BookingRow) PercentAllocated() string {
+	var sum float64
+	for _, s := range r.Splits {
+		if r.Booking.SplitMode == store.SplitPercent {
+			sum += s.Value
+			continue
+		}
+		sum += r.evenPercent(s.MemberID)
+	}
+	return strconv.FormatFloat(sum, 'f', -1, 64)
 }
 
 // NameIsSuggested reports whether the name is still the one a fresh booking was

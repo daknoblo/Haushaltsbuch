@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/daknoblo/Haushaltsbuch/internal/calc"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
 
@@ -342,7 +343,8 @@ func tagsFromForm(r *http.Request) []int64 {
 }
 
 // splitsFromForm rebuilds the split list from the submitted participation
-// checkboxes and values. Values that cannot be parsed keep their stored value.
+// checkboxes and values. Each mode reads its own field, so a mode change can
+// never reinterpret a figure that was entered for the other one.
 func (s *Server) splitsFromForm(r *http.Request, b store.Booking) ([]store.SplitInput, error) {
 	ctx := r.Context()
 	members, err := s.store.ListMembers(ctx, b.HouseholdID)
@@ -367,13 +369,15 @@ func (s *Server) splitsFromForm(r *http.Request, b store.Booking) ([]store.Split
 		val := stored[m.ID]
 		switch b.SplitMode {
 		case store.SplitPercent:
-			if v, err := ParseFloatLoose(r.FormValue("v_" + key)); err == nil {
-				val = clampPercent(v)
-			}
+			val = keepOnBlank(r, "p_"+key, val, func(raw string) (float64, bool) {
+				v, err := ParseFloatLoose(raw)
+				return calc.ClampPercent(v), err == nil
+			})
 		case store.SplitFixed:
-			if cents, err := ParseCents(r.FormValue("v_" + key)); err == nil {
-				val = float64(cents)
-			}
+			val = keepOnBlank(r, "f_"+key, val, func(raw string) (float64, bool) {
+				cents, err := ParseCents(raw)
+				return float64(cents), err == nil
+			})
 		default: // equal splits ignore the value
 			val = 0
 		}
@@ -382,16 +386,18 @@ func (s *Server) splitsFromForm(r *http.Request, b store.Booking) ([]store.Split
 	return out, nil
 }
 
-// clampPercent keeps a submitted percentage within 0-100.
-func clampPercent(v float64) float64 {
-	switch {
-	case v < 0:
-		return 0
-	case v > 100:
-		return 100
-	default:
+// keepOnBlank keeps the stored value when the field was not submitted at all.
+// An empty string parses as 0 without error, so without this a request that
+// happens to omit the field would silently wipe every share.
+func keepOnBlank(r *http.Request, name string, stored float64, parse func(string) (float64, bool)) float64 {
+	raw := r.FormValue(name)
+	if strings.TrimSpace(raw) == "" {
+		return stored
+	}
+	if v, ok := parse(raw); ok {
 		return v
 	}
+	return stored
 }
 
 func (s *Server) handleBookingDelete(w http.ResponseWriter, r *http.Request) {

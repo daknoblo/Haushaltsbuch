@@ -279,6 +279,41 @@
 
   /* A selectable chip. The checked state is styled here rather than rendered,
      because auto-save answers without markup and never repaints a class. */
+  .split-member {
+    @apply inline-flex items-center gap-2;
+  }
+  /* Which value field applies is decided by the split mode and by whether the
+     member carries anything at all. Both are form state, so CSS reads it
+     directly instead of waiting for markup the auto-save never sends. */
+  .split-value {
+    @apply hidden;
+  }
+  .dlg-form:has(select[name="split_mode"] option[value="percent"]:checked)
+    .split-member:has(input[type="checkbox"]:checked)
+    .split-percent {
+    @apply block;
+  }
+  .dlg-form:has(select[name="split_mode"] option[value="fixed"]:checked)
+    .split-member:has(input[type="checkbox"]:checked)
+    .split-fixed {
+    @apply block;
+  }
+  p.split-percent,
+  p.split-fixed {
+    @apply hidden;
+  }
+  .dlg-form:has(select[name="split_mode"] option[value="percent"]:checked) p.split-percent {
+    @apply block;
+  }
+  .dlg-form:has(select[name="split_mode"] option[value="fixed"]:checked) p.split-fixed {
+    @apply block;
+  }
+  /* Shares that do not add up to a hundred leave part of the booking on
+     nobody's tab, which the report would only show much later. */
+  .split-off {
+    @apply font-semibold text-amber-600 dark:text-amber-400;
+  }
+
   .chip {
     @apply inline-flex cursor-pointer select-none;
   }
