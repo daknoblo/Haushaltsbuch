@@ -7,8 +7,6 @@ import (
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
 
-var memberColors = []string{"#2563eb", "#db2777", "#059669", "#d97706", "#7c3aed", "#0891b2"}
-
 // ---- households ----
 
 func (s *Server) handleHouseholdCreate(w http.ResponseWriter, r *http.Request) {
@@ -136,7 +134,7 @@ func (s *Server) handleMemberCreate(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	color := memberColors[len(existing)%len(memberColors)]
+	color := store.MemberColor(len(existing))
 	m, err := s.store.CreateMember(ctx, active, name, color)
 	if err != nil {
 		s.serverError(w, r, err)

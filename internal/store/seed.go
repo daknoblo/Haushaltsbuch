@@ -29,6 +29,16 @@ var DefaultCategories = []SeedCategory{
 	{"Sonstiges", DirExpense, "#94a3b8", "tag"},
 }
 
+// MemberColors is the palette every member is colored from, in the order they
+// are handed out. It lives here because the seeded household draws from the
+// same list as one filled in by hand — two lists would drift apart.
+var MemberColors = []string{"#2563eb", "#db2777", "#059669", "#d97706", "#7c3aed", "#0891b2"}
+
+// MemberColor returns the color for the n-th member of a household.
+func MemberColor(n int) string {
+	return MemberColors[n%len(MemberColors)]
+}
+
 // CreateHouseholdSeeded creates a household pre-populated with one member and
 // the default categories, so it is immediately usable. Either the whole
 // household is created or none of it.
@@ -39,7 +49,7 @@ func (s *Store) CreateHouseholdSeeded(ctx context.Context, name string) (Househo
 		if err != nil {
 			return err
 		}
-		if _, err := tx.CreateMember(ctx, h.ID, "Ich", "#2563eb"); err != nil {
+		if _, err := tx.CreateMember(ctx, h.ID, "Ich", MemberColor(0)); err != nil {
 			return err
 		}
 		for _, c := range DefaultCategories {
@@ -71,7 +81,7 @@ func (s *Store) EnsureSeed(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			if _, err := tx.CreateMember(ctx, h.ID, "Partner/in", "#db2777"); err != nil {
+			if _, err := tx.CreateMember(ctx, h.ID, "Partner/in", MemberColor(1)); err != nil {
 				return err
 			}
 			return tx.SetActiveHousehold(ctx, h.ID)
