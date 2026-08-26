@@ -131,6 +131,9 @@ templ bookingRow(b BookingRow) {
 				<span class="badge badge-muted">{ T(ctx, "bookings.noSettle") }</span>
 			}
 			if b.MemberCount > 1 {
+				if len(b.Carriers) == 0 {
+					<span class="badge badge-warn">{ T(ctx, "overview.unassigned") }</span>
+				}
 				for _, m := range b.Carriers {
 					@memberChip(m, b.IsPayer(m.ID))
 				}

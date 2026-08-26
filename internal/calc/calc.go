@@ -145,7 +145,7 @@ func MonthlyCents(b store.Booking, overrides []store.BookingOverride, month stri
 // allocate distributes the monthly amount of a booking among members according
 // to its split mode and returns the per-member allocation plus the remainder
 // that could not be attributed to anyone.
-func allocate(amount float64, b store.Booking, splits []store.BookingSplit, members []store.Member) (map[int64]float64, float64) {
+func allocate(amount float64, b store.Booking, splits []store.BookingSplit) (map[int64]float64, float64) {
 	res := make(map[int64]float64)
 
 	switch b.SplitMode {
@@ -159,14 +159,11 @@ func allocate(amount float64, b store.Booking, splits []store.BookingSplit, memb
 			res[s.MemberID] += clampAmount(s.Value) * factor
 		}
 	default: // equal
+		// No split at all means nobody carries it: the amount stays unassigned
+		// rather than being spread over people who were never picked.
 		ids := make([]int64, 0, len(splits))
 		for _, s := range splits {
 			ids = append(ids, s.MemberID)
-		}
-		if len(ids) == 0 {
-			for _, m := range members {
-				ids = append(ids, m.ID)
-			}
 		}
 		if len(ids) > 0 {
 			share := amount / float64(len(ids))
@@ -218,7 +215,7 @@ func BuildMonthReport(d Data, month string, member int64) MonthReport {
 			continue
 		}
 		amount := float64(AmountFor(b, d.Overrides[b.ID], month)) * monthlyFactor(b)
-		shares, rest := allocate(amount, b, d.Splits[b.ID], d.Members)
+		shares, rest := allocate(amount, b, d.Splits[b.ID])
 
 		if member != Everyone {
 			share, ok := shares[member]
@@ -457,7 +454,7 @@ func FixedCosts(d Data, months []string, member int64, limit int) []LabeledTotal
 			}
 			amount := float64(AmountFor(b, d.Overrides[b.ID], m)) * monthlyFactor(b)
 			if member != Everyone {
-				shares, _ := allocate(amount, b, d.Splits[b.ID], d.Members)
+				shares, _ := allocate(amount, b, d.Splits[b.ID])
 				share, ok := shares[member]
 				if !ok {
 					continue

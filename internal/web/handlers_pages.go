@@ -139,11 +139,8 @@ func (s *Server) buildBookingsVM(ctx context.Context, householdID int64, month, 
 }
 
 // carriers names the members a booking is split between, keeping the household
-// order. No split at all means everyone, which is how the allocation reads it.
+// order. Nobody picked means nobody carries it.
 func carriers(members []store.Member, splits []store.BookingSplit) []store.Member {
-	if len(splits) == 0 {
-		return members
-	}
 	out := make([]store.Member, 0, len(splits))
 	for _, m := range members {
 		for _, s := range splits {

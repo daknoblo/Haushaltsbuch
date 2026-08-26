@@ -236,7 +236,7 @@ func classCategoryTotals(ctx context.Context, d Data, months []string, member in
 			}
 			amount := float64(AmountFor(bk, d.Overrides[bk.ID], m)) * monthlyFactor(bk)
 			if member != Everyone {
-				shares, _ := allocate(amount, bk, d.Splits[bk.ID], d.Members)
+				shares, _ := allocate(amount, bk, d.Splits[bk.ID])
 				share, ok := shares[member]
 				if !ok {
 					continue

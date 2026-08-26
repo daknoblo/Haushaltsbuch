@@ -71,31 +71,24 @@ func (s *Server) handleBookingCreate(w http.ResponseWriter, r *http.Request) {
 		name = T(ctx, "bookings.newIncome")
 	}
 	month := NormalizeMonth(r.URL.Query().Get("m"))
-	payer := form.Members[0].ID
+	// Who pays and who carries it is left open on purpose: a guess here is one
+	// the user has to notice and undo.
 	b := store.Booking{
-		HouseholdID:   active,
-		CategoryID:    catID,
-		PayerMemberID: &payer,
-		Direction:     dir,
-		Name:          name,
-		Frequency:     store.FreqMonthly,
-		Interval:      1,
-		DuePoint:      store.DueStart,
-		StartsOn:      month + "-01",
-		CostNature:    store.CostFix,
-		BudgetClass:   store.ClassNeed,
-		SplitMode:     store.SplitEqual,
-		Settle:        true,
+		HouseholdID: active,
+		CategoryID:  catID,
+		Direction:   dir,
+		Name:        name,
+		Frequency:   store.FreqMonthly,
+		Interval:    1,
+		DuePoint:    store.DueStart,
+		StartsOn:    month + "-01",
+		CostNature:  store.CostFix,
+		BudgetClass: store.ClassNeed,
+		SplitMode:   store.SplitEqual,
+		Settle:      true,
 	}
 
-	// Everyone participates by default, which is what a shared household bill
-	// almost always is.
-	splits := make([]store.SplitInput, 0, len(form.Members))
-	for _, m := range form.Members {
-		splits = append(splits, store.SplitInput{MemberID: m.ID})
-	}
-
-	created, err := s.store.CreateBooking(ctx, b, splits, nil)
+	created, err := s.store.CreateBooking(ctx, b, nil, nil)
 	if err != nil {
 		s.writeStoreError(w, r, err)
 		return

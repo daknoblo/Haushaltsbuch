@@ -92,6 +92,8 @@ func planData() Data {
 			1: {{BookingID: 1, MemberID: 1, Value: 100}},
 			2: {{BookingID: 2, MemberID: 2, Value: 100}},
 			3: {{BookingID: 3, MemberID: 1, Value: 60}, {BookingID: 3, MemberID: 2, Value: 40}},
+			4: {{BookingID: 4, MemberID: 1}, {BookingID: 4, MemberID: 2}},
+			5: {{BookingID: 5, MemberID: 1}, {BookingID: 5, MemberID: 2}},
 		},
 		TagLinks: map[int64][]int64{3: {5}, 5: {5}},
 	}
@@ -177,6 +179,36 @@ func TestUnassignedExpenseIsReported(t *testing.T) {
 	rep := BuildMonthReport(d, "2026-05", Everyone)
 	if rep.UnassignedCents != 7000 {
 		t.Errorf("unassigned = %d, want 7000", rep.UnassignedCents)
+	}
+}
+
+// Nobody picked means nobody carries it: guessing the whole household here
+// would put a figure on people who were never asked.
+func TestBookingWithoutSplitsBelongsToNobody(t *testing.T) {
+	d := Data{
+		Members:    members(),
+		Categories: categories(),
+		Bookings: []store.Booking{{
+			ID: 1, CategoryID: 20, Direction: store.DirExpense, AmountCents: 10000,
+			Frequency: store.FreqMonthly, Interval: 1, SplitMode: store.SplitEqual,
+			CostNature: store.CostFix, BudgetClass: store.ClassNeed,
+		}},
+	}
+
+	rep := BuildMonthReport(d, "2026-05", Everyone)
+	if rep.ExpenseCents != 10000 {
+		t.Errorf("household expenses = %d, want the booking to keep counting", rep.ExpenseCents)
+	}
+	if rep.UnassignedCents != 10000 {
+		t.Errorf("unassigned = %d, want 10000", rep.UnassignedCents)
+	}
+	for _, m := range rep.Members {
+		if m.ExpenseCents != 0 {
+			t.Errorf("%s carries %d of a booking nobody was picked for", m.Member.Name, m.ExpenseCents)
+		}
+	}
+	if got := BuildMonthReport(d, "2026-05", 1).ExpenseCents; got != 0 {
+		t.Errorf("person view = %d, want the booking to stay out of it", got)
 	}
 }
 

@@ -262,7 +262,7 @@ func groupByCategory(rows []BookingRow) []CategoryGroup {
 
 func splitNames(ctx context.Context, row BookingRow, names map[int64]string) string {
 	if len(row.Splits) == 0 {
-		return T(ctx, "pdf.everyone")
+		return T(ctx, "overview.unassigned")
 	}
 	parts := make([]string, 0, len(row.Splits))
 	for _, sp := range row.Splits {

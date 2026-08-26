@@ -151,7 +151,7 @@ func Settlement(d Data, months []string) SettlementReport {
 				order = append(order, b)
 			}
 			totals[b.ID] += round(amount)
-			shares, _ := allocate(amount, b, d.Splits[b.ID], d.Members)
+			shares, _ := allocate(amount, b, d.Splits[b.ID])
 			for id, v := range shares {
 				owed[id] += round(v)
 				perBooking[b.ID][id] += round(v)
