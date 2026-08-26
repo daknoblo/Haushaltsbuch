@@ -123,7 +123,9 @@ templ bookingRhythm(f BookingFormVM) {
 				<span class="block text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.recurringHint") }</span>
 			</span>
 		</label>
-		if f.Row.Booking.Frequency.Recurring() {
+		// Both halves are rendered and CSS picks one. Auto-save answers without
+		// markup, so a server-side branch would keep showing the old choice.
+		<div class="rec-on">
 			<div class="mt-3 grid gap-3 sm:grid-cols-3">
 				<div>
 					<label class="field-label" for={ "freq-" + f.Row.IDStr() }>{ T(ctx, "bookings.frequency") }</label>
@@ -156,12 +158,12 @@ templ bookingRhythm(f BookingFormVM) {
 					<input id={ "until-" + f.Row.IDStr() } class="input" type="month" name="active_until" value={ f.Row.EndMonth() }/>
 				</div>
 			</div>
-		} else {
-			<div class="mt-3 sm:max-w-xs">
-				<label class="field-label" for={ "date-" + f.Row.IDStr() }>{ T(ctx, "bookings.date") }</label>
-				<input id={ "date-" + f.Row.IDStr() } class="input" type="date" name="occurred_on" value={ f.Row.Booking.StartsOn }/>
-			</div>
-		}
+		</div>
+		<div class="rec-off mt-3 sm:max-w-xs">
+			<label class="field-label" for={ "date-" + f.Row.IDStr() }>{ T(ctx, "bookings.date") }</label>
+			<input id={ "date-" + f.Row.IDStr() } class="input" type="date" name="occurred_on" value={ f.Row.OccurredInput() }/>
+			<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.dateHint") }</p>
+		</div>
 	</div>
 }
 
@@ -294,30 +296,29 @@ templ bookingTags(f BookingFormVM) {
 }
 
 // bookingOverrides is what makes "49.99 € but 10 € for the first six months"
-// expressible without a second booking. Most bookings have none, so the block
-// only unfolds once it is asked for.
+// expressible without a second booking. It only applies to a recurring amount,
+// so it follows the same switch. Most bookings have none, so the block only
+// unfolds once it is asked for.
 templ bookingOverrides(f BookingFormVM) {
-	if f.Row.Booking.Frequency.Recurring() {
-		<div class="dlg-section">
-			<label class="switch">
-				<input type="checkbox" name="overrides_on" value="1" checked?={ len(f.Row.Overrides) > 0 }/>
-				<span class="switch-track"><span class="switch-knob"></span></span>
-				<span>
-					<span class="block text-sm font-medium text-slate-800 dark:text-slate-200">{ T(ctx, "bookings.overrides") }</span>
-					<span class="block text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.overridesHint") }</span>
-				</span>
-			</label>
-			<div class="ov-body">
-				if len(f.Row.Overrides) == 0 {
-					<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.noOverrides") }</p>
-				}
-				for _, o := range f.Row.Overrides {
-					@overrideRow(f, o)
-				}
-				@overrideAdd(f)
-			</div>
+	<div class="dlg-section rec-on">
+		<label class="switch">
+			<input type="checkbox" name="overrides_on" value="1" checked?={ len(f.Row.Overrides) > 0 }/>
+			<span class="switch-track"><span class="switch-knob"></span></span>
+			<span>
+				<span class="block text-sm font-medium text-slate-800 dark:text-slate-200">{ T(ctx, "bookings.overrides") }</span>
+				<span class="block text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.overridesHint") }</span>
+			</span>
+		</label>
+		<div class="ov-body">
+			if len(f.Row.Overrides) == 0 {
+				<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.noOverrides") }</p>
+			}
+			for _, o := range f.Row.Overrides {
+				@overrideRow(f, o)
+			}
+			@overrideAdd(f)
 		</div>
-	}
+	</div>
 }
 
 templ overrideRow(f BookingFormVM, o store.BookingOverride) {

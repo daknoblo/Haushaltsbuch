@@ -99,7 +99,7 @@ templ bookingRow(b BookingRow) {
 	<button
 		type="button"
 		id={ b.DOMID() }
-		class="booking-row"
+		class={ "booking-row", templ.KV("booking-row-off", !b.ActiveInMonth()) }
 		hx-get={ b.EditURL() + "?m=" + b.Month }
 		hx-target="#booking-dialog"
 		hx-swap="innerHTML"
@@ -123,6 +123,9 @@ templ bookingRow(b BookingRow) {
 			}
 		</span>
 		<span class="hidden items-center gap-1.5 sm:flex">
+			if !b.ActiveInMonth() {
+				<span class="badge badge-muted">{ T(ctx, "bookings.notInMonth") }</span>
+			}
 			if b.Discounted() {
 				<span class="badge badge-ok">{ FormatEUR(b.AmountCents()) }</span>
 			}

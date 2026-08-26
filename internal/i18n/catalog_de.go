@@ -71,6 +71,8 @@ var german = Catalog{
 	"bookings.costNature":          "Kostenart",
 	"bookings.budgetClass":         "Klasse",
 	"bookings.date":                "Datum",
+	"bookings.dateHint":            "Zählt nur in dem Monat, in den das Datum fällt.",
+	"bookings.notInMonth":          "Nicht in diesem Monat",
 	"bookings.activeFrom":          "Gültig ab",
 	"bookings.activeUntil":         "Gültig bis (optional)",
 	"bookings.splitMode":           "Aufteilung",

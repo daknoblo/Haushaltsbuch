@@ -225,6 +225,13 @@ func (r BookingRow) MonthlyCents() int64 {
 	return calc.MonthlyCents(r.Booking, r.Overrides, r.Month)
 }
 
+// ActiveInMonth reports whether the booking counts in the displayed month. The
+// list holds every booking so it stays editable, so a one-off from another
+// month has to say that it contributes nothing here.
+func (r BookingRow) ActiveInMonth() bool {
+	return calc.ActiveIn(r.Booking, r.Month)
+}
+
 // AmountCents returns the amount charged in the displayed month, which differs
 // from the stored one while an override is in force.
 func (r BookingRow) AmountCents() int64 {
@@ -302,6 +309,19 @@ func (r BookingRow) StartMonth() string {
 func (r BookingRow) EndMonth() string {
 	if len(r.Booking.EndsOn) >= 7 {
 		return r.Booking.EndsOn[:7]
+	}
+	return ""
+}
+
+// OccurredInput is the date a one-off booking falls on. A recurring booking
+// carries the start of its range, so switching the rhythm off leaves a usable
+// date behind instead of a booking that shows up in no month at all.
+func (r BookingRow) OccurredInput() string {
+	if len(r.Booking.StartsOn) == 10 {
+		return r.Booking.StartsOn
+	}
+	if ValidMonth(r.Month) {
+		return r.Month + "-01"
 	}
 	return ""
 }
