@@ -261,8 +261,12 @@ func (s *Server) handleBookingUpdate(w http.ResponseWriter, r *http.Request) {
 	} else if catID != 0 {
 		b.CategoryID = catID
 	}
+	// A radio cannot be unticked, so the picker carries an explicit "nobody".
+	// Without it a payer picked by mistake could never be taken back.
 	if payer := parseID(r.FormValue("payer_member_id")); payer != 0 {
 		b.PayerMemberID = &payer
+	} else if r.Form.Has("payer_member_id") {
+		b.PayerMemberID = nil
 	}
 
 	splits, err := s.splitsFromForm(r, b)

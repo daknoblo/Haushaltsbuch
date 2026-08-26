@@ -98,6 +98,7 @@ var german = Catalog{
 	"bookings.paysTitle":           "%s streckt vor",
 	"bookings.carriesTitle":        "%s trägt mit",
 	"bookings.payerHint":           "Wer die Rechnung vorstreckt – daraus entsteht der Ausgleich.",
+	"bookings.nobody":              "Niemand",
 	"bookings.recurring":           "Wiederkehrend",
 	"bookings.recurringHint":       "Miete, Internet, Versicherung …",
 	"bookings.duePoint":            "Buchungszeitpunkt",

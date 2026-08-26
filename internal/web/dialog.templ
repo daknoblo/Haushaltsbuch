@@ -192,6 +192,12 @@ templ bookingSplit(f BookingFormVM) {
 							</span>
 						</label>
 					}
+					// A radio cannot be unticked, so taking a payer back needs a choice
+					// of its own.
+					<label class="chip">
+						<input type="radio" name="payer_member_id" value="0" checked?={ f.Row.Booking.PayerMemberID == nil }/>
+						<span class="chip-body">{ T(ctx, "bookings.nobody") }</span>
+					</label>
 				</div>
 				<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.payerHint") }</p>
 			</div>
