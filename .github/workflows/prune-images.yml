@@ -17,7 +17,7 @@ on:
         default: true
 
 permissions:
-  packages: write
+  contents: read
 
 concurrency:
   group: prune-images
@@ -27,6 +27,9 @@ jobs:
   prune:
     name: Prune superseded sha- images
     runs-on: ubuntu-latest
+    permissions:
+      # The one job that deletes package versions is the only one allowed to.
+      packages: write
     steps:
       - name: Delete superseded sha- images
         env:

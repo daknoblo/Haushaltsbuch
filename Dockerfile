@@ -1,7 +1,11 @@
 # syntax=docker/dockerfile:1
-ARG GO_VERSION=1.26
 
-FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine AS build
+# Both base images are pinned to the digest they had when this line was written.
+# A tag can be moved to different content under the same name, so a tag alone
+# means the build is not reproducible and cannot be audited after the fact. The
+# readable tag stays in front of the digest to say what the digest is; Docker
+# resolves the digest and ignores the tag. Dependabot keeps both in step.
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine@sha256:28d89ee9cc0ff9fec75c82ca201e6bf7fdf9a679d4b7b24dfa04f2bb766bb468 AS build
 WORKDIR /src
 RUN apk add --no-cache git ca-certificates
 COPY go.mod go.sum ./
@@ -25,7 +29,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # with nonroot ownership. The distroless runtime has no shell to create it.
 RUN mkdir -p /out/appdata
 
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 WORKDIR /app
 COPY --from=build /out/haushaltsbuch /app/haushaltsbuch
 COPY --from=build --chown=65532:65532 /out/appdata /appdata
