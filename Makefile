@@ -22,7 +22,7 @@ LDFLAGS := -s -w \
 	-X $(PKG)/internal/version.Commit=$(COMMIT) \
 	-X $(PKG)/internal/version.Date=$(DATE)
 
-.PHONY: help fmt fmt-check vet lint test build run generate css tailwind tools check docker release clean
+.PHONY: help fmt fmt-check vet lint test build run generate css tailwind tools check verify docker release clean
 
 ## help: list available targets
 help:
@@ -89,6 +89,10 @@ tools:
 	go get -tool github.com/a-h/templ/cmd/templ@latest
 	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)
 	go install golang.org/x/vuln/cmd/govulncheck@latest
+
+## verify: run the plausibility suite on its own, with its findings spelled out
+verify:
+	go test ./internal/web/ -run TestPlausibility -count=1 -v
 
 ## check: run everything CI runs
 check: fmt-check vet lint test
