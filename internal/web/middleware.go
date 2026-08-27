@@ -59,7 +59,8 @@ func (s *Server) sameOrigin(next http.Handler) http.Handler {
 		}
 		if !requestIsSameOrigin(r) {
 			s.logger.Warn("cross-origin request rejected",
-				"path", r.URL.Path, "origin", r.Header.Get("Origin"))
+				"path", logsafe.Value(r.URL.Path),
+				"origin", logsafe.Value(r.Header.Get("Origin")))
 			s.clientError(w, r, http.StatusForbidden, "error.crossOrigin")
 			return
 		}
