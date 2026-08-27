@@ -72,6 +72,11 @@ with a token rather than a cookie, so a forged cross-site request carries
 nothing useful. It keeps the recover and the rate limit. `internal/api` holds
 it, and the browser UI never calls it.
 
+`docs/API.md` is the reference to hand to anything automating against this app:
+every route, every field with its type and default, the enum values and the
+status codes. Keep it in step with `internal/api` — a caller that cannot see the
+code has nothing else to go on.
+
 ## Non-goals
 
 - **No bank connection** (FinTS/PSD2) and no CSV import. Certification effort and
