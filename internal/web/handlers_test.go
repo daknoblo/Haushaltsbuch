@@ -469,7 +469,7 @@ func TestDashboardRendersForEveryPeriod(t *testing.T) {
 func TestDashboardOpensOnTheYear(t *testing.T) {
 	_, h, _ := newTestServer(t)
 	body := get(t, h, "/dashboard").Body.String()
-	if !strings.Contains(body, `<span class="period-chip period-chip-active">Jahr</span>`) {
+	if !strings.Contains(body, `selected>Jahr</option>`) {
 		t.Error("the year is not the period the dashboard opens on")
 	}
 }

@@ -43,10 +43,13 @@ templ DashboardPage(nav Nav, vm DashboardVM) {
 	}
 }
 
-// viewSwitch flips every card between the whole household and a single person.
+// viewSwitch flips every card between the whole household and a single person
+// and carries the one period control. It sticks to the top because the page is
+// long enough that a reader deep in the flow diagram would otherwise have to
+// scroll back up to ask the same question about a different month.
 templ viewSwitch(vm DashboardVM) {
-	<div class="card-tight no-print">
-		<div class="flex flex-wrap items-center gap-2 px-4 py-3">
+	<div class="view-bar no-print">
+		<div class="flex flex-wrap items-center gap-2 px-4 py-2.5">
 			<span class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "dash.view") }</span>
 			for _, v := range vm.Views {
 				if v.Active {
@@ -65,29 +68,25 @@ templ viewSwitch(vm DashboardVM) {
 					</a>
 				}
 			}
+			<div class="ml-auto flex items-center gap-1">
+				<a class="btn-icon" href={ templ.SafeURL(vm.PrevURL) } aria-label={ T(ctx, "dash.rangePrev") }>‹</a>
+				<label class="section-picker">
+					<select data-nav="1" aria-label={ T(ctx, "dash.range") }>
+						for _, p := range vm.Periods {
+							<option value={ p.URL } selected?={ p.Active }>{ p.Label }</option>
+						}
+					</select>
+				</label>
+				<a class="btn-icon" href={ templ.SafeURL(vm.NextURL) } aria-label={ T(ctx, "dash.rangeNext") }>›</a>
+			</div>
 		</div>
 	</div>
 }
 
-// chartCard carries the period control, centred above the chart it drives.
+// chartCard names the span it draws, now that the control moved to the bar.
 templ chartCard(vm DashboardVM) {
 	<div class="card">
-		<div class="mb-4 grid gap-3">
-			<div class="flex items-center justify-center gap-2 no-print">
-				<a class="btn-icon" href={ templ.SafeURL(vm.PrevURL) } aria-label={ T(ctx, "dash.rangePrev") }>‹</a>
-				<div class="flex flex-wrap items-center justify-center gap-1">
-					for _, p := range vm.Periods {
-						if p.Active {
-							<span class="period-chip period-chip-active">{ p.Label }</span>
-						} else {
-							<a class="period-chip" href={ templ.SafeURL(p.URL) }>{ p.Label }</a>
-						}
-					}
-				</div>
-				<a class="btn-icon" href={ templ.SafeURL(vm.NextURL) } aria-label={ T(ctx, "dash.rangeNext") }>›</a>
-			</div>
-			<div class="text-center text-sm font-medium text-slate-700 dark:text-slate-300">{ vm.RangeLabel }</div>
-		</div>
+		<div class="mb-4 text-center text-sm font-medium text-slate-700 dark:text-slate-300">{ vm.RangeLabel }</div>
 		if vm.Chart.Empty() {
 			<p class="text-center text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.noData") }</p>
 		} else {
@@ -366,21 +365,6 @@ templ headlineTiles(vm DashboardVM) {
 	</div>
 }
 
-// sectionPicker is a card's own period. The option value is the whole target
-// URL so the browser only has to follow it; app.js does the following, because
-// the content security policy forbids the inline handler a select would need.
-templ sectionPicker(vm DashboardVM, key string) {
-	{{ sec := vm.Section(key) }}
-	<label class="section-picker no-print">
-		<span class="sr-only">{ T(ctx, "dash.range") }</span>
-		<select data-nav="1" aria-label={ T(ctx, "dash.range") }>
-			for _, o := range sec.Options {
-				<option value={ o.URL } selected?={ o.Active }>{ o.Label }</option>
-			}
-		</select>
-	</label>
-}
-
 // settlementCard answers "who owes whom", which only the payer of a booking
 // makes computable. The payment comes first; every member's own ledger is one
 // click away, so the figure can be followed line by line.
@@ -388,7 +372,7 @@ templ settlementCard(vm DashboardVM) {
 	<div class="card">
 		<div class="card-head">
 			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.settlement") }</h2>
-			@sectionPicker(vm, secSettle)
+			<span class="badge ml-auto">{ vm.RangeLabel }</span>
 		</div>
 		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.settlementHint") }</p>
 		if !vm.HouseholdView() {
@@ -498,7 +482,7 @@ templ shareCard(vm DashboardVM) {
 	<div class="card">
 		<div class="card-head">
 			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.shares") }</h2>
-			@sectionPicker(vm, secShare)
+			<span class="badge ml-auto">{ vm.RangeLabel }</span>
 		</div>
 		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.sharesHint") }</p>
 		<div class="mb-4 grid gap-3 sm:mx-auto sm:max-w-xl sm:grid-cols-2">
@@ -516,7 +500,7 @@ templ shareCard(vm DashboardVM) {
 							<th class="table-head">{ T(ctx, "bookings.payer") }</th>
 							<th class="table-head">{ T(ctx, "bookings.splitMode") }</th>
 							<th class="table-head text-right whitespace-nowrap">{ T(ctx, "dash.perMonth") }</th>
-							for _, p := range vm.SharePositions() {
+							for _, p := range vm.Positions() {
 								<th class="table-head text-right whitespace-nowrap">{ p.Member.Name }</th>
 							}
 						</tr>
@@ -543,7 +527,7 @@ templ shareCard(vm DashboardVM) {
 									</span>
 								</td>
 								<td class="table-cell tnum text-right whitespace-nowrap">{ FormatEUR(l.MonthlyCents) }</td>
-								for _, p := range vm.SharePositions() {
+								for _, p := range vm.Positions() {
 									<td class="table-cell tnum text-right whitespace-nowrap">
 										if l.ShareOf(p.Member.ID) == 0 {
 											<span class="text-slate-400 dark:text-slate-600">–</span>
@@ -574,13 +558,13 @@ templ fixedCostCard(vm DashboardVM) {
 	<div class="card">
 		<div class="card-head">
 			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.fixedCosts") }</h2>
-			@sectionPicker(vm, secFix)
+			<span class="badge badge-info ml-auto">{ FormatPercent(vm.Report.FixedCostRate()) }</span>
 		</div>
 		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.fixedHint") }</p>
 		<div class="mb-4 flex items-baseline gap-3">
-			<span class="tnum text-2xl font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(vm.FixReport.FixedCents()) }</span>
+			<span class="tnum text-2xl font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(vm.Report.FixedCents()) }</span>
 			<span class="text-sm text-slate-500 dark:text-slate-400">
-				{ T(ctx, "dash.variableCosts") }: { FormatEUR(vm.FixReport.VariableCents()) }
+				{ T(ctx, "dash.variableCosts") }: { FormatEUR(vm.Report.VariableCents()) }
 			</span>
 		</div>
 		if len(vm.FixedTop) == 0 {
@@ -597,19 +581,18 @@ templ savingsCard(vm DashboardVM) {
 	<div class="card">
 		<div class="card-head">
 			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.savingsRate") }</h2>
-			<span class="badge badge-ok">{ FormatPercent(vm.SaveReport.SavingsRate()) }</span>
-			@sectionPicker(vm, secSave)
+			<span class="badge badge-ok ml-auto">{ FormatPercent(vm.Report.SavingsRate()) }</span>
 		</div>
 		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.savingsHint") }</p>
 		<div class="grid grid-cols-2 gap-3">
 			<div>
 				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "dash.deliberate") }</div>
-				<div class="tnum mt-1 text-lg font-semibold text-sky-600 dark:text-sky-400">{ FormatEUR(vm.SaveReport.SavingCents()) }</div>
+				<div class="tnum mt-1 text-lg font-semibold text-sky-600 dark:text-sky-400">{ FormatEUR(vm.Report.SavingCents()) }</div>
 			</div>
 			<div>
 				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "dash.surplus") }</div>
 				<div class="tnum mt-1 text-lg font-semibold">
-					@signedMoney(vm.SaveReport.BalanceCents)
+					@signedMoney(vm.Report.BalanceCents)
 				</div>
 			</div>
 		</div>
@@ -623,7 +606,9 @@ templ ruleCard(vm DashboardVM) {
 	<div class="card">
 		<div class="card-head">
 			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.rule503020") }</h2>
-			@sectionPicker(vm, secRule)
+			if vm.ViewName() != "" {
+				<span class="badge ml-auto">{ vm.ViewName() }</span>
+			}
 		</div>
 		<p class="mb-4 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.ruleHint") }</p>
 		if vm.Rule.Empty() {
@@ -640,9 +625,9 @@ templ ruleCard(vm DashboardVM) {
 							{ Tf(ctx, "dash.ruleSurplus", FormatEUR(vm.Rule.Surplus)) }
 						</p>
 					}
-					if vm.RuleReport.OverIncomeCents() > 0 {
+					if vm.Report.OverIncomeCents() > 0 {
 						<p class="text-xs font-medium text-rose-600 dark:text-rose-400">
-							{ Tf(ctx, "dash.overIncome", FormatEUR(vm.RuleReport.OverIncomeCents())) }
+							{ Tf(ctx, "dash.overIncome", FormatEUR(vm.Report.OverIncomeCents())) }
 						</p>
 					}
 				</div>
@@ -672,7 +657,7 @@ templ ruleRing(vm DashboardVM) {
 		</svg>
 		<div class="rule-center">
 			<div class="text-[0.65rem] uppercase tracking-wide text-slate-400 dark:text-slate-500">{ T(ctx, "dash.income") }</div>
-			<div class="tnum text-lg font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(vm.RuleReport.IncomeCents) }</div>
+			<div class="tnum text-lg font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(vm.Report.IncomeCents) }</div>
 		</div>
 	</div>
 }
@@ -684,14 +669,14 @@ templ ruleBucket(vm DashboardVM, class store.BudgetClass, dot, edge string) {
 			<span class={ "inline-block h-2.5 w-2.5 shrink-0 rounded-full", dot }></span>
 			<span class="text-sm font-medium text-slate-800 dark:text-slate-200">{ BudgetClassLabel(ctx, class) }</span>
 			<span class="tnum ml-auto text-sm font-semibold text-slate-900 dark:text-slate-100">
-				{ SharePercent(vm.RuleReport.ByBudgetClass[class], vm.RuleReport.IncomeCents) }
+				{ SharePercent(vm.Report.ByBudgetClass[class], vm.Report.IncomeCents) }
 			</span>
 		</div>
 		<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{ RuleBucketHint(ctx, class) }</p>
 		<div class="tnum mt-1.5 flex items-baseline gap-1.5 text-xs">
-			<span class="font-medium text-slate-700 dark:text-slate-300">{ FormatEUR(vm.RuleReport.ByBudgetClass[class]) }</span>
+			<span class="font-medium text-slate-700 dark:text-slate-300">{ FormatEUR(vm.Report.ByBudgetClass[class]) }</span>
 			<span class="text-slate-400 dark:text-slate-500">
-				{ TargetLabel(ctx, class.TargetPercent()) } · { FormatEUR(vm.RuleReport.TargetCents(class)) }
+				{ TargetLabel(ctx, class.TargetPercent()) } · { FormatEUR(vm.Report.TargetCents(class)) }
 			</span>
 			<span class={ "ml-auto font-medium", RuleGapTone(vm.Report, class) }>{ RuleGapLabel(ctx, vm.Report, class) }</span>
 		</div>
@@ -703,7 +688,7 @@ templ sankeyCard(vm DashboardVM) {
 	<div class="card">
 		<div class="card-head">
 			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.flow") }</h2>
-			@sectionPicker(vm, secFlow)
+			<span class="badge ml-auto">{ vm.RangeLabel }</span>
 		</div>
 		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.flowHint") }</p>
 		if vm.Sankey.Empty() {
@@ -761,13 +746,13 @@ templ categoryCard(vm DashboardVM) {
 	<div class="card">
 		<div class="card-head">
 			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.topCategories") }</h2>
-			@sectionPicker(vm, secCat)
+			<span class="badge ml-auto">{ vm.RangeLabel }</span>
 		</div>
-		if len(vm.CatReport.Categories) == 0 {
+		if len(vm.Report.Categories) == 0 {
 			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.noCategories") }</p>
 		} else {
-			for _, c := range vm.CatReport.Categories {
-				@categoryBar(c, MaxLabeled(vm.CatReport.Categories), vm.CatReport.ExpenseCents)
+			for _, c := range vm.Report.Categories {
+				@categoryBar(c, MaxLabeled(vm.Report.Categories), vm.Report.ExpenseCents)
 			}
 		}
 	</div>

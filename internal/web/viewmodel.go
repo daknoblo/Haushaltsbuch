@@ -738,29 +738,13 @@ type DashboardVM struct {
 	Views           []ViewOption
 	ViewMember      int64
 	Settlement      calc.SettlementReport
-	// Sections carry each card's own period; Report and friends stay the
-	// page-wide figures the chart and the tiles are drawn from.
-	Sections    map[string]SectionVM
-	ShareLedger calc.SettlementReport
-	SaveReport  calc.MonthReport
-	CatReport   calc.MonthReport
-	RuleReport  calc.MonthReport
-	FixReport   calc.MonthReport
 }
-
-// Section returns one card's picker. An unknown key yields a zero value rather
-// than panicking, because a template typo should not take the page down.
-func (v DashboardVM) Section(key string) SectionVM { return v.Sections[key] }
 
 // Positions is every member's paid/owed position of the period.
 func (v DashboardVM) Positions() []calc.MemberPosition { return v.Settlement.Positions }
 
 // Transfers are the payments that square the period.
 func (v DashboardVM) Transfers() []calc.Transfer { return v.Settlement.Transfers }
-
-// SharePositions are the people the "who carries what" table has a column for.
-// It follows that card's own period rather than the settlement's.
-func (v DashboardVM) SharePositions() []calc.MemberPosition { return v.ShareLedger.Positions }
 
 // ShowSettlement hides the settlement while there is nobody to settle with.
 func (v DashboardVM) ShowSettlement() bool { return len(v.Settlement.Positions) > 1 }
@@ -771,12 +755,12 @@ func (v DashboardVM) SettlementEven() bool { return len(v.Settlement.Transfers) 
 // ShareLines are the expenses the selected view carries: all of them for the
 // household, only the ones the member has a share in for a person.
 func (v DashboardVM) ShareLines() []calc.ShareLine {
-	return v.ShareLedger.LinesFor(v.ViewMember)
+	return v.Settlement.LinesFor(v.ViewMember)
 }
 
 // Carried splits what the selected view shoulders into the divided part and
 // the part it carries alone; the two add up to the expenses shown above.
-func (v DashboardVM) Carried() calc.Carried { return v.ShareLedger.CarriedBy(v.ViewMember) }
+func (v DashboardVM) Carried() calc.Carried { return v.Settlement.CarriedBy(v.ViewMember) }
 
 // Ledger lists what one member fronted and carries, booking by booking.
 func (v DashboardVM) Ledger(member int64) []calc.LedgerLine {

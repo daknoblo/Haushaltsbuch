@@ -277,6 +277,15 @@
     @apply hidden;
   }
 
+  /* The one control bar of the evaluation. It sticks so a reader deep in the
+     table can still change person or period. The background is the page's own
+     and fully opaque — a translucent bar lets the figures scrolling underneath
+     ghost through it, which reads as a rendering fault rather than as depth.
+     The negative margin lets it span the padding of the page container. */
+  .view-bar {
+    @apply sticky top-0 z-30 -mx-4 mb-1 border-b border-slate-200 bg-slate-50 px-4 py-1 shadow-sm dark:border-slate-800 dark:bg-slate-950;
+  }
+
   /* A card's own period. It sits where the badge used to, so the head keeps
      its shape whether the card can be switched or not. */
   .section-picker {
