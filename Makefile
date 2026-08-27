@@ -4,11 +4,12 @@ BINARY  := haushaltsbuch
 PKG     := github.com/daknoblo/Haushaltsbuch
 CMD     := ./cmd/haushaltsbuch
 
-TAILWIND         := ./bin/tailwindcss
-TAILWIND_VERSION := v3.4.17
-GOLANGCI_VERSION := v2.12.2
-CSS_INPUT        := internal/web/assets/input.css
-CSS_OUTPUT       := internal/web/assets/static/app.css
+TAILWIND            := ./bin/tailwindcss
+TAILWIND_VERSION    := v3.4.19
+GOLANGCI_VERSION    := v2.13.1
+GOVULNCHECK_VERSION := v1.1.4
+CSS_INPUT           := internal/web/assets/input.css
+CSS_OUTPUT          := internal/web/assets/static/app.css
 
 # Mirrors how the release workflow resolves the version, so a local build is
 # labelled exactly like the CI build of the same commit.
@@ -88,7 +89,7 @@ tailwind:
 tools:
 	go get -tool github.com/a-h/templ/cmd/templ@latest
 	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)
-	go install golang.org/x/vuln/cmd/govulncheck@latest
+	go install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
 
 ## verify: run the plausibility suite on its own, with its findings spelled out
 verify:
