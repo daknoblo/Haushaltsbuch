@@ -417,6 +417,31 @@
   .matrix-child .matrix-cell {
     @apply pl-6 text-xs text-slate-500 dark:text-slate-400;
   }
+  /* A booking's percentage belongs to the booking, not to the category above
+     it, so it lines up with the line it describes. */
+  .matrix-child + .matrix-share .matrix-cell {
+    @apply pl-6;
+  }
+  /* Mean and median stand apart from the months: they answer a question about
+     the row rather than about a point in the year. */
+  .matrix-aside {
+    @apply bg-slate-100/70 text-center dark:bg-slate-800/50;
+  }
+
+  /* How a month compares with the one before it. A circle so the row still
+     reads as a row of figures, with the arrow at the angle of the change. */
+  .trend {
+    @apply mr-1 inline-flex h-3.5 w-3.5 shrink-0 select-none items-center justify-center rounded-full align-middle text-[9px] font-bold leading-none;
+  }
+  .trend-flat {
+    @apply bg-amber-500/20 text-amber-600 dark:text-amber-400;
+  }
+  .trend-down {
+    @apply bg-emerald-500/20 text-emerald-600 dark:text-emerald-400;
+  }
+  .trend-up {
+    @apply bg-rose-500/20 text-rose-600 dark:text-rose-400;
+  }
   /* A category folds its bookings away until asked. A <details> cannot wrap
      table rows, so the state lives on a checkbox the group reads with :has(). */
   .matrix-group .matrix-child {

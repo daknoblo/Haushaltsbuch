@@ -14,6 +14,18 @@ const (
 	BandVariable = "variable"
 )
 
+// MatrixTrend says how a month compares with the one before it. A month without
+// a figure, and the first of the range, compare with nothing.
+type MatrixTrend int8
+
+// How a month compares with the one before it.
+const (
+	TrendNone MatrixTrend = iota
+	TrendFlat
+	TrendDown
+	TrendUp
+)
+
 // MatrixRow is one line of the year matrix: a category, one of its bookings, or
 // a summary. Cents and Share hold one entry per month of the range.
 type MatrixRow struct {
@@ -26,6 +38,7 @@ type MatrixRow struct {
 	Icon        string
 	Cents       []int64
 	Share       []float64
+	Trend       []MatrixTrend
 	TotalCents  int64
 	MeanCents   int64
 	MedianCents int64
@@ -194,7 +207,30 @@ func summarize(row MatrixRow, cents []int64, n int) MatrixRow {
 	}
 	row.MeanCents = row.TotalCents / int64(n)
 	row.MedianCents = median(row.Cents)
+	row.Trend = trendOf(row.Cents)
 	return row
+}
+
+// trendOf compares each month with the one before it. A month the booking did
+// not run in has nothing to compare, and neither has the first of the range;
+// both stay silent rather than claiming a change against a zero that only means
+// "not yet".
+func trendOf(cents []int64) []MatrixTrend {
+	out := make([]MatrixTrend, len(cents))
+	for i := 1; i < len(cents); i++ {
+		if cents[i] == 0 || cents[i-1] == 0 {
+			continue
+		}
+		switch {
+		case cents[i] > cents[i-1]:
+			out[i] = TrendUp
+		case cents[i] < cents[i-1]:
+			out[i] = TrendDown
+		default:
+			out[i] = TrendFlat
+		}
+	}
+	return out
 }
 
 // shareOf is a row's share of the income, per month and over the whole range.

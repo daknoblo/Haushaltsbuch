@@ -168,8 +168,8 @@ templ matrixCard(vm DashboardVM) {
 								<th class="matrix-head text-right">{ MonthShort(ctx, m) }</th>
 							}
 							<th class="matrix-head text-right">{ T(ctx, "matrix.total") }</th>
-							<th class="matrix-head text-right">{ T(ctx, "matrix.mean") }</th>
-							<th class="matrix-head text-right">{ T(ctx, "matrix.median") }</th>
+							<th class="matrix-head matrix-aside">{ T(ctx, "matrix.mean") }</th>
+							<th class="matrix-head matrix-aside">{ T(ctx, "matrix.median") }</th>
 						</tr>
 					</thead>
 					for _, band := range vm.Matrix.Bands {
@@ -247,8 +247,8 @@ templ matrixShare(row calc.MatrixRow) {
 			<td class="matrix-cell text-right">{ FormatPercent(p) }</td>
 		}
 		<td class="matrix-cell text-right">{ FormatPercent(row.ShareTotal) }</td>
-		<td class="matrix-cell"></td>
-		<td class="matrix-cell"></td>
+		<td class="matrix-cell matrix-aside"></td>
+		<td class="matrix-cell matrix-aside"></td>
 	</tr>
 }
 
@@ -260,14 +260,31 @@ templ matrixLine(vm DashboardVM, row calc.MatrixRow, extra string) {
 }
 
 templ matrixCells(row calc.MatrixRow) {
-	for _, c := range row.Cents {
-		<td class="matrix-cell text-right">{ MatrixCell(c) }</td>
+	for i, c := range row.Cents {
+		<td class="matrix-cell text-right">
+			@matrixTrend(row.Trend[i])
+			{ MatrixCell(c) }
+		</td>
 	}
 	// The three summary columns spell out a zero: a median of nothing is the
 	// point of showing a median next to a mean.
 	<td class="matrix-cell text-right font-medium">{ FormatEURShort(row.TotalCents) }</td>
-	<td class="matrix-cell text-right">{ FormatEURShort(row.MeanCents) }</td>
-	<td class="matrix-cell text-right">{ FormatEURShort(row.MedianCents) }</td>
+	<td class="matrix-cell matrix-aside">{ FormatEURShort(row.MeanCents) }</td>
+	<td class="matrix-cell matrix-aside">{ FormatEURShort(row.MedianCents) }</td>
+}
+
+// matrixTrend marks a month against the one before it. It says nothing at all
+// where there is nothing to compare, because an arrow against a month the
+// booking did not run in would invent a change.
+templ matrixTrend(t calc.MatrixTrend) {
+	switch t {
+		case calc.TrendUp:
+			<span class="trend trend-up" title={ T(ctx, "matrix.trendUp") } aria-label={ T(ctx, "matrix.trendUp") }>↗</span>
+		case calc.TrendDown:
+			<span class="trend trend-down" title={ T(ctx, "matrix.trendDown") } aria-label={ T(ctx, "matrix.trendDown") }>↘</span>
+		case calc.TrendFlat:
+			<span class="trend trend-flat" title={ T(ctx, "matrix.trendFlat") } aria-label={ T(ctx, "matrix.trendFlat") }>–</span>
+	}
 }
 
 templ matrixLabel(row calc.MatrixRow) {
