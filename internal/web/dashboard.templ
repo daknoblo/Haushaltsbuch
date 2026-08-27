@@ -377,29 +377,37 @@ templ savingsCard(vm DashboardVM) {
 	</div>
 }
 
-// budgetClassBar is a single 100 % bar, which reads better against the 50/30/20
-// targets than three separate figures.
+// budgetClassBar measures against net income, because that is what the
+// 50/30/20 rule divides up. Spending past it therefore fills the bar and is
+// named underneath rather than being scaled away.
 templ budgetClassBar(rep calc.MonthReport) {
 	<div class="flex h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-		<div class="bg-indigo-500" style={ "width:" + BarWidth(rep.ByBudgetClass[store.ClassNeed], rep.ExpenseCents) }></div>
-		<div class="bg-amber-500" style={ "width:" + BarWidth(rep.ByBudgetClass[store.ClassWant], rep.ExpenseCents) }></div>
-		<div class="bg-sky-500" style={ "width:" + BarWidth(rep.ByBudgetClass[store.ClassSaving], rep.ExpenseCents) }></div>
+		<div class="bg-indigo-500" style={ "width:" + BarWidth(rep.ByBudgetClass[store.ClassNeed], rep.IncomeCents) }></div>
+		<div class="bg-amber-500" style={ "width:" + BarWidth(rep.ByBudgetClass[store.ClassWant], rep.IncomeCents) }></div>
+		<div class="bg-sky-500" style={ "width:" + BarWidth(rep.ByBudgetClass[store.ClassSaving], rep.IncomeCents) }></div>
 	</div>
+	if rep.OverIncomeCents() > 0 {
+		<p class="mt-2 text-xs font-medium text-rose-600 dark:text-rose-400">
+			{ Tf(ctx, "dash.overIncome", FormatEUR(rep.OverIncomeCents())) }
+		</p>
+	}
 	<div class="mt-2 grid grid-cols-3 gap-2 text-xs">
-		@classLegend("bg-indigo-500", T(ctx, "class.need"), rep.ByBudgetClass[store.ClassNeed], rep.ExpenseCents, 50)
-		@classLegend("bg-amber-500", T(ctx, "class.want"), rep.ByBudgetClass[store.ClassWant], rep.ExpenseCents, 30)
-		@classLegend("bg-sky-500", T(ctx, "class.saving"), rep.ByBudgetClass[store.ClassSaving], rep.ExpenseCents, 20)
+		@classLegend("bg-indigo-500", T(ctx, "class.need"), rep, store.ClassNeed)
+		@classLegend("bg-amber-500", T(ctx, "class.want"), rep, store.ClassWant)
+		@classLegend("bg-sky-500", T(ctx, "class.saving"), rep, store.ClassSaving)
 	</div>
 }
 
-templ classLegend(dot, label string, cents, total int64, target int) {
+templ classLegend(dot, label string, rep calc.MonthReport, class store.BudgetClass) {
 	<div>
 		<div class="flex items-center gap-1.5">
 			<span class={ "inline-block h-2 w-2 rounded-full", dot }></span>
 			<span class="text-slate-600 dark:text-slate-400">{ label }</span>
 		</div>
-		<div class="tnum mt-0.5 font-medium text-slate-900 dark:text-slate-100">{ SharePercent(cents, total) }</div>
-		<div class="tnum text-slate-400 dark:text-slate-500">{ TargetLabel(ctx, target) }</div>
+		<div class="tnum mt-0.5 font-medium text-slate-900 dark:text-slate-100">{ SharePercent(rep.ByBudgetClass[class], rep.IncomeCents) }</div>
+		<div class="tnum text-slate-400 dark:text-slate-500">
+			{ TargetLabel(ctx, class.TargetPercent()) } · { FormatEUR(rep.TargetCents(class)) }
+		</div>
 	</div>
 }
 

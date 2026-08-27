@@ -91,6 +91,20 @@ func (b BudgetClass) Valid() bool {
 	}
 }
 
+// TargetPercent is the share of net income the 50/30/20 rule allots to this
+// class. The rule is named after these three numbers, so they live here rather
+// than being written out wherever a target is shown.
+func (b BudgetClass) TargetPercent() int {
+	switch b {
+	case ClassNeed:
+		return 50
+	case ClassWant:
+		return 30
+	default:
+		return 20
+	}
+}
+
 // SplitMode describes how a booking is split between members.
 type SplitMode string
 

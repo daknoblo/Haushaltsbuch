@@ -81,6 +81,29 @@ func (r MonthReport) VariableCents() int64 { return r.ByCostNature[store.CostVar
 // as a saving in the 50/30/20 breakdown.
 func (r MonthReport) SavingCents() int64 { return r.ByBudgetClass[store.ClassSaving] }
 
+// TargetCents is what the 50/30/20 rule allots to a class. The rule measures
+// against net income, so it answers 0 without any.
+func (r MonthReport) TargetCents(c store.BudgetClass) int64 {
+	if r.IncomeCents <= 0 {
+		return 0
+	}
+	return r.IncomeCents * int64(c.TargetPercent()) / 100
+}
+
+// OverIncomeCents is how far the classified expenses reach beyond net income.
+// It is 0 while they fit, and is what keeps a 100 % bar from quietly hiding a
+// household that spends more than it earns.
+func (r MonthReport) OverIncomeCents() int64 {
+	var sum int64
+	for _, v := range r.ByBudgetClass {
+		sum += v
+	}
+	if sum <= r.IncomeCents {
+		return 0
+	}
+	return sum - r.IncomeCents
+}
+
 // SavingsRate is the share of net income that is either put aside on purpose or
 // left over. It returns 0 without income.
 func (r MonthReport) SavingsRate() float64 {

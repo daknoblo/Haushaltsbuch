@@ -161,6 +161,7 @@ var english = Catalog{
 	"dash.chartTitle":      "Income & expenses",
 	"dash.noData":          "No data yet.",
 	"dash.rule503020":      "50 / 30 / 20",
+	"dash.overIncome":      "%s beyond income",
 	"dash.topCategories":   "Where does the money go?",
 	"dash.noCategories":    "No data.",
 	"dash.fixedCosts":      "All fixed costs",
