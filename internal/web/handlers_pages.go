@@ -287,26 +287,30 @@ func lessName(a, b string) bool {
 }
 
 // periodMonths is how many months each period key spans.
-var periodMonths = map[string]int{"1m": 1, "2m": 2, "3m": 3, "6m": 6, periodYear: 12}
+var periodMonths = map[string]int{"1m": 1, "2m": 2, periodQuarter: 3, "6m": 6, periodYear: 12}
 
 // periodYear covers the calendar year rather than a window around the anchor.
 const periodYear = "12m"
+
+// periodQuarter is what the dashboard opens on: a single month says too little
+// about a plan that carries yearly and quarterly figures.
+const periodQuarter = "3m"
 
 // periodOrder keeps the selector in a sensible order, which a map cannot.
 var periodOrder = []struct{ key, label string }{
 	{"1m", "dash.rangeMonth"},
 	{"2m", "dash.range2m"},
-	{"3m", "dash.rangeQuarter"},
+	{periodQuarter, "dash.rangeQuarter"},
 	{"6m", "dash.rangeHalf"},
 	{periodYear, "dash.rangeYear"},
 }
 
-// cleanPeriod falls back to a single month for anything unknown.
+// cleanPeriod falls back to the quarter for anything unknown.
 func cleanPeriod(key string) string {
 	if _, ok := periodMonths[key]; ok {
 		return key
 	}
-	return "1m"
+	return periodQuarter
 }
 
 // rangeMonths returns the months a period covers, centered on the anchor month

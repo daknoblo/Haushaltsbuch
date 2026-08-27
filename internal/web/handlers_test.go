@@ -460,6 +460,16 @@ func TestDashboardRendersForEveryPeriod(t *testing.T) {
 	}
 }
 
+// A single month says too little about a plan carrying yearly and quarterly
+// figures, so the dashboard opens on the quarter.
+func TestDashboardOpensOnTheQuarter(t *testing.T) {
+	_, h, _ := newTestServer(t)
+	body := get(t, h, "/dashboard").Body.String()
+	if !strings.Contains(body, `<span class="period-chip period-chip-active">Quartal</span>`) {
+		t.Error("the quarter is not the period the dashboard opens on")
+	}
+}
+
 func TestDashboardPersonViewNarrowsTheFigures(t *testing.T) {
 	srv, h, active := newTestServer(t)
 	ctx := t.Context()
