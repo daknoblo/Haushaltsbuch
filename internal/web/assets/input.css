@@ -372,6 +372,20 @@
   .split-member {
     @apply inline-flex items-center gap-2;
   }
+  /* Chips wrap in a row while an equal split needs no figures. Once a mode asks
+     for one per person, the row would leave an input standing between two
+     names, belonging to neither, so the people stack instead. */
+  .split-people {
+    @apply flex flex-wrap items-center gap-2;
+  }
+  .dlg-form:has(select[name="split_mode"] option[value="percent"]:checked) .split-people,
+  .dlg-form:has(select[name="split_mode"] option[value="fixed"]:checked) .split-people {
+    @apply grid gap-2;
+  }
+  .dlg-form:has(select[name="split_mode"] option[value="percent"]:checked) .split-member,
+  .dlg-form:has(select[name="split_mode"] option[value="fixed"]:checked) .split-member {
+    @apply flex w-full items-center justify-between gap-3;
+  }
   /* Which value field applies is decided by the split mode and by whether the
      member carries anything at all. Both are form state, so CSS reads it
      directly instead of waiting for markup the auto-save never sends. */

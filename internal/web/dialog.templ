@@ -209,7 +209,7 @@ templ bookingSplit(f BookingFormVM) {
 						{ T(ctx, "bookings.whoPays") }
 					}
 				</span>
-				<div class="flex flex-wrap items-center gap-2">
+				<div class="split-people">
 					for _, m := range f.Members {
 						// Every mode keeps its own field, because what a value means
 						// depends on the mode and both are submitted together: a shared
