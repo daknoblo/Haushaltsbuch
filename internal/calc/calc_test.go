@@ -434,16 +434,16 @@ func TestYearAverageCountsEmptyMonths(t *testing.T) {
 				Frequency: store.FreqOnce, StartsOn: "2026-03-15", SplitMode: store.SplitEqual},
 		},
 	}
-	rep := PeriodReport(d, calendarYear(2026), Everyone)
+	rep := PeriodReport(d, calendarYear(), Everyone)
 	if rep.IncomeCents != 98725 {
 		t.Errorf("income = %d, want 98725 (1.184.700 / 12)", rep.IncomeCents)
 	}
 }
 
-func calendarYear(y int) []string {
+func calendarYear() []string {
 	out := make([]string, 0, 12)
 	for m := 1; m <= 12; m++ {
-		out = append(out, fmt.Sprintf("%d-%02d", y, m))
+		out = append(out, fmt.Sprintf("2026-%02d", m))
 	}
 	return out
 }
