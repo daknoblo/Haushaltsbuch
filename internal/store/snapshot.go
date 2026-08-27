@@ -178,15 +178,15 @@ func (s *Store) importBooking(ctx context.Context, householdID int64, bs Booking
 		`INSERT INTO bookings
 			(id, household_id, category_id, payer_member_id, direction, name, note,
 			 amount_cents, frequency, interval_n, due_point, starts_on, ends_on,
-			 cost_nature, budget_class, split_mode, settle, created_at, updated_at)
-		 VALUES (?, ?, `+categoryRef+`, `+memberRef+`, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			 cost_nature, budget_class, split_mode, settle, external_id, created_at, updated_at)
+		 VALUES (?, ?, `+categoryRef+`, `+memberRef+`, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		b.ID, householdID,
 		b.CategoryID, householdID,
 		nullInt(b.PayerMemberID), householdID,
 		string(b.Direction), b.Name, b.Note, b.AmountCents,
 		string(b.Frequency), b.Interval, string(b.DuePoint), b.StartsOn, b.EndsOn,
 		string(b.CostNature), string(b.BudgetClass), string(b.SplitMode), b.Settle,
-		orNow(b.CreatedAt), orNow(b.UpdatedAt),
+		b.ExternalID, orNow(b.CreatedAt), orNow(b.UpdatedAt),
 	); err != nil {
 		return err
 	}

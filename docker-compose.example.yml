@@ -12,6 +12,9 @@ services:
       HB_DATA_DIR: "/appdata"
       # Log level: debug | info | warn | error.
       HB_LOG_LEVEL: "info"
+      # Bearer token of the HTTP API under /api/v1/. Leave it out to keep the
+      # API off; the browser UI does not need it.
+      # HB_API_TOKEN: "${HB_API_TOKEN}"
       # IANA time zone used for date handling.
       TZ: "Europe/Berlin"
     volumes:

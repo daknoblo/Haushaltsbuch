@@ -62,8 +62,15 @@ through a sub-select so a forged id cannot cross household boundaries.
 ## Repository-specific configuration
 
 Beyond the mandatory base set (`HB_HTTP_ADDR`, `HB_DATA_DIR`, `HB_LOG_LEVEL`,
-`TZ`) there are no environment variables. The application has no secrets and no
-outbound connections.
+`TZ`) there is one variable: `HB_API_TOKEN`. It is the bearer token of the HTTP
+API under `/api/v1/`, and leaving it unset keeps every API route answering
+`503` — which is the right default for an app that has no login. It is the only
+secret the application knows; there are still no outbound connections.
+
+The API is mounted outside the same-origin guard on purpose: it authenticates
+with a token rather than a cookie, so a forged cross-site request carries
+nothing useful. It keeps the recover and the rate limit. `internal/api` holds
+it, and the browser UI never calls it.
 
 ## Non-goals
 
@@ -72,6 +79,7 @@ outbound connections.
 - **No multi-currency and no double-entry bookkeeping.** Firefly III exists for
   that; this project stays a household budget book.
 - **No authentication.** Operated on a private network behind a reverse proxy.
+  The API token guards the machine-facing routes only; the pages stay open.
 - **No actuals tracking yet.** The app compares planned figures, not individual
   transactions.
 

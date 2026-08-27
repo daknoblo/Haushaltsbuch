@@ -152,3 +152,47 @@ func TestBackupNamesItsVersion(t *testing.T) {
 		t.Error("the backup carries no version")
 	}
 }
+
+// The API answers a bearer token, not a cookie, so the same-origin guard would
+// only turn away callers it was never meant to protect against. The HTML routes
+// keep it, and this holds the two apart.
+func TestAPIIsExemptFromTheSameOriginGuard(t *testing.T) {
+	_, h, _ := newTestServer(t)
+
+	api := httptest.NewRequest(http.MethodPost, "/api/v1/bookings", strings.NewReader(`{"name":"X"}`))
+	api.Header.Set("Content-Type", "application/json")
+	api.Header.Set("Authorization", "Bearer "+testAPIToken)
+	api.Header.Set("Sec-Fetch-Site", "cross-site")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, api)
+	if w.Code == http.StatusForbidden {
+		t.Error("the same-origin guard rejected an API call carrying a valid token")
+	}
+
+	page := httptest.NewRequest(http.MethodPost, "/settings/reset", strings.NewReader(""))
+	page.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	page.Header.Set("Sec-Fetch-Site", "cross-site")
+	pw := httptest.NewRecorder()
+	h.ServeHTTP(pw, page)
+	if pw.Code != http.StatusForbidden {
+		t.Errorf("an HTML route from another site = %d, want 403", pw.Code)
+	}
+}
+
+// A token is what stands between the API and the network, so an unauthenticated
+// call must not reach a handler even from the same origin.
+func TestAPIRefusesWithoutAToken(t *testing.T) {
+	srv, h, _ := newTestServer(t)
+
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/households", nil)
+	r.Header.Set("Sec-Fetch-Site", "same-origin")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("unauthenticated API call = %d, want 401", w.Code)
+	}
+
+	if households, err := srv.store.ListHouseholds(t.Context()); err != nil || len(households) == 0 {
+		t.Fatalf("the book was disturbed: %v", err)
+	}
+}

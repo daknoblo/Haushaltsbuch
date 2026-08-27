@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/daknoblo/Haushaltsbuch/internal/api"
 )
 
 // DBFileName is the SQLite file created inside the data directory.
@@ -25,6 +27,9 @@ type Config struct {
 	LogLevel slog.Level
 	// TZ is the configured IANA time zone (TZ). Empty means system default.
 	TZ string
+	// APIToken enables the machine-facing API (HB_API_TOKEN). Empty keeps it
+	// off, which is the right default for an app that has no login.
+	APIToken string
 }
 
 // DBPath returns the full path of the SQLite database.
@@ -40,6 +45,7 @@ func Load() Config {
 		DataDir:  getenv("HB_DATA_DIR", "/appdata"),
 		LogLevel: parseLevel(getenv("HB_LOG_LEVEL", "info")),
 		TZ:       strings.TrimSpace(os.Getenv("TZ")),
+		APIToken: strings.TrimSpace(os.Getenv(api.TokenEnv)),
 	}
 }
 

@@ -34,9 +34,13 @@ func newTestServer(t *testing.T) (*Server, http.Handler, store.Household) {
 		t.Fatalf("list households: %v", err)
 	}
 
-	srv := New(st, slog.New(slog.DiscardHandler))
+	srv := New(st, slog.New(slog.DiscardHandler), testAPIToken)
 	return srv, srv.Handler(), hs[0]
 }
+
+// testAPIToken keeps the machine-facing API reachable from the tests without
+// letting it into a deployment that never set one.
+const testAPIToken = "test-token"
 
 // post issues a same-origin form POST, which the CSRF middleware requires.
 func post(t *testing.T, h http.Handler, path string, form url.Values) *httptest.ResponseRecorder {

@@ -114,12 +114,71 @@ All settings are provided through environment variables prefixed with `HB_`:
 | `HB_HTTP_ADDR` | `:8080` | Listen address |
 | `HB_DATA_DIR` | `/appdata` | Directory holding `haushaltsbuch.db` |
 | `HB_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
+| `HB_API_TOKEN` | *(unset)* | Bearer token for the HTTP API. Unset keeps the API off |
 | `TZ` | `Europe/Berlin` | IANA time zone |
 
 The database file is created as `<HB_DATA_DIR>/haushaltsbuch.db`. In the
 container `/appdata` is declared as a volume. Invalid values for `HB_HTTP_ADDR`
 or `HB_DATA_DIR` abort the start with a clear message; an invalid `TZ` is
 reported as a warning and the application falls back to UTC.
+
+---
+
+## API
+
+Set `HB_API_TOKEN` to let a script keep the book up to date. Without it every
+route answers `503`, which is the right default for an app that has no login.
+Every request carries `Authorization: Bearer <token>`; a missing or wrong token
+is `401`. The API is deliberately exempt from the same-origin guard the pages
+carry, because it authenticates with a token rather than a cookie.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/v1/households` | Households, with the active one marked |
+| `GET` | `/api/v1/categories` | Categories of a household |
+| `GET` | `/api/v1/members` | People of a household |
+| `GET` | `/api/v1/tags` | Tags of a household |
+| `GET` | `/api/v1/report` | Income, expenses, fixed costs, savings rate |
+| `GET` | `/api/v1/bookings` | Bookings, optionally only those counting in a month |
+| `POST` | `/api/v1/bookings` | Create a booking, or update one by `external_id` |
+| `GET` | `/api/v1/bookings/{id}` | One booking |
+| `PUT` | `/api/v1/bookings/{id}` | Change the fields named in the body |
+| `DELETE` | `/api/v1/bookings/{id}` | Delete a booking |
+
+A read takes `?household=<id>` and falls back to the active household, plus
+`?month=YYYY-MM` and `?member=<id>` where they apply. Anywhere `{id}` is
+accepted, `ext:<external_id>` works too.
+
+Categories, people and tags may be given by name instead of by id, so a script
+reads like the book does. Amounts travel as `amount` in Euro or `amount_cents`
+as an integer; every other field mirrors the booking dialog. Unknown fields are
+rejected rather than ignored, so a misspelling is reported instead of silently
+changing nothing. Errors are always `{"error": "..."}`.
+
+`external_id` is the caller's own name for a booking, unique per household. It
+turns `POST` into an upsert, which is what keeps a job that runs twice from
+filing everything twice:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/bookings \
+  -H "Authorization: Bearer $HB_API_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+        "external_id": "miete",
+        "name": "Miete",
+        "category": "Miete",
+        "amount": 981.50,
+        "frequency": "monthly",
+        "active_from": "2026-01-01",
+        "cost_nature": "fix",
+        "budget_class": "need",
+        "payer": "Ich",
+        "shares": [{ "name": "Ich" }, { "name": "Partner/in" }]
+      }'
+```
+
+A `PUT` changes only what it names; anything left out keeps its value, shares
+and tags included.
 
 ---
 

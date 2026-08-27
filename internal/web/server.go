@@ -11,6 +11,7 @@ import (
 
 	"github.com/a-h/templ"
 
+	"github.com/daknoblo/Haushaltsbuch/internal/api"
 	"github.com/daknoblo/Haushaltsbuch/internal/i18n"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 	"github.com/daknoblo/Haushaltsbuch/internal/version"
@@ -21,11 +22,17 @@ type Server struct {
 	store   *store.Store
 	logger  *slog.Logger
 	limiter *rateLimiter
+	api     *api.Server
 }
 
-// New creates a Server.
-func New(st *store.Store, logger *slog.Logger) *Server {
-	return &Server{store: st, logger: logger, limiter: newRateLimiter()}
+// New creates a Server. An empty apiToken leaves the machine-facing API off.
+func New(st *store.Store, logger *slog.Logger, apiToken string) *Server {
+	return &Server{
+		store:   st,
+		logger:  logger,
+		limiter: newRateLimiter(),
+		api:     api.New(st, logger, apiToken),
+	}
 }
 
 // Handler builds the HTTP handler with all routes and middleware.
@@ -102,7 +109,15 @@ func (s *Server) Handler() http.Handler {
 	// Order follows the repository standard: recover, log, cap the body, set
 	// security headers, reject cross-origin writes, then throttle. Language
 	// resolution sits near the top so that rejections are translated too.
-	return s.recoverer(s.logRequests(withLang(limitBody(securityHeaders(s.sameOrigin(s.rateLimit(compressResponses(mux))))))))
+	page := s.recoverer(s.logRequests(withLang(limitBody(securityHeaders(s.sameOrigin(s.rateLimit(compressResponses(mux))))))))
+
+	// The API carries a bearer token instead of a cookie, so the same-origin
+	// guard would only reject callers it was never meant to protect against.
+	// It keeps the recover and the rate limit, which apply to any caller.
+	root := http.NewServeMux()
+	root.Handle("/", page)
+	root.Handle(api.Prefix, s.recoverer(s.rateLimit(s.api.Handler())))
+	return root
 }
 
 // redirectTo keeps the old page URLs working after expenses and income were

@@ -13,7 +13,7 @@ import (
 
 func testServer(t *testing.T) *Server {
 	t.Helper()
-	return New(nil, discardLogger())
+	return New(nil, discardLogger(), "")
 }
 
 func TestSecurityHeaders(t *testing.T) {

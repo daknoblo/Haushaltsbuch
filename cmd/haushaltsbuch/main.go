@@ -85,7 +85,11 @@ func run(cfg config.Config, logger *slog.Logger) error {
 		return fmt.Errorf("seed store: %w", err)
 	}
 
-	srv := web.New(st, logger)
+	if cfg.APIToken != "" {
+		logger.Info("api enabled", "prefix", "/api/v1")
+	}
+
+	srv := web.New(st, logger, cfg.APIToken)
 	httpSrv := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           srv.Handler(),

@@ -19,7 +19,7 @@ type SplitInput struct {
 
 const bookingColumns = `id, household_id, category_id, payer_member_id, direction, name, note,
 	amount_cents, frequency, interval_n, due_point, starts_on, ends_on, cost_nature,
-	budget_class, split_mode, settle, created_at, updated_at`
+	budget_class, split_mode, settle, external_id, created_at, updated_at`
 
 func scanBooking(sc scanner) (Booking, error) {
 	var (
@@ -29,7 +29,8 @@ func scanBooking(sc scanner) (Booking, error) {
 	err := sc.Scan(
 		&b.ID, &b.HouseholdID, &b.CategoryID, &payer, &b.Direction, &b.Name, &b.Note,
 		&b.AmountCents, &b.Frequency, &b.Interval, &b.DuePoint, &b.StartsOn, &b.EndsOn,
-		&b.CostNature, &b.BudgetClass, &b.SplitMode, &b.Settle, &b.CreatedAt, &b.UpdatedAt,
+		&b.CostNature, &b.BudgetClass, &b.SplitMode, &b.Settle, &b.ExternalID,
+		&b.CreatedAt, &b.UpdatedAt,
 	)
 	if err != nil {
 		return Booking{}, err
@@ -75,6 +76,21 @@ func (s *Store) GetBooking(ctx context.Context, householdID, id int64) (Booking,
 	return b, err
 }
 
+// GetBookingByExternalID finds the booking a caller filed under its own id.
+// An empty id never matches, so a hand-entered booking cannot be claimed.
+func (s *Store) GetBookingByExternalID(ctx context.Context, householdID int64, externalID string) (Booking, error) {
+	if externalID == "" {
+		return Booking{}, ErrNotFound
+	}
+	b, err := scanBooking(s.q.QueryRowContext(ctx,
+		`SELECT `+bookingColumns+` FROM bookings WHERE household_id = ? AND external_id = ?`,
+		householdID, externalID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return Booking{}, ErrNotFound
+	}
+	return b, err
+}
+
 // These sub-selects resolve to NULL unless the referenced row belongs to the
 // same household, so a forged id cannot create a cross-household reference.
 // category_id is NOT NULL, so a forged category is rejected by the constraint.
@@ -92,14 +108,15 @@ func (s *Store) CreateBooking(ctx context.Context, b Booking, splits []SplitInpu
 			`INSERT INTO bookings
 				(household_id, category_id, payer_member_id, direction, name, note,
 				 amount_cents, frequency, interval_n, due_point, starts_on, ends_on,
-				 cost_nature, budget_class, split_mode, settle, created_at, updated_at)
-			 VALUES (?, `+categoryRef+`, `+memberRef+`, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				 cost_nature, budget_class, split_mode, settle, external_id, created_at, updated_at)
+			 VALUES (?, `+categoryRef+`, `+memberRef+`, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			b.HouseholdID,
 			b.CategoryID, b.HouseholdID,
 			nullInt(b.PayerMemberID), b.HouseholdID,
 			string(b.Direction), b.Name, b.Note, b.AmountCents,
 			string(b.Frequency), b.Interval, string(b.DuePoint), b.StartsOn, b.EndsOn,
-			string(b.CostNature), string(b.BudgetClass), string(b.SplitMode), b.Settle, ts, ts,
+			string(b.CostNature), string(b.BudgetClass), string(b.SplitMode), b.Settle,
+			b.ExternalID, ts, ts,
 		)
 		if err != nil {
 			return err
@@ -132,13 +149,15 @@ func (s *Store) SaveBooking(ctx context.Context, b Booking, splits []SplitInput,
 				category_id = `+categoryRef+`, payer_member_id = `+memberRef+`,
 				direction = ?, name = ?, note = ?, amount_cents = ?, frequency = ?,
 				interval_n = ?, due_point = ?, starts_on = ?, ends_on = ?,
-				cost_nature = ?, budget_class = ?, split_mode = ?, settle = ?, updated_at = ?
+				cost_nature = ?, budget_class = ?, split_mode = ?, settle = ?,
+				external_id = ?, updated_at = ?
 			 WHERE id = ? AND household_id = ?`,
 			b.CategoryID, b.HouseholdID,
 			nullInt(b.PayerMemberID), b.HouseholdID,
 			string(b.Direction), b.Name, b.Note, b.AmountCents, string(b.Frequency),
 			b.Interval, string(b.DuePoint), b.StartsOn, b.EndsOn, string(b.CostNature),
-			string(b.BudgetClass), string(b.SplitMode), b.Settle, now(), b.ID, b.HouseholdID,
+			string(b.BudgetClass), string(b.SplitMode), b.Settle, b.ExternalID,
+			now(), b.ID, b.HouseholdID,
 		))
 		if err != nil {
 			return err
