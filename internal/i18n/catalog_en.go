@@ -162,7 +162,7 @@ var english = Catalog{
 	"dash.owed":               "Own share",
 	"dash.shares":             "Who carries what?",
 	"dash.sharesHint":         "What the settlement is built from: split expenses count pro rata, expenses carried alone stay with the payer.",
-	"dash.sharedTotal":        "Shared fixed costs",
+	"dash.sharedTotal":        "Shared costs",
 	"dash.soleTotal":          "Own costs",
 	"dash.splitAlone":         "alone",
 	"dash.booking":            "Booking",

@@ -162,7 +162,7 @@ var german = Catalog{
 	"dash.owed":               "Getragen",
 	"dash.shares":             "Wer trägt was?",
 	"dash.sharesHint":         "Grundlage des Ausgleichs: geteilte Ausgaben zählen anteilig, allein getragene bleiben beim Zahler.",
-	"dash.sharedTotal":        "Geteilte Fixkosten",
+	"dash.sharedTotal":        "Geteilte Kosten",
 	"dash.soleTotal":          "Eigene Kosten",
 	"dash.splitAlone":         "allein",
 	"dash.booking":            "Buchung",
