@@ -98,8 +98,58 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 					</form>
 				</div>
 			</div>
+			@dataCard()
 		</div>
 	}
+}
+
+// dataCard is where the whole book is carried out of the app and back in, and
+// where it is thrown away. A reset is final, so the backup sits next to it.
+templ dataCard() {
+	<div class="card-tight lg:col-span-2" id="data">
+		<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "settings.data") }</h2></div>
+		<div class="card-body grid gap-5 sm:grid-cols-2">
+			<div>
+				<span class="field-label">{ T(ctx, "settings.backup") }</span>
+				<p class="mb-2 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "settings.backupHint") }</p>
+				<a class="btn-primary inline-block" href="/settings/backup.json" download>{ T(ctx, "settings.backupDownload") }</a>
+			</div>
+			<div>
+				<span class="field-label">{ T(ctx, "settings.restore") }</span>
+				<p class="mb-2 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "settings.restoreHint") }</p>
+				<form
+					class="flex flex-wrap items-center gap-2"
+					hx-post="/settings/restore"
+					hx-encoding="multipart/form-data"
+					hx-swap="none"
+					hx-confirm={ T(ctx, "settings.restoreConfirm") }
+				>
+					<input class="input min-w-0 flex-1" type="file" name="snapshot" accept="application/json,.json" required/>
+					<button class="btn-ghost shrink-0" type="submit">{ T(ctx, "settings.restoreUpload") }</button>
+				</form>
+			</div>
+			<div class="danger-zone sm:col-span-2">
+				<span class="field-label">{ T(ctx, "settings.startOver") }</span>
+				<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "settings.startOverHint") }</p>
+				<div class="flex flex-wrap gap-2">
+					<button
+						class="btn-ghost"
+						type="button"
+						hx-post="/settings/reset-bookings"
+						hx-swap="none"
+						hx-confirm={ T(ctx, "settings.resetBookingsConfirm") }
+					>{ T(ctx, "settings.resetBookings") }</button>
+					<button
+						class="btn-danger"
+						type="button"
+						hx-post="/settings/reset"
+						hx-swap="none"
+						hx-confirm={ T(ctx, "settings.resetAllConfirm") }
+					>{ T(ctx, "settings.resetAll") }</button>
+				</div>
+			</div>
+		</div>
+	</div>
 }
 
 // categorySuggestions offers what a household usually books but has not created

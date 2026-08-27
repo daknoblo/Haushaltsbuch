@@ -46,6 +46,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /dashboard", s.handleDashboard)
 	mux.HandleFunc("GET /settings", s.handleSettings)
 
+	// The whole book out of the app and back in, and the way to start over.
+	mux.HandleFunc("GET /settings/backup.json", s.handleBackupDownload)
+	mux.HandleFunc("POST /settings/restore", s.handleBackupRestore)
+	mux.HandleFunc("POST /settings/reset", s.handleDataReset)
+	mux.HandleFunc("POST /settings/reset-bookings", s.handleBookingsReset)
+
 	// The pages that used to hold expenses and income now live in one place.
 	mux.HandleFunc("GET /expenses", redirectTo("/bookings"))
 	mux.HandleFunc("GET /income", redirectTo("/bookings"))

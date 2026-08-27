@@ -24,6 +24,9 @@ var migrationsFS embed.FS
 // ErrNotFound is returned when a requested row does not exist.
 var ErrNotFound = errors.New("store: not found")
 
+// ErrBadSnapshot is returned for a backup file this version cannot read.
+var ErrBadSnapshot = errors.New("store: unreadable snapshot")
+
 // ErrCategoryInUse is returned when a category still carries bookings. A
 // booking cannot exist without a category, so the reference must be moved
 // before the category can go.

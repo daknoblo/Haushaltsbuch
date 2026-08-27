@@ -103,11 +103,16 @@ func withLang(next http.Handler) http.Handler {
 	})
 }
 
-// limitBody caps the request body size of state-changing requests.
+// limitBody caps the request body size of state-changing requests. A restored
+// backup carries a whole household book and is allowed more than a form.
 func limitBody(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Body != nil && !isSafeMethod(r.Method) {
-			r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
+			limit := int64(maxRequestBody)
+			if r.URL.Path == restorePath {
+				limit = maxSnapshotBytes
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, limit)
 		}
 		next.ServeHTTP(w, r)
 	})
