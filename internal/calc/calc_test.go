@@ -2,6 +2,7 @@ package calc
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"testing"
 
@@ -398,7 +399,10 @@ func TestPeriodReportAveragesTheRange(t *testing.T) {
 	}
 }
 
-func TestPeriodReportSkipsMonthsWithoutFigures(t *testing.T) {
+// A period is a stretch of time, not a list of the months that happened to have
+// figures in them. A cost that only starts halfway through costs half as much
+// per month over the whole range, which is what makes ranges comparable.
+func TestPeriodReportDividesByEveryMonthOfTheRange(t *testing.T) {
 	d := Data{
 		Members:    members(),
 		Categories: categories(),
@@ -410,9 +414,38 @@ func TestPeriodReportSkipsMonthsWithoutFigures(t *testing.T) {
 	}
 	// The booking only exists in the last two months of the range.
 	rep := PeriodReport(d, []string{"2026-03", "2026-04", "2026-05", "2026-06"}, Everyone)
-	if rep.ExpenseCents != 60000 {
-		t.Errorf("expenses = %d, want 60000 rather than a diluted average", rep.ExpenseCents)
+	if rep.ExpenseCents != 30000 {
+		t.Errorf("expenses = %d, want 30000 for two months out of four", rep.ExpenseCents)
 	}
+}
+
+// The figures of the household book this was modeled on: a salary paid in
+// three months of the year averages to a twelfth of the year, not a third.
+func TestYearAverageCountsEmptyMonths(t *testing.T) {
+	d := Data{
+		Members:    members(),
+		Categories: categories(),
+		Bookings: []store.Booking{
+			{ID: 1, CategoryID: 10, Direction: store.DirIncome, AmountCents: 370100,
+				Frequency: store.FreqOnce, StartsOn: "2026-01-15", SplitMode: store.SplitEqual},
+			{ID: 2, CategoryID: 10, Direction: store.DirIncome, AmountCents: 454100,
+				Frequency: store.FreqOnce, StartsOn: "2026-02-15", SplitMode: store.SplitEqual},
+			{ID: 3, CategoryID: 10, Direction: store.DirIncome, AmountCents: 360500,
+				Frequency: store.FreqOnce, StartsOn: "2026-03-15", SplitMode: store.SplitEqual},
+		},
+	}
+	rep := PeriodReport(d, calendarYear(2026), Everyone)
+	if rep.IncomeCents != 98725 {
+		t.Errorf("income = %d, want 98725 (1.184.700 / 12)", rep.IncomeCents)
+	}
+}
+
+func calendarYear(y int) []string {
+	out := make([]string, 0, 12)
+	for m := 1; m <= 12; m++ {
+		out = append(out, fmt.Sprintf("%d-%02d", y, m))
+	}
+	return out
 }
 
 func TestFixedCostsAverageAndLimit(t *testing.T) {

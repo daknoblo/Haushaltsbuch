@@ -321,7 +321,7 @@ func Trend(d Data, months []string, member int64) []MonthReport {
 // month, so every breakdown answers for the selected period instead of only
 // its last month. A single-month range yields exactly BuildMonthReport.
 func PeriodReport(d Data, months []string, member int64) MonthReport {
-	rep := average(Trend(d, activeMonths(d, months), member))
+	rep := average(Trend(d, months, member))
 	rep.Member = member
 	if len(months) > 0 {
 		rep.Month = months[len(months)-1]
@@ -329,27 +329,9 @@ func PeriodReport(d Data, months []string, member int64) MonthReport {
 	return rep
 }
 
-// activeMonths returns the months in which at least one booking contributes,
-// falling back to the full range when none does. A range reaching back before
-// the first booking would otherwise divide by empty months and understate
-// every average.
-func activeMonths(d Data, months []string) []string {
-	out := make([]string, 0, len(months))
-	for _, m := range months {
-		for _, b := range d.Bookings {
-			if AmountFor(b, d.Overrides[b.ID], m) != 0 && ActiveIn(b, m) {
-				out = append(out, m)
-				break
-			}
-		}
-	}
-	if len(out) == 0 {
-		return months
-	}
-	return out
-}
-
-// average merges month reports into the figures of a typical month.
+// average merges month reports into the figures of a typical month. It divides
+// by every month of the range, empty ones included: a year with three months of
+// salary in it earns a twelfth of that salary per month, not a third.
 func average(reps []MonthReport) MonthReport {
 	out := MonthReport{
 		ByCostNature:  make(map[store.CostNature]int64),
@@ -438,15 +420,14 @@ func averageTotals(reps []MonthReport, n int64, pick func(MonthReport) []Labeled
 // largest first, because that is the list worth renegotiating. A limit of 0
 // keeps all of them.
 func FixedCosts(d Data, months []string, member int64, limit int) []LabeledTotal {
-	active := activeMonths(d, months)
-	n := int64(len(active))
+	n := int64(len(months))
 	if n == 0 {
 		return nil
 	}
 
 	sums := make(map[int64]int64)
 	out := make([]LabeledTotal, 0, len(d.Bookings))
-	for _, m := range active {
+	for _, m := range months {
 		for _, b := range d.Bookings {
 			if b.Direction != store.DirExpense || b.CostNature != store.CostFix || !ActiveIn(b, m) {
 				continue

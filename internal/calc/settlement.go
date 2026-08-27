@@ -128,8 +128,7 @@ func (r SettlementReport) Ledger(member int64) []LedgerLine {
 // settled is deliberately left out, and one nobody carries settles nothing —
 // counting what was fronted for it would leave the payer owed by no one.
 func Settlement(d Data, months []string) SettlementReport {
-	active := activeMonths(d, months)
-	n := int64(len(active))
+	n := int64(len(months))
 	if n == 0 || len(d.Members) == 0 {
 		return SettlementReport{}
 	}
@@ -140,7 +139,7 @@ func Settlement(d Data, months []string) SettlementReport {
 	perBooking := make(map[int64]map[int64]int64, len(d.Bookings))
 	order := make([]store.Booking, 0, len(d.Bookings))
 
-	for _, m := range active {
+	for _, m := range months {
 		for _, b := range d.Bookings {
 			if b.Direction != store.DirExpense || !b.Settle || b.PayerMemberID == nil || !ActiveIn(b, m) {
 				continue
