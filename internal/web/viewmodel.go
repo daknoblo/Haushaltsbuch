@@ -806,6 +806,8 @@ type SettingsVM struct {
 	Suggestions []store.SeedCategory
 	Icons       []string
 	Carry       CarryVM
+	Stats       store.Stats
+	Plan        calc.MonthReport
 }
 
 // UsageOf returns how many bookings still reference a category.

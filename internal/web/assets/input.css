@@ -325,6 +325,16 @@
     @apply rounded-lg border-l-4 bg-slate-50 px-3 py-2 dark:bg-slate-800/40;
   }
 
+  /* The inventory of the book, in tiles that reflow rather than a table: the
+     figures have nothing to do with each other column by column. */
+  .stat-grid {
+    @apply grid grid-cols-2 gap-3 sm:grid-cols-4;
+  }
+
+  .stat-cell {
+    @apply rounded-lg border border-slate-200 px-3 py-2.5 dark:border-slate-800;
+  }
+
   /* One booking of the yearly review: tick, name, when it stops, what it costs. */
   .carry-row {
     @apply flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/40;

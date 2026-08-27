@@ -115,6 +115,31 @@ func NormalizeMonth(ym string) string {
 	return CurrentMonth()
 }
 
+// FormatStamp renders a stored RFC 3339 timestamp as a local date and time.
+func FormatStamp(s string) string {
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return s
+	}
+	return t.Local().Format("02.01.2006, 15:04")
+}
+
+// FormatBytes renders a size the way a person reads it. Kibibytes, because the
+// figure comes from the database's own page arithmetic.
+func FormatBytes(n int64) string {
+	const unit = 1024
+	if n < unit {
+		return strconv.FormatInt(n, 10) + " B"
+	}
+	value, exp := float64(n)/unit, 0
+	for value >= unit && exp < 2 {
+		value /= unit
+		exp++
+	}
+	s := strconv.FormatFloat(value, 'f', 1, 64)
+	return strings.Replace(s, ".", ",", 1) + " " + [...]string{"KiB", "MiB", "GiB"}[exp]
+}
+
 // MonthLabel returns a human-readable label for a "YYYY-MM" string in the
 // language of ctx (e.g. "Juli 2026").
 func MonthLabel(ctx context.Context, ym string) string {

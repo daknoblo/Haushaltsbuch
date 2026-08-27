@@ -519,5 +519,13 @@ func (s *Server) buildSettingsVM(ctx context.Context) (SettingsVM, error) {
 	if vm.Carry, err = s.buildCarryVM(ctx, activeID, vm.Categories); err != nil {
 		return SettingsVM{}, err
 	}
+	if vm.Stats, err = s.store.Stats(ctx, activeID); err != nil {
+		return SettingsVM{}, err
+	}
+	data, err := s.loadHouseholdData(ctx, activeID)
+	if err != nil {
+		return SettingsVM{}, err
+	}
+	vm.Plan = calc.PeriodReport(data, []string{CurrentMonth()}, calc.Everyone)
 	return vm, nil
 }

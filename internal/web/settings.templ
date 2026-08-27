@@ -101,6 +101,7 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 			if vm.Carry.Pending() {
 				@carryCard(vm.Carry)
 			}
+			@statsCard(vm)
 			@dataCard()
 		</div>
 	}
@@ -135,6 +136,56 @@ templ carryCard(vm CarryVM) {
 				<button class="btn-primary mt-3" type="submit">{ Tf(ctx, "settings.carryApply", vm.YearStr()) }</button>
 			</form>
 		</div>
+	</div>
+}
+
+// statsCard is an inventory of the book. It counts what is in it rather than
+// what the money does, which the evaluation already answers; the two figures
+// that overlap are here because a book is also worth knowing the size of.
+templ statsCard(vm SettingsVM) {
+	<div class="card-tight lg:col-span-2" id="stats">
+		<div class="card-head">
+			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "settings.stats") }</h2>
+			<span class="badge ml-auto">{ FormatBytes(vm.Stats.SizeBytes) }</span>
+		</div>
+		<div class="card-body">
+			<div class="stat-grid">
+				@statCell(T(ctx, "settings.statBookings"), strconv.Itoa(vm.Stats.Bookings),
+					Tf(ctx, "settings.statRhythm", vm.Stats.Recurring, vm.Stats.OneOff()), "")
+				@statCell(T(ctx, "overview.income"), FormatEUR(vm.Plan.IncomeCents),
+					T(ctx, "dash.perMonth"), "text-emerald-600 dark:text-emerald-400")
+				@statCell(T(ctx, "overview.expenses"), FormatEUR(vm.Plan.ExpenseCents),
+					T(ctx, "dash.perMonth"), "text-rose-600 dark:text-rose-400")
+				@statCell(T(ctx, "dash.surplus"), FormatEUR(vm.Plan.BalanceCents),
+					T(ctx, "dash.perMonth"), "text-indigo-600 dark:text-indigo-400")
+				@statCell(T(ctx, "settings.categories"), strconv.Itoa(vm.Stats.Categories),
+					Tf(ctx, "settings.statUnused", vm.Stats.UnusedCategories), "")
+				@statCell(T(ctx, "settings.tags"), strconv.Itoa(vm.Stats.Tags),
+					Tf(ctx, "settings.statUnused", vm.Stats.UnusedTags), "")
+				@statCell(T(ctx, "overview.people"), strconv.Itoa(vm.Stats.Members),
+					Tf(ctx, "settings.statSplits", vm.Stats.Splits), "")
+				@statCell(T(ctx, "settings.households"), strconv.Itoa(vm.Stats.Households), "", "")
+			</div>
+			<div class="mt-4 grid gap-1 border-t border-slate-200/70 pt-3 text-xs text-slate-500 dark:border-slate-800/60 dark:text-slate-400">
+				if vm.Stats.FirstMonth != "" {
+					<span>{ Tf(ctx, "settings.statSpan", FormatDate(vm.Stats.FirstMonth), FormatDate(vm.Stats.LastMonth)) }</span>
+				}
+				if vm.Stats.Overrides > 0 {
+					<span>{ Tf(ctx, "settings.statOverrides", vm.Stats.Overrides) }</span>
+				}
+				if vm.Stats.UpdatedAt != "" {
+					<span>{ Tf(ctx, "settings.statChanged", FormatStamp(vm.Stats.UpdatedAt)) }</span>
+				}
+			</div>
+		</div>
+	</div>
+}
+
+templ statCell(label, value, hint, tone string) {
+	<div class="stat-cell">
+		<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ label }</div>
+		<div class={ "tnum mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100", tone }>{ value }</div>
+		<div class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">{ hint }</div>
 	</div>
 }
 
