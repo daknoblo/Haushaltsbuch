@@ -283,6 +283,85 @@
     @apply inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400;
   }
 
+  /* The surplus line of the trend chart. */
+  .chart-zero {
+    @apply stroke-slate-300 dark:stroke-slate-700;
+    stroke-width: 1;
+  }
+  .chart-line {
+    @apply stroke-slate-500 dark:stroke-slate-400;
+    fill: none;
+    stroke-width: 2;
+  }
+  .chart-dot {
+    @apply fill-slate-600 dark:fill-slate-300;
+  }
+  .chart-value {
+    @apply fill-slate-600 stroke-white stroke-[3px] text-[10px] font-medium [paint-order:stroke] dark:fill-slate-300 dark:stroke-slate-900;
+  }
+  .chart-segment {
+    @apply fill-white text-[9px] font-medium;
+  }
+
+  /* The year matrix. Fourteen columns never fit a phone, so the table scrolls
+     sideways and the caption column stays put. */
+  .matrix-scroll {
+    @apply -mx-4 overflow-x-auto px-4;
+  }
+  .matrix {
+    @apply w-full border-collapse text-sm;
+  }
+  .matrix-head {
+    @apply whitespace-nowrap border-b border-slate-200 px-2 py-2 text-xs font-medium uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400;
+  }
+  .matrix-cell {
+    @apply tnum whitespace-nowrap px-2 py-1.5 font-normal text-slate-700 dark:text-slate-300;
+  }
+  .matrix-sticky {
+    @apply sticky left-0 z-10 bg-white dark:bg-slate-900;
+  }
+  .matrix-band-head {
+    @apply border-y border-slate-200 bg-slate-50 px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-300;
+  }
+  .matrix-band .matrix-band-head.matrix-sticky {
+    @apply bg-slate-50 dark:bg-slate-800/60;
+  }
+  .matrix-row:hover .matrix-cell {
+    @apply bg-slate-50 dark:bg-slate-800/40;
+  }
+  .matrix-child .matrix-cell {
+    @apply pl-6 text-xs text-slate-500 dark:text-slate-400;
+  }
+  /* A category folds its bookings away until asked. A <details> cannot wrap
+     table rows, so the state lives on a checkbox the group reads with :has(). */
+  .matrix-group .matrix-child {
+    @apply hidden;
+  }
+  .matrix-group:has(input[type="checkbox"]:checked) .matrix-child {
+    @apply table-row;
+  }
+  .matrix-toggle {
+    @apply inline-flex cursor-pointer select-none items-center gap-1.5;
+  }
+  .matrix-caret {
+    @apply inline-block text-slate-400 transition-transform dark:text-slate-500;
+  }
+  .matrix-group:has(input[type="checkbox"]:checked) .matrix-caret {
+    @apply rotate-90;
+  }
+  .matrix-share .matrix-cell {
+    @apply py-0.5 text-xs text-slate-400 dark:text-slate-500;
+  }
+  .matrix-total .matrix-cell {
+    @apply border-t border-slate-200 font-semibold text-slate-900 dark:border-slate-800 dark:text-slate-100;
+  }
+  .matrix-summary .matrix-cell {
+    @apply border-t-2 border-slate-300 dark:border-slate-700;
+  }
+  .matrix-surplus .matrix-cell {
+    @apply text-indigo-700 dark:text-indigo-300;
+  }
+
   /* A selectable chip. The checked state is styled here rather than rendered,
      because auto-save answers without markup and never repaints a class. */
   .split-member {

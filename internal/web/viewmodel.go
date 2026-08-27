@@ -557,6 +557,56 @@ func ChartViewBox(c calc.TrendChart) string {
 	return "0 0 " + Coord(c.Width) + " " + Coord(c.Height)
 }
 
+// StackViewBox returns the SVG viewBox of the stacked chart.
+func StackViewBox(c calc.StackChart) string {
+	return "0 0 " + Coord(c.Width) + " " + Coord(c.Height)
+}
+
+// ChartLinePoints joins the surplus points into a polyline.
+func ChartLinePoints(c calc.TrendChart) string {
+	var b strings.Builder
+	for i, p := range c.Line {
+		if i > 0 {
+			b.WriteString(" ")
+		}
+		b.WriteString(Coord(p.X) + "," + Coord(p.Y))
+	}
+	return b.String()
+}
+
+// ChartLabelY keeps a surplus figure clear of its own point: above it while the
+// month is in the black, below it once it is in the red.
+func ChartLabelY(p calc.ChartPoint) float64 {
+	if p.Cents < 0 {
+		return p.Y + 14
+	}
+	return p.Y - 8
+}
+
+// StackSegmentTitle names one block of a column for the tooltip.
+func StackSegmentTitle(ctx context.Context, col calc.StackColumn, seg calc.StackSegment) string {
+	label := seg.Label
+	if seg.LabelKey != "" {
+		label = T(ctx, seg.LabelKey)
+	}
+	return MonthShort(ctx, col.Month) + " · " + label + ": " + FormatEUR(seg.Cents)
+}
+
+// MatrixSpan is how many columns follow the row caption, so a band heading can
+// stretch across the rest of the table.
+func MatrixSpan(m calc.Matrix) string {
+	return strconv.Itoa(len(m.Months) + 3)
+}
+
+// MatrixCell leaves a zero blank. A year of mostly empty cells is unreadable
+// when every one of them says 0,00 €.
+func MatrixCell(cents int64) string {
+	if cents == 0 {
+		return ""
+	}
+	return FormatEURShort(cents)
+}
+
 // Coord formats a layout coordinate for an SVG attribute.
 func Coord(v float64) string {
 	return strconv.FormatFloat(v, 'f', 2, 64)
@@ -589,11 +639,15 @@ type DashboardVM struct {
 	HouseholdReport calc.MonthReport
 	Trend           []calc.MonthReport
 	Chart           calc.TrendChart
+	Stack           calc.StackChart
+	Matrix          calc.Matrix
 	Sankey          calc.Sankey
 	FixedTop        []calc.LabeledTotal
 	Periods         []PeriodOption
+	Groupings       []PeriodOption
 	PeriodKey       string
 	PeriodLabel     string
+	Grouping        string
 	RangeLabel      string
 	PrevURL         string
 	NextURL         string

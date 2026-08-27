@@ -108,7 +108,7 @@ func Layout(nav Nav) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<main class=\"mx-auto max-w-7xl px-4 pb-16 pt-6\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<main class=\"mx-auto max-w-[110rem] px-4 pb-16 pt-6\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -184,7 +184,7 @@ func topbar(nav Nav) templ.Component {
 			templ_7745c5c3_Var10 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<header class=\"border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/60\"><div class=\"mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3\"><a href=\"/\" class=\"flex items-center gap-2 text-lg font-semibold tracking-tight text-slate-900 transition hover:text-indigo-600 dark:text-slate-100 dark:hover:text-indigo-400\"><span class=\"grid h-7 w-7 place-items-center rounded-lg bg-indigo-500 text-sm font-bold text-white\">H</span> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<header class=\"border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/60\"><div class=\"mx-auto flex max-w-[110rem] flex-wrap items-center gap-3 px-4 py-3\"><a href=\"/\" class=\"flex items-center gap-2 text-lg font-semibold tracking-tight text-slate-900 transition hover:text-indigo-600 dark:text-slate-100 dark:hover:text-indigo-400\"><span class=\"grid h-7 w-7 place-items-center rounded-lg bg-indigo-500 text-sm font-bold text-white\">H</span> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

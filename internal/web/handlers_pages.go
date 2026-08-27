@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -72,7 +73,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	var vm DashboardVM
 	if nav.ActiveHousehold.ID != 0 {
 		vm, err = s.buildDashboardVM(r.Context(), nav.ActiveHousehold.ID, nav.Month,
-			r.URL.Query().Get("p"), parseID(r.URL.Query().Get("view")))
+			r.URL.Query().Get("p"), parseID(r.URL.Query().Get("view")), r.URL.Query().Get("g"))
 		if err != nil {
 			s.serverError(w, r, err)
 			return
@@ -286,7 +287,10 @@ func lessName(a, b string) bool {
 }
 
 // periodMonths is how many months each period key spans.
-var periodMonths = map[string]int{"1m": 1, "2m": 2, "3m": 3, "6m": 6, "12m": 12}
+var periodMonths = map[string]int{"1m": 1, "2m": 2, "3m": 3, "6m": 6, periodYear: 12}
+
+// periodYear covers the calendar year rather than a window around the anchor.
+const periodYear = "12m"
 
 // periodOrder keeps the selector in a sensible order, which a map cannot.
 var periodOrder = []struct{ key, label string }{
@@ -294,7 +298,7 @@ var periodOrder = []struct{ key, label string }{
 	{"2m", "dash.range2m"},
 	{"3m", "dash.rangeQuarter"},
 	{"6m", "dash.rangeHalf"},
-	{"12m", "dash.rangeYear"},
+	{periodYear, "dash.rangeYear"},
 }
 
 // cleanPeriod falls back to a single month for anything unknown.
@@ -308,8 +312,14 @@ func cleanPeriod(key string) string {
 // rangeMonths returns the months a period covers, centered on the anchor month
 // so the month you picked stays in the middle of the chart. An even span puts
 // the extra month after it, because a plan looks forward rather than back.
+// The year is the exception: a household book is kept per calendar year, and a
+// window running from March to February compares against nothing.
 func rangeMonths(key, anchor string) []string {
-	n := periodMonths[cleanPeriod(key)]
+	key = cleanPeriod(key)
+	if key == periodYear {
+		return calendarYear(anchor)
+	}
+	n := periodMonths[key]
 	out := make([]string, n)
 	back := (n - 1) / 2
 	for i := range out {
@@ -318,29 +328,43 @@ func rangeMonths(key, anchor string) []string {
 	return out
 }
 
-// dashboardURL builds a link that keeps every dashboard control in the query,
-// so switching one of them does not reset the others.
-func dashboardURL(month, period string, member int64) string {
-	return "/dashboard?m=" + month + "&p=" + cleanPeriod(period) +
-		"&view=" + strconv.FormatInt(member, 10)
+// calendarYear returns January to December of the anchor's year.
+func calendarYear(anchor string) []string {
+	year := NormalizeMonth(anchor)[:4]
+	out := make([]string, 0, 12)
+	for m := 1; m <= 12; m++ {
+		out = append(out, fmt.Sprintf("%s-%02d", year, m))
+	}
+	return out
 }
 
-// Canvas sizes in user space; both SVGs scale to their container.
+// dashboardURL builds a link that keeps every dashboard control in the query,
+// so switching one of them does not reset the others.
+func dashboardURL(month, period string, member int64, grouping string) string {
+	return "/dashboard?m=" + month + "&p=" + cleanPeriod(period) +
+		"&view=" + strconv.FormatInt(member, 10) +
+		"&g=" + calc.CleanGrouping(grouping)
+}
+
+// Canvas sizes in user space; the SVGs scale to their container.
 const (
 	sankeyWidth  = 900.0
 	sankeyHeight = 460.0
 	chartWidth   = 760.0
 	chartHeight  = 260.0
+	stackWidth   = 900.0
+	stackHeight  = 320.0
 	fixedCostTop = 8
 )
 
-func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month, period string, member int64) (DashboardVM, error) {
+func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month, period string, member int64, grouping string) (DashboardVM, error) {
 	data, err := s.loadHouseholdData(ctx, householdID)
 	if err != nil {
 		return DashboardVM{}, err
 	}
 	period = cleanPeriod(period)
 	member = knownMember(data.Members, member)
+	grouping = calc.CleanGrouping(grouping)
 	months := rangeMonths(period, month)
 	span := len(months)
 
@@ -349,8 +373,9 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 		Trend:      calc.Trend(data, months, member),
 		PeriodKey:  period,
 		ViewMember: member,
-		PrevURL:    dashboardURL(ShiftMonth(month, -span), period, member),
-		NextURL:    dashboardURL(ShiftMonth(month, span), period, member),
+		Grouping:   grouping,
+		PrevURL:    dashboardURL(ShiftMonth(month, -span), period, member, grouping),
+		NextURL:    dashboardURL(ShiftMonth(month, span), period, member, grouping),
 		RangeLabel: rangeLabel(ctx, months),
 	}
 	// In the household view both scopes are the same figure, so it is only
@@ -369,7 +394,18 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 			Key:    p.key,
 			Label:  label,
 			Active: p.key == period,
-			URL:    dashboardURL(month, p.key, member),
+			URL:    dashboardURL(month, p.key, member, grouping),
+		})
+	}
+	for _, g := range []struct{ key, label string }{
+		{calc.GroupCategory, "dash.byCategory"},
+		{calc.GroupClass, "dash.byClass"},
+	} {
+		vm.Groupings = append(vm.Groupings, PeriodOption{
+			Key:    g.key,
+			Label:  T(ctx, g.label),
+			Active: g.key == grouping,
+			URL:    dashboardURL(month, period, member, g.key),
 		})
 	}
 
@@ -377,7 +413,7 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 		Member: calc.Everyone,
 		Label:  T(ctx, "dash.viewHousehold"),
 		Active: member == calc.Everyone,
-		URL:    dashboardURL(month, period, calc.Everyone),
+		URL:    dashboardURL(month, period, calc.Everyone, grouping),
 	})
 	for _, m := range data.Members {
 		vm.Views = append(vm.Views, ViewOption{
@@ -385,11 +421,13 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 			Label:  m.Name,
 			Color:  m.Color,
 			Active: member == m.ID,
-			URL:    dashboardURL(month, period, m.ID),
+			URL:    dashboardURL(month, period, m.ID, grouping),
 		})
 	}
 
 	vm.Chart = calc.BuildTrendChart(vm.Trend, chartWidth, chartHeight)
+	vm.Stack = calc.BuildStackChart(data, months, member, grouping, stackWidth, stackHeight)
+	vm.Matrix = calc.BuildMatrix(data, months, member)
 	vm.FixedTop = calc.FixedCosts(data, months, member, fixedCostTop)
 	vm.Sankey = calc.BuildSankey(ctx, data, vm.Report, months, sankeyWidth, sankeyHeight)
 	vm.Settlement = calc.Settlement(data, months)

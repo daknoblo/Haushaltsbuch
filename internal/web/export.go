@@ -163,7 +163,7 @@ func (s *Server) handleExportStatistics(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	month := NormalizeMonth(r.URL.Query().Get("m"))
-	vm, err := s.buildDashboardVM(r.Context(), hh.ID, month, "12m", calc.Everyone)
+	vm, err := s.buildDashboardVM(r.Context(), hh.ID, month, periodYear, calc.Everyone, calc.GroupCategory)
 	if err != nil {
 		s.serverError(w, r, err)
 		return

@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 
+	"github.com/daknoblo/Haushaltsbuch/internal/calc"
 	"github.com/daknoblo/Haushaltsbuch/internal/i18n"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
@@ -128,6 +129,33 @@ func DuePointLabel(ctx context.Context, p store.DuePoint) string {
 		return T(ctx, "bookings.dueEnd")
 	default:
 		return T(ctx, "bookings.dueStart")
+	}
+}
+
+// MatrixBandLabel names one band of the year matrix. The keys are spelled out
+// rather than assembled, so the catalog guard can see them.
+func MatrixBandLabel(ctx context.Context, key string) string {
+	switch key {
+	case calc.BandIncome:
+		return T(ctx, "matrix.band.income")
+	case calc.BandFixed:
+		return T(ctx, "matrix.band.fixed")
+	case calc.BandVariable:
+		return T(ctx, "matrix.band.variable")
+	default:
+		return T(ctx, "matrix.band.class")
+	}
+}
+
+// MatrixShareLabel names what a band's percentage row is a share of.
+func MatrixShareLabel(ctx context.Context, key string) string {
+	switch key {
+	case calc.BandFixed:
+		return T(ctx, "matrix.shareOf.fixed")
+	case calc.BandVariable:
+		return T(ctx, "matrix.shareOf.variable")
+	default:
+		return T(ctx, "matrix.shareOf.income")
 	}
 }
 

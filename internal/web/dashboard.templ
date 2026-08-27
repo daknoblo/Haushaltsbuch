@@ -21,6 +21,8 @@ templ DashboardPage(nav Nav, vm DashboardVM) {
 				@viewSwitch(vm)
 				@chartCard(vm)
 				@headlineTiles(vm)
+				@matrixCard(vm)
+				@stackCard(vm)
 				if vm.ShowSettlement() {
 					@settlementCard(vm)
 					@shareCard(vm)
@@ -86,9 +88,10 @@ templ chartCard(vm DashboardVM) {
 			<p class="text-center text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.noData") }</p>
 		} else {
 			@trendChart(vm.Chart)
-			<div class="mt-3 flex items-center justify-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+			<div class="mt-3 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-500 dark:text-slate-400">
 				<span class="flex items-center gap-1.5"><span class="dot bg-emerald-500"></span>{ T(ctx, "overview.income") }</span>
 				<span class="flex items-center gap-1.5"><span class="dot bg-indigo-500"></span>{ T(ctx, "overview.expenses") }</span>
+				<span class="flex items-center gap-1.5"><span class="dot bg-slate-500"></span>{ T(ctx, "dash.surplus") }</span>
 			</div>
 		}
 	</div>
@@ -120,6 +123,212 @@ templ trendChart(c calc.TrendChart) {
 				</rect>
 			}
 		</g>
+		<g>
+			<line class="chart-zero" x1={ Coord(c.Left) } y1={ Coord(c.Zero) } x2={ Coord(c.Right) } y2={ Coord(c.Zero) }></line>
+			<polyline class="chart-line" points={ ChartLinePoints(c) }></polyline>
+			for _, p := range c.Line {
+				<circle class="chart-dot" cx={ Coord(p.X) } cy={ Coord(p.Y) } r="3"></circle>
+				<text class="chart-value" x={ Coord(p.X) } y={ Coord(ChartLabelY(p)) } text-anchor="middle">
+					{ FormatEURShort(p.Cents) }
+				</text>
+			}
+		</g>
+		<g>
+			for _, t := range c.Ticks {
+				<text class="chart-label" x={ Coord(t.X) } y={ Coord(c.Bottom + 15) } text-anchor="middle">
+					{ MonthShort(ctx, t.Month) }
+				</text>
+			}
+		</g>
+	</svg>
+}
+
+// matrixCard is the year at a glance: what every category cost in every month,
+// with its bookings a click away. The other cards answer what a household
+// spends; this one answers when.
+templ matrixCard(vm DashboardVM) {
+	<div class="card">
+		<div class="card-head">
+			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "matrix.title") }</h2>
+			<span class="badge ml-auto">{ vm.RangeLabel }</span>
+		</div>
+		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "matrix.hint") }</p>
+		if vm.Matrix.Empty() {
+			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.noData") }</p>
+		} else {
+			<div class="matrix-scroll">
+				<table class="matrix">
+					<thead>
+						<tr>
+							<th class="matrix-head matrix-sticky text-left">{ T(ctx, "matrix.row") }</th>
+							for _, m := range vm.Matrix.Months {
+								<th class="matrix-head text-right">{ MonthShort(ctx, m) }</th>
+							}
+							<th class="matrix-head text-right">{ T(ctx, "matrix.total") }</th>
+							<th class="matrix-head text-right">{ T(ctx, "matrix.mean") }</th>
+							<th class="matrix-head text-right">{ T(ctx, "matrix.median") }</th>
+						</tr>
+					</thead>
+					for _, band := range vm.Matrix.Bands {
+						@matrixBand(vm, band)
+					}
+					<tbody class="matrix-summary">
+						@matrixLine(vm, vm.Matrix.Expense, "")
+						@matrixLine(vm, vm.Matrix.Target, "")
+						@matrixLine(vm, vm.Matrix.Surplus, "matrix-surplus")
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+}
+
+templ matrixBand(vm DashboardVM, band calc.MatrixBand) {
+	<tbody class="matrix-band">
+		<tr>
+			<th class="matrix-band-head matrix-sticky text-left" colspan="1">{ MatrixBandLabel(ctx, band.Key) }</th>
+			<td class="matrix-band-head" colspan={ MatrixSpan(vm.Matrix) }></td>
+		</tr>
+	</tbody>
+	for _, row := range band.Rows {
+		// One group per category, so a checkbox and :has() can fold its bookings
+		// away. A <details> cannot wrap table rows.
+		<tbody class="matrix-group">
+			<tr class="matrix-row">
+				<th class="matrix-cell matrix-sticky text-left">
+					if len(row.Children) > 0 {
+						<label class="matrix-toggle">
+							<input type="checkbox" class="sr-only"/>
+							<span class="matrix-caret" aria-hidden="true">›</span>
+							@matrixDot(row)
+							@matrixLabel(row)
+						</label>
+					} else {
+						@matrixDot(row)
+						@matrixLabel(row)
+					}
+				</th>
+				@matrixCells(row)
+			</tr>
+			for _, child := range row.Children {
+				<tr class="matrix-child">
+					<th class="matrix-cell matrix-sticky text-left">{ child.Label }</th>
+					@matrixCells(child)
+				</tr>
+			}
+			if band.Key != calc.BandIncome {
+				<tr class="matrix-share">
+					<th class="matrix-cell matrix-sticky text-left">{ MatrixShareLabel(ctx, band.Key) }</th>
+					for _, p := range row.Share {
+						<td class="matrix-cell text-right">{ FormatPercent(p) }</td>
+					}
+					<td class="matrix-cell text-right">{ FormatPercent(row.ShareTotal) }</td>
+					<td class="matrix-cell"></td>
+					<td class="matrix-cell"></td>
+				</tr>
+			}
+		</tbody>
+	}
+	<tbody>
+		<tr class="matrix-total">
+			<th class="matrix-cell matrix-sticky text-left">@matrixLabel(band.Total)</th>
+			@matrixCells(band.Total)
+		</tr>
+	</tbody>
+}
+
+templ matrixLine(vm DashboardVM, row calc.MatrixRow, extra string) {
+	<tr class={ "matrix-total", extra }>
+		<th class="matrix-cell matrix-sticky text-left">@matrixLabel(row)</th>
+		@matrixCells(row)
+	</tr>
+}
+
+templ matrixCells(row calc.MatrixRow) {
+	for _, c := range row.Cents {
+		<td class="matrix-cell text-right">{ MatrixCell(c) }</td>
+	}
+	// The three summary columns spell out a zero: a median of nothing is the
+	// point of showing a median next to a mean.
+	<td class="matrix-cell text-right font-medium">{ FormatEURShort(row.TotalCents) }</td>
+	<td class="matrix-cell text-right">{ FormatEURShort(row.MeanCents) }</td>
+	<td class="matrix-cell text-right">{ FormatEURShort(row.MedianCents) }</td>
+}
+
+templ matrixLabel(row calc.MatrixRow) {
+	if row.LabelKey != "" {
+		{ T(ctx, row.LabelKey) }
+	} else {
+		{ row.Label }
+	}
+}
+
+templ matrixDot(row calc.MatrixRow) {
+	if row.Color != "" {
+		@memberDot(row.Color)
+	}
+}
+
+// stackCard compares the months by height and reads them by color, grouped
+// either by category or by the third of the 50/30/20 rule they land in.
+templ stackCard(vm DashboardVM) {
+	<div class="card">
+		<div class="card-head">
+			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.stackTitle") }</h2>
+			<div class="ml-auto flex flex-wrap items-center gap-1 no-print">
+				for _, g := range vm.Groupings {
+					if g.Active {
+						<span class="period-chip period-chip-active">{ g.Label }</span>
+					} else {
+						<a class="period-chip" href={ templ.SafeURL(g.URL) }>{ g.Label }</a>
+					}
+				}
+			</div>
+		</div>
+		if vm.Stack.Empty() {
+			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.noData") }</p>
+		} else {
+			@stackChart(vm.Stack)
+			<div class="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+				for _, k := range vm.Stack.Keys {
+					<span class="flex items-center gap-1.5">
+						@memberDot(k.Color)
+						if k.LabelKey != "" {
+							{ T(ctx, k.LabelKey) }
+						} else {
+							{ k.Label }
+						}
+					</span>
+				}
+			</div>
+		}
+	</div>
+}
+
+templ stackChart(c calc.StackChart) {
+	<svg class="h-auto w-full" viewBox={ StackViewBox(c) } role="img" aria-label={ T(ctx, "dash.stackTitle") }>
+		<g class="chart-grid">
+			for _, g := range c.Grid {
+				<line x1={ Coord(c.Left) } y1={ Coord(g.Y) } x2={ Coord(c.Right) } y2={ Coord(g.Y) }></line>
+				<text class="chart-label" x={ Coord(c.Left - 8) } y={ Coord(g.Y) } text-anchor="end" dominant-baseline="middle">
+					{ FormatCents(g.Cents) }
+				</text>
+			}
+		</g>
+		for _, col := range c.Columns {
+			<g>
+				for _, seg := range col.Segments {
+					<rect x={ Coord(seg.X) } y={ Coord(seg.Y) } width={ Coord(seg.Width) } height={ Coord(seg.Height) } fill={ ColorOr(seg.Color) }>
+						<title>{ StackSegmentTitle(ctx, col, seg) }</title>
+					</rect>
+					if seg.Labeled {
+						<text class="chart-segment" x={ Coord(seg.X + seg.Width/2) } y={ Coord(seg.Y + seg.Height/2) } text-anchor="middle" dominant-baseline="middle">
+							{ FormatEURShort(seg.Cents) }
+						</text>
+					}
+				}
+			</g>
+		}
 		<g>
 			for _, t := range c.Ticks {
 				<text class="chart-label" x={ Coord(t.X) } y={ Coord(c.Bottom + 15) } text-anchor="middle">
@@ -379,7 +588,8 @@ templ savingsCard(vm DashboardVM) {
 
 // budgetClassBar measures against net income, because that is what the
 // 50/30/20 rule divides up. Spending past it therefore fills the bar and is
-// named underneath rather than being scaled away.templ budgetClassBar(rep calc.MonthReport) {
+// named underneath rather than being scaled away.
+templ budgetClassBar(rep calc.MonthReport) {
 	<div class="flex h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
 		<div class="bg-indigo-500" style={ "width:" + BarWidth(rep.ByBudgetClass[store.ClassNeed], rep.IncomeCents) }></div>
 		<div class="bg-amber-500" style={ "width:" + BarWidth(rep.ByBudgetClass[store.ClassWant], rep.IncomeCents) }></div>
