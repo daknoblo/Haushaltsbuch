@@ -2,6 +2,7 @@ package web
 
 import (
 	"compress/gzip"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -258,7 +259,8 @@ func (s *Server) recoverer(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if rec := recover(); rec != nil {
-				s.logger.Error("panic recovered", "err", rec, "path", logsafe.Value(r.URL.Path))
+				s.logger.Error("panic recovered", "err", logsafe.Value(fmt.Sprint(rec)),
+					"path", logsafe.Value(r.URL.Path))
 				s.clientError(w, r, http.StatusInternalServerError, "error.internal")
 			}
 		}()

@@ -149,6 +149,10 @@ jobs:
         uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
         with:
           sarif_file: trivy-results.sarif
+          # Without a category every tool uploads into the same analysis, so the
+          # next CodeQL run looks like a Trivy run that suddenly found nothing
+          # and Trivy's own findings can never be marked fixed.
+          category: trivy-image
 
   github-release:
     name: GitHub release

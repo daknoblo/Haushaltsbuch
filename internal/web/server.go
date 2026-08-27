@@ -173,12 +173,13 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, c templ.Componen
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	if err := c.Render(r.Context(), w); err != nil {
-		s.logger.Error("render failed", "err", err, "path", logsafe.Value(r.URL.Path))
+		s.logger.Error("render failed", "err", logsafe.Value(err.Error()),
+			"path", logsafe.Value(r.URL.Path))
 	}
 }
 
 func (s *Server) serverError(w http.ResponseWriter, r *http.Request, err error) {
-	s.logger.Error("request failed", "err", err,
+	s.logger.Error("request failed", "err", logsafe.Value(err.Error()),
 		"path", logsafe.Value(r.URL.Path), "method", logsafe.Value(r.Method))
 	s.clientError(w, r, http.StatusInternalServerError, "error.internal")
 }
