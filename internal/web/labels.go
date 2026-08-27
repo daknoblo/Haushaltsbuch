@@ -140,23 +140,15 @@ func MatrixBandLabel(ctx context.Context, key string) string {
 		return T(ctx, "matrix.band.income")
 	case calc.BandFixed:
 		return T(ctx, "matrix.band.fixed")
-	case calc.BandVariable:
-		return T(ctx, "matrix.band.variable")
 	default:
-		return T(ctx, "matrix.band.class")
+		return T(ctx, "matrix.band.variable")
 	}
 }
 
-// MatrixShareLabel names what a band's percentage row is a share of.
-func MatrixShareLabel(ctx context.Context, key string) string {
-	switch key {
-	case calc.BandFixed:
-		return T(ctx, "matrix.shareOf.fixed")
-	case calc.BandVariable:
-		return T(ctx, "matrix.shareOf.variable")
-	default:
-		return T(ctx, "matrix.shareOf.income")
-	}
+// MatrixShareLabel names what a percentage row is a share of. Every one of them
+// is a share of income now, so the band no longer enters into it.
+func MatrixShareLabel(ctx context.Context) string {
+	return T(ctx, "matrix.shareOf.income")
 }
 
 // BudgetClassDot is the color a class carries in the 50/30/20 bar, so the same

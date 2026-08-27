@@ -6,15 +6,12 @@ import (
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
 
-// Bands of the year matrix. A booking lands in one of the first three by its
-// direction and cost nature; every expense additionally counts towards the
-// 50/30/20 band, which is a second view of the same money rather than a fourth
-// pot.
+// Bands of the year matrix. A booking lands in one of them by its direction
+// and cost nature.
 const (
 	BandIncome   = "income"
 	BandFixed    = "fixed"
 	BandVariable = "variable"
-	BandClass    = "class"
 )
 
 // MatrixRow is one line of the year matrix: a category, one of its bookings, or
@@ -50,9 +47,6 @@ type Matrix struct {
 	Bands   []MatrixBand
 	Expense MatrixRow
 	Surplus MatrixRow
-	// Target is what the 50/30/20 rule sets aside for saving, so the class band
-	// can be read against something.
-	Target MatrixRow
 }
 
 // Empty reports whether the matrix has nothing to show.
@@ -100,7 +94,6 @@ func BuildMatrix(d Data, months []string, member int64) Matrix {
 	byBooking := make(map[rowKey]map[int64][]int64)
 	bookings := make(map[int64]store.Booking, len(d.Bookings))
 	byBand := make(map[string][]int64)
-	byClass := make(map[store.BudgetClass][]int64)
 
 	for i, month := range months {
 		for _, b := range d.Bookings {
@@ -127,7 +120,6 @@ func BuildMatrix(d Data, months []string, member int64) Matrix {
 				if b.CostNature == store.CostFix {
 					band = BandFixed
 				}
-				addAt(byClass, b.BudgetClass, i, n, cents)
 			}
 
 			k := rowKey{band, b.CategoryID}
@@ -150,7 +142,6 @@ func BuildMatrix(d Data, months []string, member int64) Matrix {
 			}
 			c := cats[key.cat]
 			row := summarize(MatrixRow{Key: key.cat, Label: c.Name, Color: c.Color, Icon: c.Icon}, cents, n)
-			row.Share, row.ShareTotal = shareOf(row, mb.Total)
 			// A category holding a single booking already is that booking, so
 			// unfolding it would only repeat the row.
 			if len(byBooking[key]) > 1 {
@@ -170,36 +161,26 @@ func BuildMatrix(d Data, months []string, member int64) Matrix {
 	expense := addRows(m.Band(BandFixed).Total, m.Band(BandVariable).Total, n)
 	m.Expense = summarize(MatrixRow{LabelKey: "matrix.total.expense"}, expense, n)
 	m.Surplus = summarize(MatrixRow{LabelKey: "matrix.surplus"}, diffRows(income.Cents, expense, n), n)
-	m.Target = summarize(MatrixRow{LabelKey: "matrix.savingTarget"}, scale(income.Cents, store.ClassSaving.TargetPercent()), n)
 
-	// The two expense bands say how the spending splits; the classes say what
-	// share of the income it eats, which is what the rule is about.
+	// Every percentage on the table is a share of income. A category measured
+	// against its own band answers how the spending splits, which is a question
+	// about the table; what the reader wants to know is what a line costs of
+	// what came in.
 	for i := range m.Bands {
 		if m.Bands[i].Key == BandIncome {
 			continue
 		}
-		m.Bands[i].Total.Share, m.Bands[i].Total.ShareTotal = shareOf(m.Bands[i].Total, m.Expense)
-	}
-	m.Bands = append(m.Bands, classBand(byClass, income, n))
-	return m
-}
-
-// classBand is the 50/30/20 view: the same expenses again, grouped by what the
-// household decided they were for and measured against what came in.
-func classBand(byClass map[store.BudgetClass][]int64, income MatrixRow, n int) MatrixBand {
-	mb := MatrixBand{Key: BandClass}
-	total := make([]int64, n)
-	for _, c := range []store.BudgetClass{store.ClassNeed, store.ClassWant, store.ClassSaving} {
-		row := summarize(MatrixRow{LabelKey: "class." + string(c)}, byClass[c], n)
-		row.Share, row.ShareTotal = shareOf(row, income)
-		mb.Rows = append(mb.Rows, row)
-		for i, v := range byClass[c] {
-			total[i] += v
+		for j := range m.Bands[i].Rows {
+			row := &m.Bands[i].Rows[j]
+			row.Share, row.ShareTotal = shareOf(*row, income)
+			for k := range row.Children {
+				child := &row.Children[k]
+				child.Share, child.ShareTotal = shareOf(*child, income)
+			}
 		}
+		m.Bands[i].Total.Share, m.Bands[i].Total.ShareTotal = shareOf(m.Bands[i].Total, income)
 	}
-	mb.Total = summarize(MatrixRow{LabelKey: "matrix.total.class"}, total, n)
-	mb.Total.Share, mb.Total.ShareTotal = shareOf(mb.Total, income)
-	return mb
+	return m
 }
 
 // summarize fills in the figures that only exist across the whole row. The mean
@@ -216,7 +197,7 @@ func summarize(row MatrixRow, cents []int64, n int) MatrixRow {
 	return row
 }
 
-// shareOf is a row's share of its band, per month and over the whole range.
+// shareOf is a row's share of the income, per month and over the whole range.
 func shareOf(row, base MatrixRow) ([]float64, float64) {
 	out := make([]float64, len(row.Cents))
 	for i, v := range row.Cents {
@@ -260,14 +241,6 @@ func diffRows(a, b []int64, n int) []int64 {
 		if i < len(b) {
 			out[i] -= b[i]
 		}
-	}
-	return out
-}
-
-func scale(cents []int64, percent int) []int64 {
-	out := make([]int64, len(cents))
-	for i, v := range cents {
-		out[i] = v * int64(percent) / 100
 	}
 	return out
 }

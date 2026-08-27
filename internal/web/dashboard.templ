@@ -178,7 +178,6 @@ templ matrixCard(vm DashboardVM) {
 					}
 					<tbody class="matrix-summary">
 						@matrixLine(vm, vm.Matrix.Expense, "")
-						@matrixLine(vm, vm.Matrix.Target, "")
 						@matrixLine(vm, vm.Matrix.Surplus, "matrix-surplus")
 					</tbody>
 				</table>
@@ -198,7 +197,7 @@ templ matrixBand(vm DashboardVM, band calc.MatrixBand) {
 		// One group per category, so a checkbox and :has() can fold its bookings
 		// away. A <details> cannot wrap table rows.
 		<tbody class="matrix-group">
-			<tr class="matrix-row">
+			<tr class="matrix-line matrix-row">
 				<th class="matrix-cell matrix-sticky text-left">
 					if len(row.Children) > 0 {
 						<label class="matrix-toggle">
@@ -214,35 +213,48 @@ templ matrixBand(vm DashboardVM, band calc.MatrixBand) {
 				</th>
 				@matrixCells(row)
 			</tr>
+			if band.Key != calc.BandIncome {
+				@matrixShare(row)
+			}
 			for _, child := range row.Children {
-				<tr class="matrix-child">
+				<tr class="matrix-line matrix-child">
 					<th class="matrix-cell matrix-sticky text-left">{ child.Label }</th>
 					@matrixCells(child)
 				</tr>
-			}
-			if band.Key != calc.BandIncome {
-				<tr class="matrix-share">
-					<th class="matrix-cell matrix-sticky text-left">{ MatrixShareLabel(ctx, band.Key) }</th>
-					for _, p := range row.Share {
-						<td class="matrix-cell text-right">{ FormatPercent(p) }</td>
-					}
-					<td class="matrix-cell text-right">{ FormatPercent(row.ShareTotal) }</td>
-					<td class="matrix-cell"></td>
-					<td class="matrix-cell"></td>
-				</tr>
+				if band.Key != calc.BandIncome {
+					@matrixShare(child)
+				}
 			}
 		</tbody>
 	}
 	<tbody>
-		<tr class="matrix-total">
+		<tr class="matrix-line matrix-total">
 			<th class="matrix-cell matrix-sticky text-left">@matrixLabel(band.Total)</th>
 			@matrixCells(band.Total)
 		</tr>
+		if band.Key != calc.BandIncome {
+			@matrixShare(band.Total)
+		}
 	</tbody>
 }
 
+// matrixShare is the percentage belonging to the row above it. It is a second
+// line only because a cell cannot hold two numbers legibly; hovering either one
+// lights up both.
+templ matrixShare(row calc.MatrixRow) {
+	<tr class="matrix-share">
+		<th class="matrix-cell matrix-sticky text-left">{ MatrixShareLabel(ctx) }</th>
+		for _, p := range row.Share {
+			<td class="matrix-cell text-right">{ FormatPercent(p) }</td>
+		}
+		<td class="matrix-cell text-right">{ FormatPercent(row.ShareTotal) }</td>
+		<td class="matrix-cell"></td>
+		<td class="matrix-cell"></td>
+	</tr>
+}
+
 templ matrixLine(vm DashboardVM, row calc.MatrixRow, extra string) {
-	<tr class={ "matrix-total", extra }>
+	<tr class={ "matrix-line matrix-total", extra }>
 		<th class="matrix-cell matrix-sticky text-left">@matrixLabel(row)</th>
 		@matrixCells(row)
 	</tr>

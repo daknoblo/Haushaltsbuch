@@ -332,14 +332,14 @@ func (s *Server) handleExportYear(w http.ResponseWriter, r *http.Request) {
 				pdfMatrixRow(m, "   "+child.Label, pdfCells(child), fontstyle.Normal, pdfGrey)
 			}
 			if band.Key != calc.BandIncome {
-				pdfMatrixRow(m, "   "+MatrixShareLabel(ctx, band.Key), pdfShares(row), fontstyle.Italic, pdfGrey)
+				pdfMatrixRow(m, "   "+MatrixShareLabel(ctx), pdfShares(row), fontstyle.Italic, pdfGrey)
 			}
 		}
 		pdfMatrixRow(m, T(ctx, band.Total.LabelKey), pdfCells(band.Total), fontstyle.Bold, nil)
 	}
 
 	m.AddRow(4)
-	for _, row := range []calc.MatrixRow{vm.Matrix.Expense, vm.Matrix.Target, vm.Matrix.Surplus} {
+	for _, row := range []calc.MatrixRow{vm.Matrix.Expense, vm.Matrix.Surplus} {
 		pdfMatrixRow(m, T(ctx, row.LabelKey), pdfCells(row), fontstyle.Bold, nil)
 	}
 

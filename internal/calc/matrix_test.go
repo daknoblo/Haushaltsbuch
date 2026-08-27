@@ -78,10 +78,48 @@ func TestMatrixMeanAndMedianDisagreeOnAnUnevenYear(t *testing.T) {
 	}
 }
 
-func TestMatrixSavingTargetIsAFifthOfIncome(t *testing.T) {
+// Every percentage on the table answers the same question: what does this cost
+// of what came in. A category measured against its own band answered a question
+// about the table instead.
+func TestMatrixSharesAreMeasuredAgainstIncome(t *testing.T) {
 	m := BuildMatrix(budgetBook(), calendarYear(), Everyone)
-	if got, want := m.Target.TotalCents, int64(236940); got != want {
-		t.Errorf("saving target = %d, want %d (20 %% of 1.184.700)", got, want)
+	income := m.Band(BandIncome).Total
+
+	for _, band := range []string{BandFixed, BandVariable} {
+		b := m.Band(band)
+		for _, row := range b.Rows {
+			want := float64(row.TotalCents) / float64(income.TotalCents) * 100
+			if diff := row.ShareTotal - want; diff > 0.01 || diff < -0.01 {
+				t.Errorf("%q share = %.2f, want %.2f of income", row.Label, row.ShareTotal, want)
+			}
+		}
+		want := float64(b.Total.TotalCents) / float64(income.TotalCents) * 100
+		if diff := b.Total.ShareTotal - want; diff > 0.01 || diff < -0.01 {
+			t.Errorf("%s total share = %.2f, want %.2f", band, b.Total.ShareTotal, want)
+		}
+	}
+}
+
+// An unfolded booking is a figure like any other and needs its own percentage,
+// or the lines under a category say nothing about what they cost.
+func TestUnfoldedBookingsCarryTheirOwnShare(t *testing.T) {
+	m := BuildMatrix(budgetBook(), calendarYear(), Everyone)
+	income := m.Band(BandIncome).Total
+
+	var seen int
+	for _, band := range []string{BandFixed, BandVariable} {
+		for _, row := range m.Band(band).Rows {
+			for _, child := range row.Children {
+				seen++
+				want := float64(child.TotalCents) / float64(income.TotalCents) * 100
+				if diff := child.ShareTotal - want; diff > 0.01 || diff < -0.01 {
+					t.Errorf("%q share = %.2f, want %.2f", child.Label, child.ShareTotal, want)
+				}
+			}
+		}
+	}
+	if seen == 0 {
+		t.Fatal("no unfolded booking in the fixture")
 	}
 }
 
@@ -132,18 +170,6 @@ func TestMatrixDoesNotUnfoldASingleBooking(t *testing.T) {
 				t.Errorf("%q was unfolded into a single child %q", row.Label, row.Children[0].Label)
 			}
 		}
-	}
-}
-
-// The class band is the same expenses seen a second way, so it has to come to
-// the same total.
-func TestMatrixClassBandCoversEveryExpense(t *testing.T) {
-	m := BuildMatrix(budgetBook(), calendarYear(), Everyone)
-	if got, want := m.Band(BandClass).Total.TotalCents, m.Expense.TotalCents; got != want {
-		t.Errorf("classes = %d, expenses = %d", got, want)
-	}
-	if got := m.Band(BandClass).Rows[2].TotalCents; got != 100000*12 {
-		t.Errorf("saving = %d, want the savings plan", got)
 	}
 }
 
