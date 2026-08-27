@@ -138,12 +138,12 @@ var german = Catalog{
 	"bookings.left":                "Übrig",
 
 	// Dashboard
-	"dash.title":              "Auswertung",
-	"dash.subtitle":           "Zeitraum wählen und sehen, wohin das Geld fließt.",
-	"dash.rangeMonth":         "Monat",
-	"dash.range2m":            "2 Monate",
-	"dash.rangeQuarter":       "Quartal",
-	"dash.rangeHalf":          "Halbjahr",
+	"dash.title":        "Auswertung",
+	"dash.subtitle":     "Zeitraum wählen und sehen, wohin das Geld fließt.",
+	"dash.rangeMonth":   "Monat",
+	"dash.range2m":      "2 Monate",
+	"dash.range":        "Zeitraum",
+	"dash.rangeQuarter": "Quartal", "dash.rangeHalf": "Halbjahr",
 	"dash.rangeYear":          "Jahr",
 	"dash.rangePrev":          "Früherer Zeitraum",
 	"dash.rangeNext":          "Späterer Zeitraum",

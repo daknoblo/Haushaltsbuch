@@ -224,4 +224,14 @@
 
   document.addEventListener("input", refreshSplitState);
   document.addEventListener("change", refreshSplitState);
+
+  // A period picker carries the whole target URL in each option, so following
+  // it needs no knowledge of the page. The handler lives here because the
+  // content security policy forbids the inline one a select would otherwise use.
+  document.addEventListener("change", function (e) {
+    var el = e.target;
+    if (el && el.tagName === "SELECT" && el.hasAttribute("data-nav") && el.value) {
+      window.location.assign(el.value);
+    }
+  });
 })();

@@ -142,6 +142,7 @@ var english = Catalog{
 	"dash.subtitle":           "Pick a period and see where the money goes.",
 	"dash.rangeMonth":         "Month",
 	"dash.range2m":            "2 months",
+	"dash.range":              "Period",
 	"dash.rangeQuarter":       "Quarter",
 	"dash.rangeHalf":          "Half year",
 	"dash.rangeYear":          "Year",

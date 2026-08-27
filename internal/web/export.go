@@ -175,7 +175,7 @@ func (s *Server) handleExportStatistics(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	month := NormalizeMonth(r.URL.Query().Get("m"))
-	vm, err := s.buildDashboardVM(r.Context(), hh.ID, month, periodYear, calc.Everyone, calc.GroupCategory)
+	vm, err := s.buildDashboardVM(r.Context(), hh.ID, month, periodYear, calc.Everyone, calc.GroupCategory, nil)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -299,7 +299,7 @@ func (s *Server) handleExportYear(w http.ResponseWriter, r *http.Request) {
 	}
 	month := NormalizeMonth(r.URL.Query().Get("m"))
 	member := parseID(r.URL.Query().Get("view"))
-	vm, err := s.buildDashboardVM(ctx, hh.ID, month, periodYear, member, calc.GroupCategory)
+	vm, err := s.buildDashboardVM(ctx, hh.ID, month, periodYear, member, calc.GroupCategory, nil)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
