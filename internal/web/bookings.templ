@@ -133,6 +133,12 @@ templ bookingRow(b BookingRow) {
 			if b.ShowDuePoint() {
 				<span class="badge badge-muted">{ DuePointLabel(ctx, b.Booking.DuePoint) }</span>
 			}
+			if !b.IsIncome() {
+				<span class="class-chip">
+					<span class={ "inline-block h-2 w-2 rounded-full", BudgetClassDot(b.Booking.BudgetClass) }></span>
+					{ BudgetClassLabel(ctx, b.Booking.BudgetClass) }
+				</span>
+			}
 			if !b.IsIncome() && !b.Booking.Settle {
 				<span class="badge badge-muted">{ T(ctx, "bookings.noSettle") }</span>
 			}

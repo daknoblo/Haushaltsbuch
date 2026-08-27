@@ -379,8 +379,7 @@ templ savingsCard(vm DashboardVM) {
 
 // budgetClassBar measures against net income, because that is what the
 // 50/30/20 rule divides up. Spending past it therefore fills the bar and is
-// named underneath rather than being scaled away.
-templ budgetClassBar(rep calc.MonthReport) {
+// named underneath rather than being scaled away.templ budgetClassBar(rep calc.MonthReport) {
 	<div class="flex h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
 		<div class="bg-indigo-500" style={ "width:" + BarWidth(rep.ByBudgetClass[store.ClassNeed], rep.IncomeCents) }></div>
 		<div class="bg-amber-500" style={ "width:" + BarWidth(rep.ByBudgetClass[store.ClassWant], rep.IncomeCents) }></div>

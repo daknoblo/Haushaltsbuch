@@ -131,6 +131,19 @@ func DuePointLabel(ctx context.Context, p store.DuePoint) string {
 	}
 }
 
+// BudgetClassDot is the color a class carries in the 50/30/20 bar, so the same
+// class is the same color wherever it shows up.
+func BudgetClassDot(c store.BudgetClass) string {
+	switch c {
+	case store.ClassWant:
+		return "bg-amber-500"
+	case store.ClassSaving:
+		return "bg-sky-500"
+	default:
+		return "bg-indigo-500"
+	}
+}
+
 // CostNatureOptions returns the selectable cost natures.
 func CostNatureOptions(ctx context.Context) []Option {
 	return []Option{
