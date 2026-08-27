@@ -145,6 +145,12 @@ func BookingDialog(f BookingFormVM) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
+		if !f.Draft {
+			templ_7745c5c3_Err = bookingChange(f).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
 		templ_7745c5c3_Err = bookingOverrides(f).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -160,7 +166,7 @@ func BookingDialog(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(f.Row.DeleteURL())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 38, Col: 32}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 41, Col: 32}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 		if templ_7745c5c3_Err != nil {
@@ -173,7 +179,7 @@ func BookingDialog(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(T(ctx, "bookings.confirmDelete"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 40, Col: 50}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 43, Col: 50}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 		if templ_7745c5c3_Err != nil {
@@ -186,7 +192,7 @@ func BookingDialog(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "action.delete"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 42, Col: 30}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 45, Col: 30}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
@@ -199,7 +205,7 @@ func BookingDialog(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "status.saved"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 43, Col: 101}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 46, Col: 101}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -212,7 +218,7 @@ func BookingDialog(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "action.close"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 44, Col: 96}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 47, Col: 96}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
@@ -254,7 +260,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.ResolveAttributeValue("name-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 53, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 56, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 		if templ_7745c5c3_Err != nil {
@@ -267,7 +273,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.name"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 53, Col: 87}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 56, Col: 87}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -280,7 +286,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.ResolveAttributeValue("name-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 55, Col: 32}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 58, Col: 32}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
 		if templ_7745c5c3_Err != nil {
@@ -293,7 +299,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue(f.Row.Booking.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 59, Col: 30}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 62, Col: 30}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 		if templ_7745c5c3_Err != nil {
@@ -306,7 +312,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.ResolveAttributeValue(T(ctx, "bookings.namePlaceholder"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 60, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 63, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 		if templ_7745c5c3_Err != nil {
@@ -329,7 +335,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.ResolveAttributeValue("amount-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 66, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 69, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 		if templ_7745c5c3_Err != nil {
@@ -342,7 +348,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.amount"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 66, Col: 91}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 69, Col: 91}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
@@ -355,7 +361,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.ResolveAttributeValue("amount-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 67, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 70, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
 		if templ_7745c5c3_Err != nil {
@@ -368,7 +374,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var23 string
 		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.ResolveAttributeValue(CentsToInput(f.Row.Booking.AmountCents))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 67, Col: 157}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 70, Col: 157}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 		if templ_7745c5c3_Err != nil {
@@ -381,7 +387,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var24 string
 		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.ResolveAttributeValue("cat-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 70, Col: 58}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 73, Col: 58}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var24)
 		if templ_7745c5c3_Err != nil {
@@ -394,7 +400,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var25 string
 		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.category"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 70, Col: 90}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 73, Col: 90}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {
@@ -407,7 +413,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var26 string
 		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.ResolveAttributeValue("cat-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 74, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 77, Col: 31}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
 		if templ_7745c5c3_Err != nil {
@@ -420,7 +426,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var27 string
 		templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.ResolveAttributeValue("cats-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 78, Col: 34}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 81, Col: 34}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var27)
 		if templ_7745c5c3_Err != nil {
@@ -433,7 +439,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var28 string
 		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.ResolveAttributeValue(f.Row.Category.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 79, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 82, Col: 31}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var28)
 		if templ_7745c5c3_Err != nil {
@@ -446,7 +452,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var29 string
 		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.ResolveAttributeValue(T(ctx, "bookings.categoryPlaceholder"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 80, Col: 56}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 83, Col: 56}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
 		if templ_7745c5c3_Err != nil {
@@ -469,7 +475,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var30 string
 		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.ResolveAttributeValue("cats-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 85, Col: 41}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 88, Col: 41}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var30)
 		if templ_7745c5c3_Err != nil {
@@ -487,7 +493,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var31 string
 			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.ResolveAttributeValue(c.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 87, Col: 27}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 90, Col: 27}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
 			if templ_7745c5c3_Err != nil {
@@ -510,7 +516,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var32 string
 			templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.ResolveAttributeValue("cost-" + f.Row.IDStr())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 93, Col: 60}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 96, Col: 60}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var32)
 			if templ_7745c5c3_Err != nil {
@@ -523,7 +529,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var33 string
 			templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.costNature"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 93, Col: 94}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 96, Col: 94}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 			if templ_7745c5c3_Err != nil {
@@ -536,7 +542,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var34 string
 			templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.ResolveAttributeValue("cost-" + f.Row.IDStr())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 94, Col: 40}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 97, Col: 40}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var34)
 			if templ_7745c5c3_Err != nil {
@@ -554,7 +560,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 				var templ_7745c5c3_Var35 string
 				templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.ResolveAttributeValue(o.Value)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 96, Col: 29}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 99, Col: 29}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var35)
 				if templ_7745c5c3_Err != nil {
@@ -577,7 +583,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 				var templ_7745c5c3_Var36 string
 				templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(o.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 96, Col: 99}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 99, Col: 99}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 				if templ_7745c5c3_Err != nil {
@@ -595,7 +601,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var37 string
 			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.ResolveAttributeValue("class-" + f.Row.IDStr())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 101, Col: 61}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 104, Col: 61}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var37)
 			if templ_7745c5c3_Err != nil {
@@ -608,7 +614,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var38 string
 			templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.budgetClass"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 101, Col: 96}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 104, Col: 96}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 			if templ_7745c5c3_Err != nil {
@@ -621,7 +627,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var39 string
 			templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.ResolveAttributeValue("class-" + f.Row.IDStr())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 102, Col: 41}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 105, Col: 41}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var39)
 			if templ_7745c5c3_Err != nil {
@@ -639,7 +645,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 				var templ_7745c5c3_Var40 string
 				templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.ResolveAttributeValue(o.Value)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 104, Col: 29}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 107, Col: 29}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var40)
 				if templ_7745c5c3_Err != nil {
@@ -662,7 +668,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 				var templ_7745c5c3_Var41 string
 				templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(o.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 104, Col: 100}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 107, Col: 100}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 				if templ_7745c5c3_Err != nil {
@@ -685,7 +691,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var42 string
 		templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.ResolveAttributeValue("note-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 110, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 113, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var42)
 		if templ_7745c5c3_Err != nil {
@@ -698,7 +704,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var43 string
 		templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.note"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 110, Col: 87}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 113, Col: 87}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 		if templ_7745c5c3_Err != nil {
@@ -711,7 +717,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var44 string
 		templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.ResolveAttributeValue("note-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 111, Col: 38}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 114, Col: 38}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var44)
 		if templ_7745c5c3_Err != nil {
@@ -724,7 +730,7 @@ func bookingBasics(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var45 string
 		templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.ResolveAttributeValue(f.Row.Booking.Note)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 111, Col: 105}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 114, Col: 105}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var45)
 		if templ_7745c5c3_Err != nil {
@@ -776,7 +782,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var47 string
 		templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.recurring"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 122, Col: 109}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 125, Col: 109}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 		if templ_7745c5c3_Err != nil {
@@ -789,7 +795,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var48 string
 		templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.recurringHint"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 123, Col: 101}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 126, Col: 101}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 		if templ_7745c5c3_Err != nil {
@@ -802,7 +808,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var49 string
 		templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.ResolveAttributeValue("freq-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 131, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 134, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var49)
 		if templ_7745c5c3_Err != nil {
@@ -815,7 +821,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var50 string
 		templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.frequency"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 131, Col: 94}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 134, Col: 94}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var50))
 		if templ_7745c5c3_Err != nil {
@@ -828,7 +834,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var51 string
 		templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.ResolveAttributeValue("freq-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 132, Col: 41}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 135, Col: 41}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var51)
 		if templ_7745c5c3_Err != nil {
@@ -846,7 +852,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var52 string
 			templ_7745c5c3_Var52, templ_7745c5c3_Err = templ.ResolveAttributeValue(o.Value)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 134, Col: 30}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 137, Col: 30}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var52)
 			if templ_7745c5c3_Err != nil {
@@ -869,7 +875,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var53 string
 			templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinStringErrs(o.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 134, Col: 99}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 137, Col: 99}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
 			if templ_7745c5c3_Err != nil {
@@ -887,7 +893,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var54 string
 		templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.ResolveAttributeValue("interval-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 139, Col: 65}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 142, Col: 65}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var54)
 		if templ_7745c5c3_Err != nil {
@@ -900,7 +906,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var55 string
 		templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.interval"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 139, Col: 97}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 142, Col: 97}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
 		if templ_7745c5c3_Err != nil {
@@ -913,7 +919,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var56 string
 		templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.ResolveAttributeValue("interval-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 140, Col: 44}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 143, Col: 44}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var56)
 		if templ_7745c5c3_Err != nil {
@@ -926,7 +932,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var57 string
 		templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.ResolveAttributeValue(f.Row.IntervalInput())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 140, Col: 142}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 143, Col: 142}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var57)
 		if templ_7745c5c3_Err != nil {
@@ -939,7 +945,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var58 string
 		templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.ResolveAttributeValue(T(ctx, "bookings.intervalHint"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 140, Col: 184}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 143, Col: 184}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var58)
 		if templ_7745c5c3_Err != nil {
@@ -952,7 +958,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var59 string
 		templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.ResolveAttributeValue("due-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 143, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 146, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var59)
 		if templ_7745c5c3_Err != nil {
@@ -965,7 +971,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var60 string
 		templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.duePoint"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 143, Col: 92}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 146, Col: 92}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var60))
 		if templ_7745c5c3_Err != nil {
@@ -978,7 +984,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var61 string
 		templ_7745c5c3_Var61, templ_7745c5c3_Err = templ.ResolveAttributeValue("due-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 144, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 147, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var61)
 		if templ_7745c5c3_Err != nil {
@@ -996,7 +1002,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var62 string
 			templ_7745c5c3_Var62, templ_7745c5c3_Err = templ.ResolveAttributeValue(o.Value)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 146, Col: 30}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 149, Col: 30}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var62)
 			if templ_7745c5c3_Err != nil {
@@ -1019,7 +1025,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var63 string
 			templ_7745c5c3_Var63, templ_7745c5c3_Err = templ.JoinStringErrs(o.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 146, Col: 98}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 149, Col: 98}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var63))
 			if templ_7745c5c3_Err != nil {
@@ -1037,7 +1043,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var64 string
 		templ_7745c5c3_Var64, templ_7745c5c3_Err = templ.ResolveAttributeValue("from-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 153, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 156, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var64)
 		if templ_7745c5c3_Err != nil {
@@ -1050,7 +1056,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var65 string
 		templ_7745c5c3_Var65, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.activeFrom"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 153, Col: 95}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 156, Col: 95}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var65))
 		if templ_7745c5c3_Err != nil {
@@ -1063,7 +1069,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var66 string
 		templ_7745c5c3_Var66, templ_7745c5c3_Err = templ.ResolveAttributeValue("from-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 154, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 157, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var66)
 		if templ_7745c5c3_Err != nil {
@@ -1076,7 +1082,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var67 string
 		templ_7745c5c3_Var67, templ_7745c5c3_Err = templ.ResolveAttributeValue(f.Row.StartMonth())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 154, Col: 115}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 157, Col: 115}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var67)
 		if templ_7745c5c3_Err != nil {
@@ -1089,7 +1095,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var68 string
 		templ_7745c5c3_Var68, templ_7745c5c3_Err = templ.ResolveAttributeValue("until-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 157, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 160, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var68)
 		if templ_7745c5c3_Err != nil {
@@ -1102,7 +1108,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var69 string
 		templ_7745c5c3_Var69, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.activeUntil"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 157, Col: 97}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 160, Col: 97}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var69))
 		if templ_7745c5c3_Err != nil {
@@ -1115,7 +1121,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var70 string
 		templ_7745c5c3_Var70, templ_7745c5c3_Err = templ.ResolveAttributeValue("until-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 158, Col: 41}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 161, Col: 41}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var70)
 		if templ_7745c5c3_Err != nil {
@@ -1128,7 +1134,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var71 string
 		templ_7745c5c3_Var71, templ_7745c5c3_Err = templ.ResolveAttributeValue(f.Row.EndMonth())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 158, Col: 115}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 161, Col: 115}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var71)
 		if templ_7745c5c3_Err != nil {
@@ -1141,7 +1147,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var72 string
 		templ_7745c5c3_Var72, templ_7745c5c3_Err = templ.ResolveAttributeValue("date-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 163, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 166, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var72)
 		if templ_7745c5c3_Err != nil {
@@ -1154,7 +1160,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var73 string
 		templ_7745c5c3_Var73, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.date"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 163, Col: 87}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 166, Col: 87}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var73))
 		if templ_7745c5c3_Err != nil {
@@ -1167,7 +1173,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var74 string
 		templ_7745c5c3_Var74, templ_7745c5c3_Err = templ.ResolveAttributeValue("date-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 164, Col: 38}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 167, Col: 38}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var74)
 		if templ_7745c5c3_Err != nil {
@@ -1180,7 +1186,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var75 string
 		templ_7745c5c3_Var75, templ_7745c5c3_Err = templ.ResolveAttributeValue(f.Row.OccurredInput())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 164, Col: 115}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 167, Col: 115}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var75)
 		if templ_7745c5c3_Err != nil {
@@ -1193,7 +1199,7 @@ func bookingRhythm(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var76 string
 		templ_7745c5c3_Var76, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.dateHint"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 165, Col: 91}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 168, Col: 91}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var76))
 		if templ_7745c5c3_Err != nil {
@@ -1235,7 +1241,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var78 string
 		templ_7745c5c3_Var78, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.splitSection"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 172, Col: 104}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 175, Col: 104}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var78))
 		if templ_7745c5c3_Err != nil {
@@ -1248,7 +1254,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var79 string
 		templ_7745c5c3_Var79, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.splitHint"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 173, Col: 91}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 176, Col: 91}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var79))
 		if templ_7745c5c3_Err != nil {
@@ -1262,7 +1268,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var80 string
 			templ_7745c5c3_Var80, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.receiver"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 178, Col: 35}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 181, Col: 35}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var80))
 			if templ_7745c5c3_Err != nil {
@@ -1272,7 +1278,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var81 string
 			templ_7745c5c3_Var81, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.payer"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 180, Col: 32}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 183, Col: 32}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var81))
 			if templ_7745c5c3_Err != nil {
@@ -1291,7 +1297,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var82 string
 			templ_7745c5c3_Var82, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.FormatInt(m.ID, 10))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 188, Col: 85}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 191, Col: 85}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var82)
 			if templ_7745c5c3_Err != nil {
@@ -1318,7 +1324,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var83 string
 			templ_7745c5c3_Var83, templ_7745c5c3_Err = templ.JoinStringErrs(m.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 191, Col: 16}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 194, Col: 16}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var83))
 			if templ_7745c5c3_Err != nil {
@@ -1346,7 +1352,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var84 string
 		templ_7745c5c3_Var84, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.nobody"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 199, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 202, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var84))
 		if templ_7745c5c3_Err != nil {
@@ -1359,7 +1365,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var85 string
 		templ_7745c5c3_Var85, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.payerHint"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 202, Col: 93}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 205, Col: 93}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var85))
 		if templ_7745c5c3_Err != nil {
@@ -1373,7 +1379,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var86 string
 			templ_7745c5c3_Var86, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.whoGets"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 207, Col: 34}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 210, Col: 34}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var86))
 			if templ_7745c5c3_Err != nil {
@@ -1383,7 +1389,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var87 string
 			templ_7745c5c3_Var87, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.whoPays"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 209, Col: 34}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 212, Col: 34}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var87))
 			if templ_7745c5c3_Err != nil {
@@ -1402,7 +1408,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var88 string
 			templ_7745c5c3_Var88, templ_7745c5c3_Err = templ.ResolveAttributeValue("m_" + strconv.FormatInt(m.ID, 10))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 221, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 224, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var88)
 			if templ_7745c5c3_Err != nil {
@@ -1429,7 +1435,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var89 string
 			templ_7745c5c3_Var89, templ_7745c5c3_Err = templ.JoinStringErrs(m.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 224, Col: 17}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 227, Col: 17}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var89))
 			if templ_7745c5c3_Err != nil {
@@ -1442,7 +1448,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var90 string
 			templ_7745c5c3_Var90, templ_7745c5c3_Err = templ.ResolveAttributeValue("p_" + strconv.FormatInt(m.ID, 10))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 233, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 236, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var90)
 			if templ_7745c5c3_Err != nil {
@@ -1455,7 +1461,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var91 string
 			templ_7745c5c3_Var91, templ_7745c5c3_Err = templ.ResolveAttributeValue(f.Row.PercentInput(m.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 234, Col: 40}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 237, Col: 40}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var91)
 			if templ_7745c5c3_Err != nil {
@@ -1468,7 +1474,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var92 string
 			templ_7745c5c3_Var92, templ_7745c5c3_Err = templ.ResolveAttributeValue(Tf(ctx, "bookings.shareOf", m.Name))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 235, Col: 56}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 238, Col: 56}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var92)
 			if templ_7745c5c3_Err != nil {
@@ -1481,7 +1487,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var93 string
 			templ_7745c5c3_Var93, templ_7745c5c3_Err = templ.ResolveAttributeValue("f_" + strconv.FormatInt(m.ID, 10))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 243, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 246, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var93)
 			if templ_7745c5c3_Err != nil {
@@ -1494,7 +1500,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var94 string
 			templ_7745c5c3_Var94, templ_7745c5c3_Err = templ.ResolveAttributeValue(f.Row.FixedInput(m.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 244, Col: 38}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 247, Col: 38}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var94)
 			if templ_7745c5c3_Err != nil {
@@ -1507,7 +1513,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var95 string
 			templ_7745c5c3_Var95, templ_7745c5c3_Err = templ.ResolveAttributeValue(Tf(ctx, "bookings.amountOf", m.Name))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 245, Col: 57}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 248, Col: 57}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var95)
 			if templ_7745c5c3_Err != nil {
@@ -1548,7 +1554,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var98 string
 			templ_7745c5c3_Var98, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.nobodyGets"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 255, Col: 37}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 258, Col: 37}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var98))
 			if templ_7745c5c3_Err != nil {
@@ -1558,7 +1564,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var99 string
 			templ_7745c5c3_Var99, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.nobodyCarries"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 257, Col: 40}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 260, Col: 40}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var99))
 			if templ_7745c5c3_Err != nil {
@@ -1577,7 +1583,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var100 string
 			templ_7745c5c3_Var100, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.whoPaysHint"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 262, Col: 96}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 265, Col: 96}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var100))
 			if templ_7745c5c3_Err != nil {
@@ -1595,7 +1601,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var101 string
 		templ_7745c5c3_Var101, templ_7745c5c3_Err = templ.JoinStringErrs(f.Row.PercentAllocated())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 265, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 268, Col: 54}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var101))
 		if templ_7745c5c3_Err != nil {
@@ -1608,7 +1614,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var102 string
 		templ_7745c5c3_Var102, templ_7745c5c3_Err = templ.JoinStringErrs(" % " + T(ctx, "bookings.percentAllocated"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 266, Col: 50}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 269, Col: 50}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var102))
 		if templ_7745c5c3_Err != nil {
@@ -1621,7 +1627,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var103 string
 		templ_7745c5c3_Var103, templ_7745c5c3_Err = templ.JoinStringErrs(Tf(ctx, "bookings.fixedHint", FrequencyLabel(ctx, f.Row.Booking.Frequency)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 269, Col: 82}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 272, Col: 82}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var103))
 		if templ_7745c5c3_Err != nil {
@@ -1634,7 +1640,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var104 string
 		templ_7745c5c3_Var104, templ_7745c5c3_Err = templ.ResolveAttributeValue("split-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 274, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 277, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var104)
 		if templ_7745c5c3_Err != nil {
@@ -1647,7 +1653,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var105 string
 		templ_7745c5c3_Var105, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.splitMode"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 274, Col: 93}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 277, Col: 93}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var105))
 		if templ_7745c5c3_Err != nil {
@@ -1660,7 +1666,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var106 string
 		templ_7745c5c3_Var106, templ_7745c5c3_Err = templ.ResolveAttributeValue("split-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 275, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 278, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var106)
 		if templ_7745c5c3_Err != nil {
@@ -1678,7 +1684,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var107 string
 			templ_7745c5c3_Var107, templ_7745c5c3_Err = templ.ResolveAttributeValue(o.Value)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 277, Col: 28}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 280, Col: 28}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var107)
 			if templ_7745c5c3_Err != nil {
@@ -1701,7 +1707,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var108 string
 			templ_7745c5c3_Var108, templ_7745c5c3_Err = templ.JoinStringErrs(o.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 277, Col: 97}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 280, Col: 97}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var108))
 			if templ_7745c5c3_Err != nil {
@@ -1734,7 +1740,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var109 string
 			templ_7745c5c3_Var109, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.settle"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 286, Col: 107}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 289, Col: 107}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var109))
 			if templ_7745c5c3_Err != nil {
@@ -1747,7 +1753,7 @@ func bookingSplit(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var110 string
 			templ_7745c5c3_Var110, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.settleHint"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 287, Col: 99}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 290, Col: 99}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var110))
 			if templ_7745c5c3_Err != nil {
@@ -1794,7 +1800,7 @@ func bookingTags(f BookingFormVM) templ.Component {
 		var templ_7745c5c3_Var112 string
 		templ_7745c5c3_Var112, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.tags"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 296, Col: 53}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 299, Col: 53}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var112))
 		if templ_7745c5c3_Err != nil {
@@ -1812,7 +1818,7 @@ func bookingTags(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var113 string
 			templ_7745c5c3_Var113, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.noTags"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 299, Col: 31}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 302, Col: 31}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var113))
 			if templ_7745c5c3_Err != nil {
@@ -1825,7 +1831,7 @@ func bookingTags(f BookingFormVM) templ.Component {
 			var templ_7745c5c3_Var114 string
 			templ_7745c5c3_Var114, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "settings.newTag"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 299, Col: 104}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 302, Col: 104}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var114))
 			if templ_7745c5c3_Err != nil {
@@ -1848,7 +1854,7 @@ func bookingTags(f BookingFormVM) templ.Component {
 				var templ_7745c5c3_Var115 string
 				templ_7745c5c3_Var115, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.FormatInt(t.ID, 10))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 305, Col: 75}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 308, Col: 75}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var115)
 				if templ_7745c5c3_Err != nil {
@@ -1875,7 +1881,7 @@ func bookingTags(f BookingFormVM) templ.Component {
 				var templ_7745c5c3_Var116 string
 				templ_7745c5c3_Var116, templ_7745c5c3_Err = templ.JoinStringErrs(t.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 308, Col: 15}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 311, Col: 15}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var116))
 				if templ_7745c5c3_Err != nil {
@@ -1892,6 +1898,234 @@ func bookingTags(f BookingFormVM) templ.Component {
 			}
 		}
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 167, "</div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+// bookingChange records a lasting change of the amount, which is a different
+// thing from an override: an override is a promotion that runs out, this is the
+// new price. It ends the booking and starts a successor, so the book keeps when
+// the price moved and what it was before.
+func bookingChange(f BookingFormVM) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var117 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var117 == nil {
+			templ_7745c5c3_Var117 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 168, "<div class=\"dlg-section rec-on\"><h3 class=\"text-sm font-semibold text-slate-800 dark:text-slate-200\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var118 string
+		templ_7745c5c3_Var118, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.change"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 326, Col: 98}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var118))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 169, "</h3><p class=\"mb-3 text-xs text-slate-500 dark:text-slate-400\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var119 string
+		templ_7745c5c3_Var119, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.changeHint"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 327, Col: 92}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var119))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 170, "</p><div class=\"change-row\" id=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var120 string
+		templ_7745c5c3_Var120, templ_7745c5c3_Err = templ.ResolveAttributeValue("change-" + f.Row.IDStr())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 328, Col: 56}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var120)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 171, "\"><div><label class=\"field-label\" for=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var121 string
+		templ_7745c5c3_Var121, templ_7745c5c3_Err = templ.ResolveAttributeValue("chgm-" + f.Row.IDStr())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 330, Col: 60}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var121)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 172, "\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var122 string
+		templ_7745c5c3_Var122, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.changeFrom"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 330, Col: 94}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var122))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 173, "</label> <input id=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var123 string
+		templ_7745c5c3_Var123, templ_7745c5c3_Err = templ.ResolveAttributeValue("chgm-" + f.Row.IDStr())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 331, Col: 39}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var123)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 174, "\" class=\"input\" type=\"month\" name=\"change_from\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var124 string
+		templ_7745c5c3_Var124, templ_7745c5c3_Err = templ.ResolveAttributeValue(f.Row.NextMonth())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 331, Col: 113}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var124)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 175, "\"></div><div><label class=\"field-label\" for=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var125 string
+		templ_7745c5c3_Var125, templ_7745c5c3_Err = templ.ResolveAttributeValue("chga-" + f.Row.IDStr())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 334, Col: 60}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var125)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 176, "\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var126 string
+		templ_7745c5c3_Var126, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.changeAmount"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 334, Col: 96}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var126))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 177, "</label> <input id=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var127 string
+		templ_7745c5c3_Var127, templ_7745c5c3_Err = templ.ResolveAttributeValue("chga-" + f.Row.IDStr())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 335, Col: 39}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var127)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 178, "\" class=\"input tnum\" type=\"number\" step=\"0.01\" min=\"0\" name=\"change_amount\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var128 string
+		templ_7745c5c3_Var128, templ_7745c5c3_Err = templ.ResolveAttributeValue(CentsToInput(f.Row.Booking.AmountCents))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 335, Col: 163}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var128)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 179, "\" data-cents></div><input type=\"hidden\" name=\"m\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var129 string
+		templ_7745c5c3_Var129, templ_7745c5c3_Err = templ.ResolveAttributeValue(f.Row.Month)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 337, Col: 52}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var129)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 180, "\"> <button type=\"button\" class=\"btn-ghost\" hx-post=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var130 string
+		templ_7745c5c3_Var130, templ_7745c5c3_Err = templ.ResolveAttributeValue("/bookings/" + f.Row.IDStr() + "/change")
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 341, Col: 54}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var130)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 181, "\" hx-include=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var131 string
+		templ_7745c5c3_Var131, templ_7745c5c3_Err = templ.ResolveAttributeValue("#change-" + f.Row.IDStr())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 342, Col: 43}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var131)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 182, "\" hx-target=\"#booking-dialog\" hx-swap=\"innerHTML\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var132 string
+		templ_7745c5c3_Var132, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.changeApply"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 345, Col: 36}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var132))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 183, "</button></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1919,66 +2153,66 @@ func bookingOverrides(f BookingFormVM) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var117 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var117 == nil {
-			templ_7745c5c3_Var117 = templ.NopComponent
+		templ_7745c5c3_Var133 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var133 == nil {
+			templ_7745c5c3_Var133 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 168, "<div class=\"dlg-section rec-on\"><label class=\"switch\"><input type=\"checkbox\" name=\"overrides_on\" value=\"1\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 184, "<div class=\"dlg-section rec-on\"><label class=\"switch\"><input type=\"checkbox\" name=\"overrides_on\" value=\"1\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(f.Row.Overrides) > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 169, " checked")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 185, " checked")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 170, "> <span class=\"switch-track\"><span class=\"switch-knob\"></span></span> <span><span class=\"block text-sm font-medium text-slate-800 dark:text-slate-200\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 186, "> <span class=\"switch-track\"><span class=\"switch-knob\"></span></span> <span><span class=\"block text-sm font-medium text-slate-800 dark:text-slate-200\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var118 string
-		templ_7745c5c3_Var118, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.overrides"))
+		var templ_7745c5c3_Var134 string
+		templ_7745c5c3_Var134, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.overrides"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 327, Col: 109}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 360, Col: 109}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var118))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 171, "</span> <span class=\"block text-xs text-slate-500 dark:text-slate-400\">")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var134))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var119 string
-		templ_7745c5c3_Var119, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.overridesHint"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 328, Col: 101}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var119))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 187, "</span> <span class=\"block text-xs text-slate-500 dark:text-slate-400\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 172, "</span></span></label><div class=\"ov-body\">")
+		var templ_7745c5c3_Var135 string
+		templ_7745c5c3_Var135, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.overridesHint"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 361, Col: 101}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var135))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 188, "</span></span></label><div class=\"ov-body\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(f.Row.Overrides) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 173, "<p class=\"text-sm text-slate-500 dark:text-slate-400\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 189, "<p class=\"text-sm text-slate-500 dark:text-slate-400\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var120 string
-			templ_7745c5c3_Var120, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.noOverrides"))
+			var templ_7745c5c3_Var136 string
+			templ_7745c5c3_Var136, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.noOverrides"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 333, Col: 90}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 366, Col: 90}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var120))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var136))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 174, "</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 190, "</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1993,7 +2227,7 @@ func bookingOverrides(f BookingFormVM) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 175, "</div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 191, "</div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -2017,233 +2251,233 @@ func overrideRow(f BookingFormVM, o store.BookingOverride) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var121 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var121 == nil {
-			templ_7745c5c3_Var121 = templ.NopComponent
+		templ_7745c5c3_Var137 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var137 == nil {
+			templ_7745c5c3_Var137 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 176, "<div class=\"override-row\" id=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var122 string
-		templ_7745c5c3_Var122, templ_7745c5c3_Err = templ.ResolveAttributeValue("ov-" + strconv.FormatInt(o.ID, 10))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 344, Col: 67}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var122)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 177, "\"><div class=\"contents\" hx-post=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var123 string
-		templ_7745c5c3_Var123, templ_7745c5c3_Err = templ.ResolveAttributeValue("/overrides/" + strconv.FormatInt(o.ID, 10))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 347, Col: 56}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var123)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 178, "\" hx-trigger=\"change, keyup changed delay:600ms\" hx-include=\"closest .override-row\" hx-swap=\"none\"><label class=\"field-label sr-only\" for=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var124 string
-		templ_7745c5c3_Var124, templ_7745c5c3_Err = templ.ResolveAttributeValue("ovf-" + strconv.FormatInt(o.ID, 10))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 352, Col: 80}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var124)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 179, "\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var125 string
-		templ_7745c5c3_Var125, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.overrideFrom"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 352, Col: 116}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var125))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 180, "</label> <input id=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var126 string
-		templ_7745c5c3_Var126, templ_7745c5c3_Err = templ.ResolveAttributeValue("ovf-" + strconv.FormatInt(o.ID, 10))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 353, Col: 51}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var126)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 181, "\" class=\"input\" type=\"date\" name=\"starts_on\" value=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var127 string
-		templ_7745c5c3_Var127, templ_7745c5c3_Err = templ.ResolveAttributeValue(o.StartsOn)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 353, Col: 115}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var127)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 182, "\"> <label class=\"field-label sr-only\" for=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var128 string
-		templ_7745c5c3_Var128, templ_7745c5c3_Err = templ.ResolveAttributeValue("ovu-" + strconv.FormatInt(o.ID, 10))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 354, Col: 80}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var128)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 183, "\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var129 string
-		templ_7745c5c3_Var129, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.overrideUntil"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 354, Col: 117}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var129))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 184, "</label> <input id=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var130 string
-		templ_7745c5c3_Var130, templ_7745c5c3_Err = templ.ResolveAttributeValue("ovu-" + strconv.FormatInt(o.ID, 10))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 355, Col: 51}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var130)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 185, "\" class=\"input\" type=\"date\" name=\"ends_on\" value=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var131 string
-		templ_7745c5c3_Var131, templ_7745c5c3_Err = templ.ResolveAttributeValue(o.EndsOn)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 355, Col: 111}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var131)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 186, "\"> <label class=\"field-label sr-only\" for=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var132 string
-		templ_7745c5c3_Var132, templ_7745c5c3_Err = templ.ResolveAttributeValue("ova-" + strconv.FormatInt(o.ID, 10))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 356, Col: 80}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var132)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 187, "\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var133 string
-		templ_7745c5c3_Var133, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.amount"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 356, Col: 110}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var133))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 188, "</label> <input id=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var134 string
-		templ_7745c5c3_Var134, templ_7745c5c3_Err = templ.ResolveAttributeValue("ova-" + strconv.FormatInt(o.ID, 10))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 357, Col: 51}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var134)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 189, "\" class=\"input tnum\" type=\"number\" step=\"0.01\" min=\"0\" name=\"amount\" value=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var135 string
-		templ_7745c5c3_Var135, templ_7745c5c3_Err = templ.ResolveAttributeValue(CentsToInput(o.AmountCents))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 357, Col: 156}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var135)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 190, "\" data-cents></div><button type=\"button\" class=\"btn-icon text-rose-600 dark:text-rose-400\" title=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var136 string
-		templ_7745c5c3_Var136, templ_7745c5c3_Err = templ.ResolveAttributeValue(T(ctx, "action.delete"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 362, Col: 34}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var136)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 191, "\" hx-post=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var137 string
-		templ_7745c5c3_Var137, templ_7745c5c3_Err = templ.ResolveAttributeValue("/overrides/" + strconv.FormatInt(o.ID, 10) + "/delete")
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 363, Col: 68}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var137)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 192, "\" hx-vals=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 192, "<div class=\"override-row\" id=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var138 string
-		templ_7745c5c3_Var138, templ_7745c5c3_Err = templ.ResolveAttributeValue(`{"booking_id":"` + f.Row.IDStr() + `","m":"` + f.Row.Month + `"}`)
+		templ_7745c5c3_Var138, templ_7745c5c3_Err = templ.ResolveAttributeValue("ov-" + strconv.FormatInt(o.ID, 10))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 364, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 377, Col: 67}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var138)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 193, "\" hx-target=\"#booking-dialog\" hx-swap=\"innerHTML\">✕</button></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 193, "\"><div class=\"contents\" hx-post=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var139 string
+		templ_7745c5c3_Var139, templ_7745c5c3_Err = templ.ResolveAttributeValue("/overrides/" + strconv.FormatInt(o.ID, 10))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 380, Col: 56}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var139)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 194, "\" hx-trigger=\"change, keyup changed delay:600ms\" hx-include=\"closest .override-row\" hx-swap=\"none\"><label class=\"field-label sr-only\" for=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var140 string
+		templ_7745c5c3_Var140, templ_7745c5c3_Err = templ.ResolveAttributeValue("ovf-" + strconv.FormatInt(o.ID, 10))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 385, Col: 80}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var140)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 195, "\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var141 string
+		templ_7745c5c3_Var141, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.overrideFrom"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 385, Col: 116}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var141))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 196, "</label> <input id=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var142 string
+		templ_7745c5c3_Var142, templ_7745c5c3_Err = templ.ResolveAttributeValue("ovf-" + strconv.FormatInt(o.ID, 10))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 386, Col: 51}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var142)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 197, "\" class=\"input\" type=\"date\" name=\"starts_on\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var143 string
+		templ_7745c5c3_Var143, templ_7745c5c3_Err = templ.ResolveAttributeValue(o.StartsOn)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 386, Col: 115}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var143)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 198, "\"> <label class=\"field-label sr-only\" for=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var144 string
+		templ_7745c5c3_Var144, templ_7745c5c3_Err = templ.ResolveAttributeValue("ovu-" + strconv.FormatInt(o.ID, 10))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 387, Col: 80}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var144)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 199, "\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var145 string
+		templ_7745c5c3_Var145, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.overrideUntil"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 387, Col: 117}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var145))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 200, "</label> <input id=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var146 string
+		templ_7745c5c3_Var146, templ_7745c5c3_Err = templ.ResolveAttributeValue("ovu-" + strconv.FormatInt(o.ID, 10))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 388, Col: 51}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var146)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 201, "\" class=\"input\" type=\"date\" name=\"ends_on\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var147 string
+		templ_7745c5c3_Var147, templ_7745c5c3_Err = templ.ResolveAttributeValue(o.EndsOn)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 388, Col: 111}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var147)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 202, "\"> <label class=\"field-label sr-only\" for=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var148 string
+		templ_7745c5c3_Var148, templ_7745c5c3_Err = templ.ResolveAttributeValue("ova-" + strconv.FormatInt(o.ID, 10))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 389, Col: 80}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var148)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 203, "\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var149 string
+		templ_7745c5c3_Var149, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.amount"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 389, Col: 110}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var149))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 204, "</label> <input id=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var150 string
+		templ_7745c5c3_Var150, templ_7745c5c3_Err = templ.ResolveAttributeValue("ova-" + strconv.FormatInt(o.ID, 10))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 390, Col: 51}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var150)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 205, "\" class=\"input tnum\" type=\"number\" step=\"0.01\" min=\"0\" name=\"amount\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var151 string
+		templ_7745c5c3_Var151, templ_7745c5c3_Err = templ.ResolveAttributeValue(CentsToInput(o.AmountCents))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 390, Col: 156}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var151)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 206, "\" data-cents></div><button type=\"button\" class=\"btn-icon text-rose-600 dark:text-rose-400\" title=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var152 string
+		templ_7745c5c3_Var152, templ_7745c5c3_Err = templ.ResolveAttributeValue(T(ctx, "action.delete"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 395, Col: 34}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var152)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 207, "\" hx-post=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var153 string
+		templ_7745c5c3_Var153, templ_7745c5c3_Err = templ.ResolveAttributeValue("/overrides/" + strconv.FormatInt(o.ID, 10) + "/delete")
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 396, Col: 68}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var153)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 208, "\" hx-vals=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var154 string
+		templ_7745c5c3_Var154, templ_7745c5c3_Err = templ.ResolveAttributeValue(`{"booking_id":"` + f.Row.IDStr() + `","m":"` + f.Row.Month + `"}`)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 397, Col: 79}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var154)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 209, "\" hx-target=\"#booking-dialog\" hx-swap=\"innerHTML\">✕</button></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -2267,142 +2501,142 @@ func overrideAdd(f BookingFormVM) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var139 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var139 == nil {
-			templ_7745c5c3_Var139 = templ.NopComponent
+		templ_7745c5c3_Var155 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var155 == nil {
+			templ_7745c5c3_Var155 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 194, "<div class=\"override-row override-add mt-2\"><div class=\"contents\" id=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 210, "<div class=\"override-row override-add mt-2\"><div class=\"contents\" id=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var140 string
-		templ_7745c5c3_Var140, templ_7745c5c3_Err = templ.ResolveAttributeValue("ov-new-" + f.Row.IDStr())
+		var templ_7745c5c3_Var156 string
+		templ_7745c5c3_Var156, templ_7745c5c3_Err = templ.ResolveAttributeValue("ov-new-" + f.Row.IDStr())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 375, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 408, Col: 33}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var140)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 195, "\" hx-post=\"")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var156)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var141 string
-		templ_7745c5c3_Var141, templ_7745c5c3_Err = templ.ResolveAttributeValue("/bookings/" + f.Row.IDStr() + "/overrides")
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 376, Col: 56}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var141)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 211, "\" hx-post=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 196, "\" hx-include=\"")
+		var templ_7745c5c3_Var157 string
+		templ_7745c5c3_Var157, templ_7745c5c3_Err = templ.ResolveAttributeValue("/bookings/" + f.Row.IDStr() + "/overrides")
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 409, Col: 56}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var157)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var142 string
-		templ_7745c5c3_Var142, templ_7745c5c3_Err = templ.ResolveAttributeValue("#ov-new-" + f.Row.IDStr())
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 377, Col: 42}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var142)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 212, "\" hx-include=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 197, "\" hx-target=\"#booking-dialog\" hx-swap=\"innerHTML\"><input class=\"input\" type=\"date\" name=\"starts_on\" aria-label=\"")
+		var templ_7745c5c3_Var158 string
+		templ_7745c5c3_Var158, templ_7745c5c3_Err = templ.ResolveAttributeValue("#ov-new-" + f.Row.IDStr())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 410, Col: 42}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var158)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var143 string
-		templ_7745c5c3_Var143, templ_7745c5c3_Err = templ.ResolveAttributeValue(T(ctx, "bookings.overrideFrom"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 381, Col: 97}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var143)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 213, "\" hx-target=\"#booking-dialog\" hx-swap=\"innerHTML\"><input class=\"input\" type=\"date\" name=\"starts_on\" aria-label=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 198, "\"> <input class=\"input\" type=\"date\" name=\"ends_on\" aria-label=\"")
+		var templ_7745c5c3_Var159 string
+		templ_7745c5c3_Var159, templ_7745c5c3_Err = templ.ResolveAttributeValue(T(ctx, "bookings.overrideFrom"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 414, Col: 97}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var159)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var144 string
-		templ_7745c5c3_Var144, templ_7745c5c3_Err = templ.ResolveAttributeValue(T(ctx, "bookings.overrideUntil"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 382, Col: 96}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var144)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 214, "\"> <input class=\"input\" type=\"date\" name=\"ends_on\" aria-label=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 199, "\"> <input class=\"input tnum\" type=\"number\" step=\"0.01\" min=\"0\" name=\"amount\" aria-label=\"")
+		var templ_7745c5c3_Var160 string
+		templ_7745c5c3_Var160, templ_7745c5c3_Err = templ.ResolveAttributeValue(T(ctx, "bookings.overrideUntil"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 415, Col: 96}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var160)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var145 string
-		templ_7745c5c3_Var145, templ_7745c5c3_Err = templ.ResolveAttributeValue(T(ctx, "bookings.amount"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 383, Col: 115}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var145)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 215, "\"> <input class=\"input tnum\" type=\"number\" step=\"0.01\" min=\"0\" name=\"amount\" aria-label=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 200, "\" data-cents> <input type=\"hidden\" name=\"m\" value=\"")
+		var templ_7745c5c3_Var161 string
+		templ_7745c5c3_Var161, templ_7745c5c3_Err = templ.ResolveAttributeValue(T(ctx, "bookings.amount"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 416, Col: 115}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var161)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var146 string
-		templ_7745c5c3_Var146, templ_7745c5c3_Err = templ.ResolveAttributeValue(f.Row.Month)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 384, Col: 52}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var146)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 216, "\" data-cents> <input type=\"hidden\" name=\"m\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 201, "\"> <button type=\"button\" class=\"btn-ghost\" hx-post=\"")
+		var templ_7745c5c3_Var162 string
+		templ_7745c5c3_Var162, templ_7745c5c3_Err = templ.ResolveAttributeValue(f.Row.Month)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 417, Col: 52}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var162)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var147 string
-		templ_7745c5c3_Var147, templ_7745c5c3_Err = templ.ResolveAttributeValue("/bookings/" + f.Row.IDStr() + "/overrides")
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 385, Col: 96}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var147)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 217, "\"> <button type=\"button\" class=\"btn-ghost\" hx-post=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 202, "\" hx-include=\"")
+		var templ_7745c5c3_Var163 string
+		templ_7745c5c3_Var163, templ_7745c5c3_Err = templ.ResolveAttributeValue("/bookings/" + f.Row.IDStr() + "/overrides")
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 418, Col: 96}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var163)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var148 string
-		templ_7745c5c3_Var148, templ_7745c5c3_Err = templ.ResolveAttributeValue("#ov-new-" + f.Row.IDStr())
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 385, Col: 138}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var148)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 218, "\" hx-include=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 203, "\" hx-target=\"#booking-dialog\" hx-swap=\"innerHTML\">")
+		var templ_7745c5c3_Var164 string
+		templ_7745c5c3_Var164, templ_7745c5c3_Err = templ.ResolveAttributeValue("#ov-new-" + f.Row.IDStr())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 418, Col: 138}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var164)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var149 string
-		templ_7745c5c3_Var149, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.addOverride"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 386, Col: 36}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var149))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 219, "\" hx-target=\"#booking-dialog\" hx-swap=\"innerHTML\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 204, "</button></div></div>")
+		var templ_7745c5c3_Var165 string
+		templ_7745c5c3_Var165, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "bookings.addOverride"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dialog.templ`, Line: 419, Col: 36}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var165))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 220, "</button></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

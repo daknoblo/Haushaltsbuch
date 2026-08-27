@@ -283,6 +283,44 @@ func (s *Server) handleBookingUpdate(w http.ResponseWriter, r *http.Request) {
 	hxChanged(w)
 }
 
+// handleBookingChange records a lasting change of a recurring amount: the old
+// booking is closed off and a successor carries the new figure. Two bookings
+// keep the change itself in the book, which one booking with a new number
+// cannot — it would look as though the old price never existed.
+func (s *Server) handleBookingChange(w http.ResponseWriter, r *http.Request) {
+	active, ok := s.requireActiveHousehold(w, r)
+	if !ok {
+		return
+	}
+	if !s.parseForm(w, r) {
+		return
+	}
+
+	month := cleanMonth(r.FormValue("change_from"))
+	if month == "" {
+		s.clientError(w, r, http.StatusBadRequest, "error.changeMonthMissing")
+		return
+	}
+	amount, err := ParseCents(r.FormValue("change_amount"))
+	if err != nil {
+		s.clientError(w, r, http.StatusBadRequest, "error.amountRange")
+		return
+	}
+
+	created, err := s.store.ChangeAmountFrom(r.Context(), active,
+		parseID(r.PathValue("id")), monthToDate(month), amount)
+	if errors.Is(err, store.ErrInvalid) {
+		s.clientError(w, r, http.StatusBadRequest, "error.changeRange")
+		return
+	}
+	if err != nil {
+		s.writeStoreError(w, r, err)
+		return
+	}
+	// Land on the successor, so the new figure and its period can be checked.
+	s.renderDialog(w, r, active, created.ID, NormalizeMonth(r.FormValue("m")), false)
+}
+
 // categoryFromName resolves what was typed into the category field. The field
 // saves itself on every keystroke, so a half-typed name has to leave the
 // stored category alone; "geh" already picks Gehalt once nothing else starts

@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
+	"time"
 )
 
 type scanner interface {
@@ -173,6 +175,72 @@ func (s *Store) SaveBooking(ctx context.Context, b Booking, splits []SplitInput,
 func (s *Store) DeleteBooking(ctx context.Context, householdID, id int64) error {
 	return affected(s.q.ExecContext(ctx,
 		`DELETE FROM bookings WHERE id = ? AND household_id = ?`, id, householdID))
+}
+
+// ChangeAmountFrom records a lasting change of a recurring amount: the booking
+// is closed off the day before, and a copy of it carries the new amount onward.
+// Two bookings rather than one is what makes the change itself visible — when
+// it happened and what it was before. Both halves are written together, because
+// an ended booking without its successor is money silently gone from the plan.
+func (s *Store) ChangeAmountFrom(ctx context.Context, householdID, id int64, from string, amountCents int64) (Booking, error) {
+	var created Booking
+	err := s.withTx(ctx, func(tx *Store) error {
+		old, err := tx.GetBooking(ctx, householdID, id)
+		if err != nil {
+			return err
+		}
+		if !old.Frequency.Recurring() {
+			return fmt.Errorf("%w: a one-off amount has nothing to change from", ErrInvalid)
+		}
+
+		day, err := time.Parse("2006-01-02", from)
+		if err != nil {
+			return fmt.Errorf("%w: %q is not a date", ErrInvalid, from)
+		}
+		if old.StartsOn != "" && from <= old.StartsOn {
+			return fmt.Errorf("%w: the change starts before the booking does", ErrInvalid)
+		}
+		if old.EndsOn != "" && from > old.EndsOn {
+			return fmt.Errorf("%w: the change starts after the booking ends", ErrInvalid)
+		}
+
+		splits, err := tx.ListSplits(ctx, householdID, id)
+		if err != nil {
+			return err
+		}
+		tagIDs, err := tx.ListTagIDs(ctx, householdID, id)
+		if err != nil {
+			return err
+		}
+
+		next := old
+		next.ID = 0
+		next.AmountCents = amountCents
+		next.StartsOn = from
+		// An external id is unique per household, so the successor cannot carry
+		// the one its predecessor was filed under.
+		next.ExternalID = ""
+
+		old.EndsOn = day.AddDate(0, 0, -1).Format("2006-01-02")
+		if err := tx.SaveBooking(ctx, old, splitInputs(splits), tagIDs); err != nil {
+			return err
+		}
+		created, err = tx.CreateBooking(ctx, next, splitInputs(splits), tagIDs)
+		return err
+	})
+	if err != nil {
+		return Booking{}, err
+	}
+	return created, nil
+}
+
+// splitInputs turns stored splits back into what a write expects.
+func splitInputs(splits []BookingSplit) []SplitInput {
+	out := make([]SplitInput, 0, len(splits))
+	for _, sp := range splits {
+		out = append(out, SplitInput{MemberID: sp.MemberID, Value: sp.Value})
+	}
+	return out
 }
 
 func (s *Store) replaceSplits(ctx context.Context, bookingID, householdID int64, splits []SplitInput) error {

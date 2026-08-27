@@ -28,6 +28,9 @@ templ BookingDialog(f BookingFormVM) {
 				@bookingBasics(f)
 				@bookingRhythm(f)
 				@bookingSplit(f)
+				if !f.Draft {
+					@bookingChange(f)
+				}
 				@bookingOverrides(f)
 				@bookingTags(f)
 			</div>
@@ -311,6 +314,36 @@ templ bookingTags(f BookingFormVM) {
 				}
 			</div>
 		}
+	</div>
+}
+
+// bookingChange records a lasting change of the amount, which is a different
+// thing from an override: an override is a promotion that runs out, this is the
+// new price. It ends the booking and starts a successor, so the book keeps when
+// the price moved and what it was before.
+templ bookingChange(f BookingFormVM) {
+	<div class="dlg-section rec-on">
+		<h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200">{ T(ctx, "bookings.change") }</h3>
+		<p class="mb-3 text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.changeHint") }</p>
+		<div class="change-row" id={ "change-" + f.Row.IDStr() }>
+			<div>
+				<label class="field-label" for={ "chgm-" + f.Row.IDStr() }>{ T(ctx, "bookings.changeFrom") }</label>
+				<input id={ "chgm-" + f.Row.IDStr() } class="input" type="month" name="change_from" value={ f.Row.NextMonth() }/>
+			</div>
+			<div>
+				<label class="field-label" for={ "chga-" + f.Row.IDStr() }>{ T(ctx, "bookings.changeAmount") }</label>
+				<input id={ "chga-" + f.Row.IDStr() } class="input tnum" type="number" step="0.01" min="0" name="change_amount" value={ CentsToInput(f.Row.Booking.AmountCents) } data-cents/>
+			</div>
+			<input type="hidden" name="m" value={ f.Row.Month }/>
+			<button
+				type="button"
+				class="btn-ghost"
+				hx-post={ "/bookings/" + f.Row.IDStr() + "/change" }
+				hx-include={ "#change-" + f.Row.IDStr() }
+				hx-target="#booking-dialog"
+				hx-swap="innerHTML"
+			>{ T(ctx, "bookings.changeApply") }</button>
+		</div>
 	</div>
 }
 

@@ -277,6 +277,11 @@
     @apply hidden;
   }
 
+  /* Month, new amount and the button that splits the booking in two. */
+  .change-row {
+    @apply grid items-end gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto];
+  }
+
   /* When a booking applies. Quiet like the class chip, because it sits on
      every row and has to inform without shouting. */
   .date-chip {

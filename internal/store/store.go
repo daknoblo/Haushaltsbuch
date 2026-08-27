@@ -27,6 +27,9 @@ var ErrNotFound = errors.New("store: not found")
 // ErrBadSnapshot is returned for a backup file this version cannot read.
 var ErrBadSnapshot = errors.New("store: unreadable snapshot")
 
+// ErrInvalid is returned when a request cannot be carried out as asked.
+var ErrInvalid = errors.New("store: invalid request")
+
 // ErrCategoryInUse is returned when a category still carries bookings. A
 // booking cannot exist without a category, so the reference must be moved
 // before the category can go.

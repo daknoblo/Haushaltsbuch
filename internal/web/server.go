@@ -95,6 +95,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /bookings/new", s.handleBookingCreate)
 	mux.HandleFunc("POST /bookings/{id}", s.handleBookingUpdate)
 	mux.HandleFunc("POST /bookings/{id}/delete", s.handleBookingDelete)
+	mux.HandleFunc("POST /bookings/{id}/change", s.handleBookingChange)
 	mux.HandleFunc("POST /bookings/{id}/discard", s.handleBookingDiscard)
 	mux.HandleFunc("POST /bookings/{id}/overrides", s.handleOverrideCreate)
 	mux.HandleFunc("POST /overrides/{id}", s.handleOverrideUpdate)

@@ -328,6 +328,12 @@ func (r BookingRow) DateLabel(ctx context.Context) string {
 	return MonthShort(ctx, from) + " – " + MonthShort(ctx, until)
 }
 
+// NextMonth is the month a price change is offered from: the one after the
+// displayed month, because a change entered today usually takes effect next.
+func (r BookingRow) NextMonth() string {
+	return ShiftMonth(NormalizeMonth(r.Month), 1)
+}
+
 // carrierIndex is a member's position among those carrying the booking, -1 for
 // anyone who carries none of it.
 func (r BookingRow) carrierIndex(id int64) int {
