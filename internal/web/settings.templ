@@ -280,9 +280,9 @@ templ CategoryRowView(c store.Category, usage int, icons []string) {
 			hx-swap="none"
 		>
 			@categoryIcon(c)
-			<select class="input w-32 shrink-0" name="icon" aria-label={ T(ctx, "settings.icon") }>
+			<select class="input w-auto shrink-0" name="icon" aria-label={ T(ctx, "settings.icon") }>
 				for _, key := range icons {
-						<option value={ key } selected?={ key == IconOr(c.Icon, c.Name) }>{ key }</option>
+					<option value={ key } selected?={ key == IconOr(c.Icon, c.Name) }>{ key }</option>
 				}
 			</select>
 			<input class="input h-11 w-12 shrink-0 p-1" type="color" name="color" value={ ColorOr(c.Color) } aria-label={ T(ctx, "settings.color") }/>
@@ -293,11 +293,14 @@ templ CategoryRowView(c store.Category, usage int, icons []string) {
 				}
 			</select>
 		</form>
-		if usage > 0 {
-			<span class="badge shrink-0">{ Tf(ctx, "settings.usedBy", usage) }</span>
-		}
+		// The count is always shown, and shown red when it is zero: a category
+		// nothing points at is the one worth noticing, and hiding the badge in
+		// exactly that case pushed the whole row out of line as well.
+		<span class={ "badge cat-usage tnum", templ.KV("badge-ok", usage > 0), templ.KV("badge-danger", usage == 0) }>
+			{ UsageLabel(ctx, usage) }
+		</span>
 		<button
-			class="btn-icon shrink-0 no-print"
+			class="btn-icon btn-icon-danger shrink-0 no-print"
 			hx-post={ "/categories/" + strconv.FormatInt(c.ID, 10) + "/delete" }
 			hx-swap="none"
 			hx-confirm={ T(ctx, "settings.confirmCategory") }

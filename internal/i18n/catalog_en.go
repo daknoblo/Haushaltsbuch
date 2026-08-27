@@ -261,6 +261,7 @@ var english = Catalog{
 	"settings.active":               "Active",
 	"settings.activate":             "activate",
 	"settings.usedBy":               "%d bookings",
+	"settings.usedByOne":            "1 booking",
 	"settings.confirmHousehold":     "Delete the household and all of its data?",
 	"settings.confirmMember":        "Delete this person?",
 	"settings.confirmCategory":      "Delete this category?",

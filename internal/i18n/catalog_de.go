@@ -260,6 +260,7 @@ var german = Catalog{
 	"settings.active":               "Aktiv",
 	"settings.activate":             "aktivieren",
 	"settings.usedBy":               "%d Buchungen",
+	"settings.usedByOne":            "1 Buchung",
 	"settings.confirmHousehold":     "Haushalt inkl. aller Daten löschen?",
 	"settings.confirmMember":        "Person löschen?",
 	"settings.confirmCategory":      "Kategorie löschen?",

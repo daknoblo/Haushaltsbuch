@@ -197,6 +197,16 @@ func RuleArcTitle(ctx context.Context, a calc.RuleArc) string {
 	return BudgetClassLabel(ctx, a.Class) + ": " + FormatEUR(a.Cents)
 }
 
+// UsageLabel is how many bookings point at a category. The singular needs its
+// own wording, and now that the count sits on every row "1 Buchungen" would be
+// on the screen more often than not.
+func UsageLabel(ctx context.Context, n int) string {
+	if n == 1 {
+		return T(ctx, "settings.usedByOne")
+	}
+	return Tf(ctx, "settings.usedBy", n)
+}
+
 // CostNatureOptions returns the selectable cost natures.
 func CostNatureOptions(ctx context.Context) []Option {
 	return []Option{
