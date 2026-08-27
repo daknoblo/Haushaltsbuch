@@ -752,13 +752,9 @@ templ categoryCard(vm DashboardVM) {
 templ categoryBar(c calc.LabeledTotal, max, total int64) {
 	<div class="grid grid-cols-[minmax(0,10rem)_1fr_auto_auto] items-center gap-3 py-1.5">
 		<div class="flex min-w-0 items-center gap-2">
-			if c.Icon != "" {
-				<span class="cat-icon cat-icon-sm" style={ "color:" + ColorOr(c.Color) }>
-					@iconSVG(c.Icon)
-				</span>
-			} else {
-				@memberDot(c.Color)
-			}
+			<span class="cat-icon cat-icon-sm" style={ "color:" + ColorOr(c.Color) }>
+				@iconSVG(IconOr(c.Icon, c.Label))
+			</span>
 			<span class="truncate text-sm text-slate-600 dark:text-slate-400">{ c.Label }</span>
 		</div>
 		<div class="bar-track">

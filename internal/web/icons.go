@@ -5,8 +5,6 @@ import (
 	"strings"
 
 	"github.com/a-h/templ"
-
-	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
 
 // Icons are drawn as inline SVG rather than loaded from a font or a sprite
@@ -60,6 +58,8 @@ var iconKeywords = []struct {
 	match string
 	icon  string
 }{
+	// The first match wins, so "haushalt" has to come before "haus".
+	{"haushalt", "tool"}, {"einrichtung", "tool"}, {"möbel", "tool"},
 	{"miete", "home"}, {"wohn", "home"}, {"rent", "home"}, {"haus", "home"},
 	{"strom", "bolt"}, {"energ", "bolt"}, {"electric", "bolt"},
 	{"gas", "flame"}, {"heiz", "flame"}, {"heating", "flame"},
@@ -84,8 +84,7 @@ var iconKeywords = []struct {
 	{"haustier", "paw"}, {"tier", "paw"}, {"pet", "paw"},
 	{"kind", "baby"}, {"kita", "baby"}, {"child", "baby"}, {"baby", "baby"},
 	{"sport", "dumbbell"}, {"fitness", "dumbbell"}, {"gym", "dumbbell"},
-	{"reparatur", "tool"}, {"instandhalt", "tool"}, {"repair", "tool"}, {"renovier", "tool"},
-	{"kredit", "card"}, {"rate", "card"}, {"darlehen", "card"}, {"loan", "card"},
+	{"reparatur", "tool"}, {"instandhalt", "tool"}, {"repair", "tool"}, {"renovier", "tool"}, {"kredit", "card"}, {"rate", "card"}, {"darlehen", "card"}, {"loan", "card"},
 	{"sparen", "piggy"}, {"sparrate", "piggy"}, {"rücklage", "piggy"}, {"saving", "piggy"},
 	{"gehalt", "wallet"}, {"lohn", "wallet"}, {"salary", "wallet"}, {"income", "wallet"},
 	{"einnahm", "coins"}, {"nebenjob", "coins"}, {"bonus", "coins"},
@@ -122,12 +121,15 @@ func cleanIcon(key string) string {
 	return ""
 }
 
-// IconOr returns the icon of a category, falling back to a guess from its name.
-func IconOr(c store.Category) string {
-	if _, ok := iconPaths[c.Icon]; ok {
-		return c.Icon
+// IconOr returns an icon key, falling back to a guess from the name. A stored
+// icon can be empty — the API lets a caller leave it out — so the guess belongs
+// here at the point of drawing rather than at the point of saving, which also
+// gives categories written before this rule existed a symbol.
+func IconOr(icon, name string) string {
+	if _, ok := iconPaths[icon]; ok {
+		return icon
 	}
-	return GuessIcon(c.Name)
+	return GuessIcon(name)
 }
 
 // iconSVG renders an icon. The markup is a package constant, never user input,

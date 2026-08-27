@@ -282,7 +282,7 @@ templ CategoryRowView(c store.Category, usage int, icons []string) {
 			@categoryIcon(c)
 			<select class="input w-32 shrink-0" name="icon" aria-label={ T(ctx, "settings.icon") }>
 				for _, key := range icons {
-					<option value={ key } selected?={ key == IconOr(c) }>{ key }</option>
+						<option value={ key } selected?={ key == IconOr(c.Icon, c.Name) }>{ key }</option>
 				}
 			</select>
 			<input class="input h-11 w-12 shrink-0 p-1" type="color" name="color" value={ ColorOr(c.Color) } aria-label={ T(ctx, "settings.color") }/>

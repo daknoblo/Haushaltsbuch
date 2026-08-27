@@ -154,6 +154,6 @@ templ moveButtons(baseURL string) {
 // categoryIcon renders a category's symbol in its own colour.
 templ categoryIcon(c store.Category) {
 	<span class="cat-icon" style={ "color:" + ColorOr(c.Color) }>
-		@iconSVG(IconOr(c))
+		@iconSVG(IconOr(c.Icon, c.Name))
 	</span>
 }
