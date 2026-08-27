@@ -100,6 +100,8 @@ var german = Catalog{
 	"bookings.settle":              "Im Ausgleich berücksichtigen",
 	"bookings.settleHint":          "Aus, wenn die Kosten zwar geteilt notiert sind, aber nie verrechnet werden.",
 	"bookings.noSettle":            "ohne Ausgleich",
+	"bookings.shared":              "Geteilt",
+	"bookings.alone":               "Allein",
 	"bookings.paysTitle":           "%s streckt vor",
 	"bookings.carriesTitle":        "%s trägt mit",
 	"bookings.payerHint":           "Wer die Rechnung vorstreckt – daraus entsteht der Ausgleich.",

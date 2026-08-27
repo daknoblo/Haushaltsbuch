@@ -143,10 +143,29 @@ type BookingRow struct {
 	// Month is the month the displayed amount is computed for, because a
 	// temporary override makes that amount depend on when you look.
 	Month string
-	// MemberCount is how many people the household has, which is what decides
-	// whether "carried alone" says anything at all.
-	MemberCount int
+	// Members is the whole household in its own order, not just the people who
+	// carry this booking. The list gives each of them a column of their own, so
+	// a name always sits in the same place and an absence is visible as a gap.
+	Members []store.Member
 }
+
+// MemberCount is how many people the household has, which is what decides
+// whether saying who carries a booking says anything at all.
+func (r BookingRow) MemberCount() int { return len(r.Members) }
+
+// Carries reports whether the member holds a share of this booking.
+func (r BookingRow) Carries(id int64) bool {
+	for _, m := range r.Carriers {
+		if m.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+// IsShared reports whether the cost is divided between people rather than
+// resting on one of them.
+func (r BookingRow) IsShared() bool { return len(r.Carriers) > 1 }
 
 // IsIncome reports whether the booking adds to the budget.
 func (r BookingRow) IsIncome() bool { return r.Booking.Direction == store.DirIncome }

@@ -122,13 +122,13 @@ func (s *Server) buildBookingsVM(ctx context.Context, householdID int64, month, 
 	}
 	for _, b := range data.Bookings {
 		row := BookingRow{
-			Booking:     b,
-			Category:    categories[b.CategoryID],
-			Splits:      data.Splits[b.ID],
-			TagIDs:      data.TagLinks[b.ID],
-			Overrides:   data.Overrides[b.ID],
-			Month:       month,
-			MemberCount: len(data.Members),
+			Booking:   b,
+			Category:  categories[b.CategoryID],
+			Splits:    data.Splits[b.ID],
+			TagIDs:    data.TagLinks[b.ID],
+			Overrides: data.Overrides[b.ID],
+			Month:     month,
+			Members:   data.Members,
 		}
 		if b.PayerMemberID != nil {
 			row.Payer = members[*b.PayerMemberID]

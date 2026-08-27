@@ -122,38 +122,58 @@ templ bookingRow(b BookingRow) {
 				{ b.Booking.Name }
 			}
 		</span>
-		<span class="hidden items-center gap-1.5 sm:flex">
-			if b.DateLabel(ctx) != "" {
-				<span class="date-chip">{ b.DateLabel(ctx) }</span>
-			}
+		<span class="row-flags">
 			if !b.ActiveInMonth() {
 				<span class="badge badge-muted">{ T(ctx, "bookings.notInMonth") }</span>
 			}
 			if b.Discounted() {
 				<span class="badge badge-ok">{ FormatEUR(b.AmountCents()) }</span>
 			}
-			<span class={ "badge", FrequencyBadgeClass(b.Booking.Frequency) }>{ RhythmLabel(ctx, b.Booking) }</span>
 			if b.ShowDuePoint() {
 				<span class="badge badge-muted">{ DuePointLabel(ctx, b.Booking.DuePoint) }</span>
-			}
-			if !b.IsIncome() {
-				<span class="class-chip">
-					<span class={ "inline-block h-2 w-2 rounded-full", BudgetClassDot(b.Booking.BudgetClass) }></span>
-					{ BudgetClassLabel(ctx, b.Booking.BudgetClass) }
-				</span>
 			}
 			if !b.IsIncome() && !b.Booking.Settle {
 				<span class="badge badge-muted">{ T(ctx, "bookings.noSettle") }</span>
 			}
-			if b.MemberCount > 1 {
-				if len(b.Carriers) == 0 {
-					<span class="badge badge-warn">{ T(ctx, "overview.unassigned") }</span>
+			if b.MemberCount() > 1 && len(b.Carriers) == 0 {
+				<span class="badge badge-warn">{ T(ctx, "overview.unassigned") }</span>
+			}
+		</span>
+		<span class="row-meta">
+			<span class="meta-cell meta-date">
+				if b.DateLabel(ctx) != "" {
+					<span class="date-chip">{ b.DateLabel(ctx) }</span>
 				}
-				for _, m := range b.Carriers {
-					@memberChip(m, b.IsPayer(m.ID))
+			</span>
+			<span class="meta-cell meta-rhythm">
+				<span class={ "badge truncate", FrequencyBadgeClass(b.Booking.Frequency) } title={ RhythmLabel(ctx, b.Booking) }>
+					{ RhythmLabel(ctx, b.Booking) }
+				</span>
+			</span>
+			<span class="meta-cell meta-split">
+				if b.MemberCount() > 1 {
+					if b.IsShared() {
+						<span class="badge badge-sky">{ T(ctx, "bookings.shared") }</span>
+					} else if len(b.Carriers) == 1 {
+						<span class="badge badge-muted">{ T(ctx, "bookings.alone") }</span>
+					}
 				}
-				if b.PayerCarriesNothing() {
-					@memberChip(b.Payer, true)
+			</span>
+			<span class="meta-cell meta-class">
+				if !b.IsIncome() {
+					<span class="class-chip">
+						<span class={ "inline-block h-2 w-2 shrink-0 rounded-full", BudgetClassDot(b.Booking.BudgetClass) }></span>
+						<span class="truncate">{ BudgetClassLabel(ctx, b.Booking.BudgetClass) }</span>
+					</span>
+				}
+			</span>
+			if b.MemberCount() > 1 {
+				for _, m := range b.Members {
+					<span class="meta-cell meta-member">
+						if b.Carries(m.ID) || (b.IsPayer(m.ID) && b.PayerCarriesNothing()) {
+							@memberChip(m, b.IsPayer(m.ID))
+						}
+					</span>
 				}
 			}
 		</span>

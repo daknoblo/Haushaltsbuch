@@ -100,6 +100,8 @@ var english = Catalog{
 	"bookings.settle":              "Count in the settlement",
 	"bookings.settleHint":          "Off for costs that are noted as shared but never squared between you.",
 	"bookings.noSettle":            "not settled",
+	"bookings.shared":              "Shared",
+	"bookings.alone":               "Alone",
 	"bookings.paysTitle":           "%s fronts the money",
 	"bookings.carriesTitle":        "%s carries a share",
 	"bookings.payerHint":           "Who fronts the bill – that is what the settlement is built from.",

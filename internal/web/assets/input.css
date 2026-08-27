@@ -216,6 +216,39 @@
     @apply opacity-50;
   }
 
+  /* The meta columns line up down the whole list, so a rhythm or a person is
+     found by position instead of by reading every row. Each cell keeps its
+     width whether or not it has content — the gap where a name would be is
+     what says that this cost rests on one person alone. Widths are cut to the
+     longest label each column can hold, and the columns that say least drop
+     out first as the window narrows, so what is left stays aligned. */
+  .row-meta {
+    @apply hidden shrink-0 items-center gap-1.5 sm:flex;
+  }
+  .meta-cell {
+    @apply hidden shrink-0 items-center overflow-hidden;
+  }
+  .meta-date {
+    @apply flex w-[6.25rem] justify-end;
+  }
+  .meta-rhythm {
+    @apply flex w-[7.25rem];
+  }
+  .meta-split {
+    @apply flex w-[3.75rem];
+  }
+  .meta-member {
+    @apply w-24 md:flex;
+  }
+  .meta-class {
+    @apply w-[6.25rem] lg:flex;
+  }
+  /* What is true of only a few bookings sits ahead of the columns, where it
+     eats into the name rather than pushing every figure out of line. */
+  .row-flags {
+    @apply hidden min-w-0 shrink items-center justify-end gap-1.5 overflow-hidden sm:flex;
+  }
+
   .dlg {
     @apply w-[min(55rem,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white p-0 text-slate-800 shadow-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200;
   }
