@@ -484,8 +484,19 @@ func FixedCosts(d Data, months []string, member int64, limit int) []LabeledTotal
 	return kept
 }
 
+// sortByCentsDesc puts the largest first. The tie-breaks are not cosmetic: the
+// totals are collected out of a map, so two equal entries would otherwise land
+// in a different order on every request.
 func sortByCentsDesc(t []LabeledTotal) {
-	sort.SliceStable(t, func(i, j int) bool { return t[i].Cents > t[j].Cents })
+	sort.Slice(t, func(i, j int) bool {
+		if t[i].Cents != t[j].Cents {
+			return t[i].Cents > t[j].Cents
+		}
+		if t[i].Label != t[j].Label {
+			return t[i].Label < t[j].Label
+		}
+		return t[i].Key < t[j].Key
+	})
 }
 
 func round(f float64) int64 {

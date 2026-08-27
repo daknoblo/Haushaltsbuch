@@ -198,11 +198,20 @@ func stackTotals(d Data, months []string, member int64, grouping string) ([]Stac
 		keys = append(keys, k)
 	}
 	if grouping == GroupClass {
-		sort.SliceStable(keys, func(i, j int) bool { return keys[i].Key < keys[j].Key })
+		sort.Slice(keys, func(i, j int) bool { return keys[i].Key < keys[j].Key })
 		return keys, cents
 	}
-	sort.SliceStable(keys, func(i, j int) bool {
-		return sumOf(cents[keys[i].Key]) > sumOf(cents[keys[j].Key])
+	// The keys come out of a map, so equal columns need a tie-break of their own
+	// or the legend reorders itself between reloads.
+	sort.Slice(keys, func(i, j int) bool {
+		a, b := sumOf(cents[keys[i].Key]), sumOf(cents[keys[j].Key])
+		if a != b {
+			return a > b
+		}
+		if keys[i].Label != keys[j].Label {
+			return keys[i].Label < keys[j].Label
+		}
+		return keys[i].Key < keys[j].Key
 	})
 	return keys, cents
 }

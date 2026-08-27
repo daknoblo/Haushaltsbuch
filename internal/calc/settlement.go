@@ -201,7 +201,15 @@ func shareLines(d Data, order []store.Booking, totals map[int64]int64, shares ma
 		}
 		out = append(out, line)
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].MonthlyCents > out[j].MonthlyCents })
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].MonthlyCents != out[j].MonthlyCents {
+			return out[i].MonthlyCents > out[j].MonthlyCents
+		}
+		if out[i].Booking.Name != out[j].Booking.Name {
+			return out[i].Booking.Name < out[j].Booking.Name
+		}
+		return out[i].Booking.ID < out[j].Booking.ID
+	})
 	return out
 }
 

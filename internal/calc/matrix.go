@@ -260,6 +260,21 @@ func median(v []int64) int64 {
 	return (s[mid-1] + s[mid]) / 2
 }
 
+// sortRows puts the expensive lines first. The tie-breaks matter as much as the
+// amount: the rows are collected out of a map, so two lines costing the same
+// would otherwise swap places between one page load and the next.
 func sortRows(rows []MatrixRow) {
-	sort.SliceStable(rows, func(i, j int) bool { return rows[i].TotalCents > rows[j].TotalCents })
+	sort.Slice(rows, func(i, j int) bool {
+		a, b := rows[i], rows[j]
+		if a.TotalCents != b.TotalCents {
+			return a.TotalCents > b.TotalCents
+		}
+		if a.Label != b.Label {
+			return a.Label < b.Label
+		}
+		if a.LabelKey != b.LabelKey {
+			return a.LabelKey < b.LabelKey
+		}
+		return a.Key < b.Key
+	})
 }

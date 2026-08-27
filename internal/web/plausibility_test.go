@@ -64,9 +64,9 @@ func plausibilityBook(t *testing.T, srv *Server, h store.Household) map[string]i
 		b.StartsOn, b.EndsOn = "2026-01-01", "2026-12-31"
 		return b
 	}
-	expense := func(amount int64, freq store.Frequency, nature store.CostNature, class store.BudgetClass) store.Booking {
+	expense := func(category string, amount int64, freq store.Frequency, nature store.CostNature, class store.BudgetClass) store.Booking {
 		return year(store.Booking{
-			CategoryID: cat("Miete"), Direction: store.DirExpense, AmountCents: amount,
+			CategoryID: cat(category), Direction: store.DirExpense, AmountCents: amount,
 			Frequency: freq, Interval: 1, DuePoint: store.DueStart,
 			CostNature: nature, BudgetClass: class, SplitMode: store.SplitEqual,
 			Settle: true, PayerMemberID: &a,
@@ -85,35 +85,42 @@ func plausibilityBook(t *testing.T, srv *Server, h store.Household) map[string]i
 		StartsOn: "2026-04-10", SplitMode: store.SplitEqual, PayerMemberID: &a,
 	}, []store.SplitInput{{MemberID: a}})
 
-	// Expenses across every rhythm, nature and class.
-	add("Miete", expense(100000, store.FreqMonthly, store.CostFix, store.ClassNeed),
+	// Expenses across every rhythm, nature and class. Versicherung, Nebenkosten
+	// and Sonstiges all come to a hundred euro a month, and the two subscriptions
+	// tie inside their category: rows that cost the same are where an unstable
+	// sort shows itself.
+	add("Miete", expense("Miete", 100000, store.FreqMonthly, store.CostFix, store.ClassNeed),
 		[]store.SplitInput{{MemberID: a}, {MemberID: b}})
-	add("Versicherung", expense(120000, store.FreqYearly, store.CostFix, store.ClassNeed),
+	add("Versicherung", expense("Versicherung", 120000, store.FreqYearly, store.CostFix, store.ClassNeed),
 		[]store.SplitInput{{MemberID: a}})
-	add("Abschlag", expense(30000, store.FreqQuarterly, store.CostFix, store.ClassNeed),
+	add("Abschlag", expense("Nebenkosten", 30000, store.FreqQuarterly, store.CostFix, store.ClassNeed),
 		[]store.SplitInput{{MemberID: a}, {MemberID: b}})
-	add("Haushaltsgeld", expense(5000, store.FreqWeekly, store.CostVariable, store.ClassNeed),
+	add("Haushaltsgeld", expense("Lebensmittel", 5000, store.FreqWeekly, store.CostVariable, store.ClassNeed),
+		[]store.SplitInput{{MemberID: a}})
+	add("Streaming", expense("Abo", 1500, store.FreqMonthly, store.CostFix, store.ClassWant),
+		[]store.SplitInput{{MemberID: a}})
+	add("Zeitung", expense("Abo", 1500, store.FreqMonthly, store.CostFix, store.ClassWant),
 		[]store.SplitInput{{MemberID: a}})
 
 	// The three ways of dividing a booking.
-	percent := expense(50000, store.FreqMonthly, store.CostVariable, store.ClassWant)
+	percent := expense("Freizeit", 50000, store.FreqMonthly, store.CostVariable, store.ClassWant)
 	percent.SplitMode = store.SplitPercent
 	add("Freizeit", percent, []store.SplitInput{{MemberID: a, Value: 60}, {MemberID: b, Value: 40}})
 
-	fixed := expense(80000, store.FreqMonthly, store.CostVariable, store.ClassWant)
+	fixed := expense("Mobilität", 80000, store.FreqMonthly, store.CostVariable, store.ClassWant)
 	fixed.SplitMode = store.SplitFixed
 	add("Einkauf", fixed, []store.SplitInput{{MemberID: a, Value: 50000}, {MemberID: b, Value: 30000}})
 
 	// A savings rate everyone runs for themselves stays out of the settlement.
-	unsettled := expense(40000, store.FreqMonthly, store.CostFix, store.ClassSaving)
+	unsettled := expense("Sparrate", 40000, store.FreqMonthly, store.CostFix, store.ClassSaving)
 	unsettled.Settle = false
 	add("Sparrate", unsettled, []store.SplitInput{{MemberID: a}, {MemberID: b}})
 
 	// A booking nobody carries: it costs the household but settles nothing.
-	add("Herrenlos", expense(10000, store.FreqMonthly, store.CostVariable, store.ClassWant), nil)
+	add("Herrenlos", expense("Sonstiges", 10000, store.FreqMonthly, store.CostVariable, store.ClassWant), nil)
 
 	// An amount that differs for part of the year.
-	over := expense(20000, store.FreqMonthly, store.CostFix, store.ClassNeed)
+	over := expense("Strom", 20000, store.FreqMonthly, store.CostFix, store.ClassNeed)
 	over.PayerMemberID = &b
 	add("Strom", over, []store.SplitInput{{MemberID: a}, {MemberID: b}})
 	if _, err := srv.store.CreateOverride(ctx, h.ID, store.BookingOverride{
@@ -443,6 +450,26 @@ func TestPlausibilityTheAPIAgreesWithTheReport(t *testing.T) {
 	}
 }
 
+// The same book has to render the same page twice. Rows are collected out of
+// maps, whose order Go deliberately shuffles, so anything that only sorts by
+// amount lets two equal lines swap places between one reload and the next.
+func TestPlausibilityTheSamePageRendersTheSame(t *testing.T) {
+	_, h, _, _ := plausibilityFixture(t)
+
+	for _, path := range []string{
+		"/", "/bookings?m=2026-04", "/settings",
+		"/dashboard?m=2026-04", "/dashboard?m=2026-04&p=1m", "/dashboard?m=2026-04&g=class",
+	} {
+		first := get(t, h, path).Body.String()
+		for i := range 15 {
+			if again := get(t, h, path).Body.String(); again != first {
+				t.Errorf("GET %s reads differently on call %d without anything having changed", path, i+2)
+				break
+			}
+		}
+	}
+}
+
 // A backup is only worth keeping if it comes back identical. This is the one
 // check whose failure costs a household its book.
 func TestPlausibilityABackupSurvivesTheRoundTrip(t *testing.T) {
@@ -468,7 +495,7 @@ func TestPlausibilityABackupSurvivesTheRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stats: %v", err)
 	}
-	if stats.Bookings != 11 {
-		t.Errorf("%d bookings after the round trip, want the 11 that went in", stats.Bookings)
+	if stats.Bookings != 13 {
+		t.Errorf("%d bookings after the round trip, want the 13 that went in", stats.Bookings)
 	}
 }
