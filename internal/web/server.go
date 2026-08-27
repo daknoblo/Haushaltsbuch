@@ -58,6 +58,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /settings/restore", s.handleBackupRestore)
 	mux.HandleFunc("POST /settings/reset", s.handleDataReset)
 	mux.HandleFunc("POST /settings/reset-bookings", s.handleBookingsReset)
+	mux.HandleFunc("POST /settings/carry-forward", s.handleCarryForward)
 
 	// The pages that used to hold expenses and income now live in one place.
 	mux.HandleFunc("GET /expenses", redirectTo("/bookings"))

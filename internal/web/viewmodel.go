@@ -765,6 +765,7 @@ type SettingsVM struct {
 	CatUsage    map[int64]int
 	Suggestions []store.SeedCategory
 	Icons       []string
+	Carry       CarryVM
 }
 
 // UsageOf returns how many bookings still reference a category.

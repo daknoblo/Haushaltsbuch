@@ -177,6 +177,33 @@ func (s *Store) DeleteBooking(ctx context.Context, householdID, id int64) error 
 		`DELETE FROM bookings WHERE id = ? AND household_id = ?`, id, householdID))
 }
 
+// ExtendBookings moves the end of the given recurring bookings, which is how a
+// book that runs to December is taken into the next year. It never shortens a
+// period and never touches a one-off, so a stale checkbox can do no harm;
+// anything that does not qualify is left alone rather than reported, because a
+// review of a dozen bookings should not fail over one of them.
+func (s *Store) ExtendBookings(ctx context.Context, householdID int64, ids []int64, until string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	if _, err := time.Parse("2006-01-02", until); err != nil {
+		return fmt.Errorf("%w: %q is not a date", ErrInvalid, until)
+	}
+
+	return s.withTx(ctx, func(tx *Store) error {
+		for _, id := range ids {
+			if _, err := tx.q.ExecContext(ctx,
+				`UPDATE bookings SET ends_on = ?, updated_at = ?
+				 WHERE id = ? AND household_id = ? AND frequency <> ? AND ends_on <> '' AND ends_on < ?`,
+				until, now(), id, householdID, string(FreqOnce), until,
+			); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 // ChangeAmountFrom records a lasting change of a recurring amount: the booking
 // is closed off the day before, and a copy of it carries the new amount onward.
 // Two bookings rather than one is what makes the change itself visible — when

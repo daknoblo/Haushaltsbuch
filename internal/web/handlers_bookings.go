@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/calc"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
@@ -251,7 +252,7 @@ func (s *Server) handleBookingUpdate(w http.ResponseWriter, r *http.Request) {
 
 	if b.Frequency.Recurring() {
 		b.StartsOn = monthToDate(cleanMonth(r.FormValue("active_from")))
-		b.EndsOn = monthToDate(cleanMonth(r.FormValue("active_until")))
+		b.EndsOn = monthEnd(cleanMonth(r.FormValue("active_until")))
 	} else {
 		b.StartsOn = cleanDate(r.FormValue("occurred_on"))
 		b.EndsOn = ""
@@ -386,6 +387,22 @@ func monthToDate(m string) string {
 		return ""
 	}
 	return m + "-01"
+}
+
+// monthEnd turns a YYYY-MM value into the last day of that month, which is what
+// the closing half of a period means: valid until December runs through the
+// 31st, not until the 1st. The reports compare whole months and never noticed
+// the difference, but the stored date is read by anything that asks a sharper
+// question — whether a booking runs out at the turn of the year, say.
+func monthEnd(m string) string {
+	if m == "" {
+		return ""
+	}
+	first, err := time.Parse("2006-01", m)
+	if err != nil {
+		return ""
+	}
+	return first.AddDate(0, 1, -1).Format("2006-01-02")
 }
 
 // tagsFromForm collects the checked tag ids.

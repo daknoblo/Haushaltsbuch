@@ -491,5 +491,8 @@ func (s *Server) buildSettingsVM(ctx context.Context) (SettingsVM, error) {
 		return SettingsVM{}, err
 	}
 	vm.Suggestions = suggestCategories(vm.Categories)
+	if vm.Carry, err = s.buildCarryVM(ctx, activeID, vm.Categories); err != nil {
+		return SettingsVM{}, err
+	}
 	return vm, nil
 }

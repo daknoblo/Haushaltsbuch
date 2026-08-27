@@ -277,6 +277,11 @@
     @apply hidden;
   }
 
+  /* One booking of the yearly review: tick, name, when it stops, what it costs. */
+  .carry-row {
+    @apply flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/40;
+  }
+
   /* Month, new amount and the button that splits the booking in two. */
   .change-row {
     @apply grid items-end gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto];

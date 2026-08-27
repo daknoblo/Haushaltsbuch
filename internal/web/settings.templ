@@ -98,9 +98,44 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 					</form>
 				</div>
 			</div>
+			if vm.Carry.Pending() {
+				@carryCard(vm.Carry)
+			}
 			@dataCard()
 		</div>
 	}
+}
+
+// carryCard is the yearly review. Every recurring booking runs to the end of
+// its year on purpose, so the new year is a decision per booking rather than
+// something that happens while nobody is looking.
+templ carryCard(vm CarryVM) {
+	<div class="card-tight lg:col-span-2" id="carry">
+		<div class="card-head">
+			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "settings.carry") }</h2>
+			<span class="badge ml-auto">{ vm.YearStr() }</span>
+		</div>
+		<div class="card-body">
+			<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "settings.carryHint") }</p>
+			<form hx-post="/settings/carry-forward" hx-swap="none">
+				<input type="hidden" name="year" value={ vm.YearStr() }/>
+				<div class="grid gap-1">
+					for _, row := range vm.Rows {
+						<label class="carry-row">
+							<input type="checkbox" name="booking" value={ strconv.FormatInt(row.Booking.ID, 10) } checked/>
+							<span class="min-w-0 flex-1 truncate text-sm text-slate-800 dark:text-slate-200">
+								{ row.Booking.Name }
+								<span class="text-slate-400 dark:text-slate-500">· { row.Category.Name }</span>
+							</span>
+							<span class="date-chip">{ Tf(ctx, "settings.carryUntil", FormatDate(row.Booking.EndsOn)) }</span>
+							<span class="tnum shrink-0 text-sm font-medium text-slate-700 dark:text-slate-300">{ FormatEUR(row.Booking.AmountCents) }</span>
+						</label>
+					}
+				</div>
+				<button class="btn-primary mt-3" type="submit">{ Tf(ctx, "settings.carryApply", vm.YearStr()) }</button>
+			</form>
+		</div>
+	</div>
 }
 
 // dataCard is where the whole book is carried out of the app and back in, and
