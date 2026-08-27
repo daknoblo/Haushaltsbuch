@@ -47,7 +47,7 @@ var german = Catalog{
 	"overview.byCategory":    "Nach Kategorie",
 	"overview.noExpenses":    "Noch keine Ausgaben erfasst.",
 	"overview.costNature":    "Fix / Variabel",
-	"overview.budgetClasses": "Bedarf / Wunsch / Sparen",
+	"overview.budgetClasses": "Lebenshaltung / Vergnügen / Sparen",
 
 	// Bookings
 	"bookings.title":               "Buchungen",
@@ -175,7 +175,7 @@ var german = Catalog{
 	"dash.ruleNoIncome":       "Ohne Einkommen lässt sich nichts aufteilen.",
 	"dash.ruleSurplus":        "%s des Einkommens bleiben übrig",
 	"dash.income":             "Einkommen",
-	"rule.needHint":           "Fixkosten und Lebenshaltung — Miete, Strom, Versicherungen, Einkauf.",
+	"rule.needHint":           "Was laufen muss — Miete, Strom, Versicherungen, Einkauf.",
 	"rule.wantHint":           "Freizeit und alles, was das Leben schöner macht — Hobbys, Urlaub, Essengehen.",
 	"rule.savingHint":         "Rücklagen bilden oder Schulden tilgen.",
 	"rule.over":               "%s darüber",
@@ -281,8 +281,8 @@ var german = Catalog{
 	"dir.expense":      "Ausgabe",
 	"cost.fix":         "Fix",
 	"cost.variable":    "Variabel",
-	"class.need":       "Bedarf",
-	"class.want":       "Wunsch",
+	"class.need":       "Lebenshaltung",
+	"class.want":       "Vergnügen",
 	"class.saving":     "Sparen",
 	"split.equal":      "Gleichmäßig",
 	"split.percent":    "Prozentual",
