@@ -43,7 +43,10 @@ type MatrixRow struct {
 	MeanCents   int64
 	MedianCents int64
 	ShareTotal  float64
-	Children    []MatrixRow
+	// Gain marks a row where a larger figure is the better news, which is what
+	// separates a raise from a rising cost.
+	Gain     bool
+	Children []MatrixRow
 }
 
 // MatrixBand groups rows under one heading and carries their sum.
@@ -174,6 +177,22 @@ func BuildMatrix(d Data, months []string, member int64) Matrix {
 	expense := addRows(m.Band(BandFixed).Total, m.Band(BandVariable).Total, n)
 	m.Expense = summarize(MatrixRow{LabelKey: "matrix.total.expense"}, expense, n)
 	m.Surplus = summarize(MatrixRow{LabelKey: "matrix.surplus"}, diffRows(income.Cents, expense, n), n)
+	m.Surplus.Gain = true
+
+	// Income is the one band where more is the good news, and the surplus rides
+	// along with it.
+	for i := range m.Bands {
+		if m.Bands[i].Key != BandIncome {
+			continue
+		}
+		m.Bands[i].Total.Gain = true
+		for j := range m.Bands[i].Rows {
+			m.Bands[i].Rows[j].Gain = true
+			for k := range m.Bands[i].Rows[j].Children {
+				m.Bands[i].Rows[j].Children[k].Gain = true
+			}
+		}
+	}
 
 	// Every percentage on the table is a share of income. A category measured
 	// against its own band answers how the spending splits, which is a question

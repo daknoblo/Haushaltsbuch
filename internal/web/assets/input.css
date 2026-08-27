@@ -436,10 +436,10 @@
   .trend-flat {
     @apply bg-amber-500/20 text-amber-600 dark:text-amber-400;
   }
-  .trend-down {
+  .trend-good {
     @apply bg-emerald-500/20 text-emerald-600 dark:text-emerald-400;
   }
-  .trend-up {
+  .trend-bad {
     @apply bg-rose-500/20 text-rose-600 dark:text-rose-400;
   }
   /* A category folds its bookings away until asked. A <details> cannot wrap

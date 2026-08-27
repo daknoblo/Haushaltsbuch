@@ -262,7 +262,7 @@ templ matrixLine(vm DashboardVM, row calc.MatrixRow, extra string) {
 templ matrixCells(row calc.MatrixRow) {
 	for i, c := range row.Cents {
 		<td class="matrix-cell text-right">
-			@matrixTrend(row.Trend[i])
+			@matrixTrend(row.Trend[i], row.Gain)
 			{ MatrixCell(c) }
 		</td>
 	}
@@ -273,15 +273,17 @@ templ matrixCells(row calc.MatrixRow) {
 	<td class="matrix-cell matrix-aside">{ FormatEURShort(row.MedianCents) }</td>
 }
 
-// matrixTrend marks a month against the one before it. It says nothing at all
-// where there is nothing to compare, because an arrow against a month the
-// booking did not run in would invent a change.
-templ matrixTrend(t calc.MatrixTrend) {
+// matrixTrend marks a month against the one before it. The arrow is the fact
+// and the color the verdict, which is why they can disagree: a rising salary
+// points up in green, a rising rent points up in red. Nothing is drawn where
+// there is nothing to compare, because an arrow against a month the booking did
+// not run in would invent a change.
+templ matrixTrend(t calc.MatrixTrend, gain bool) {
 	switch t {
 		case calc.TrendUp:
-			<span class="trend trend-up" title={ T(ctx, "matrix.trendUp") } aria-label={ T(ctx, "matrix.trendUp") }>↗</span>
+			<span class={ "trend", TrendTone(t, gain) } title={ T(ctx, "matrix.trendUp") } aria-label={ T(ctx, "matrix.trendUp") }>↗</span>
 		case calc.TrendDown:
-			<span class="trend trend-down" title={ T(ctx, "matrix.trendDown") } aria-label={ T(ctx, "matrix.trendDown") }>↘</span>
+			<span class={ "trend", TrendTone(t, gain) } title={ T(ctx, "matrix.trendDown") } aria-label={ T(ctx, "matrix.trendDown") }>↘</span>
 		case calc.TrendFlat:
 			<span class="trend trend-flat" title={ T(ctx, "matrix.trendFlat") } aria-label={ T(ctx, "matrix.trendFlat") }>–</span>
 	}

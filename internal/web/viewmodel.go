@@ -603,6 +603,16 @@ func ruleMet(rep calc.MonthReport, class store.BudgetClass) bool {
 	return got <= want
 }
 
+// TrendTone colors a change by whether it is welcome rather than by its
+// direction. The arrow already says which way the figure moved; what it cannot
+// say is that a rising rent and a rising salary are not the same news.
+func TrendTone(t calc.MatrixTrend, gain bool) string {
+	if (t == calc.TrendUp) == gain {
+		return "trend-good"
+	}
+	return "trend-bad"
+}
+
 // RuleViewBox returns the SVG viewBox of the 50/30/20 ring.
 func RuleViewBox(r calc.RuleRing) string {
 	return "0 0 " + Coord(r.Size) + " " + Coord(r.Size)

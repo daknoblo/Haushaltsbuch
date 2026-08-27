@@ -202,3 +202,30 @@ func TestMatrixWithoutMonthsIsEmpty(t *testing.T) {
 		t.Error("a range without months produced a matrix")
 	}
 }
+
+// A rising rent and a rising salary point the same way and mean the opposite,
+// so the row has to say which of the two it is.
+func TestMatrixMarksWhereMoreIsBetter(t *testing.T) {
+	m := BuildMatrix(budgetBook(), calendarYear(), Everyone)
+
+	income := m.Band(BandIncome)
+	if !income.Total.Gain {
+		t.Error("the income total is not marked as a row where more is better")
+	}
+	for _, row := range income.Rows {
+		if !row.Gain {
+			t.Errorf("income row %q is not marked", row.Label)
+		}
+	}
+	if !m.Surplus.Gain {
+		t.Error("the surplus is not marked")
+	}
+	if m.Expense.Gain {
+		t.Error("more expenses are not better news")
+	}
+	for _, band := range []string{BandFixed, BandVariable} {
+		if m.Band(band).Total.Gain {
+			t.Errorf("%s is marked as a row where more is better", band)
+		}
+	}
+}
