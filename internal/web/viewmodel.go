@@ -303,6 +303,31 @@ func (r BookingRow) FixedInput(id int64) string {
 	return CentsToInput(r.evenCents(id))
 }
 
+// DateLabel says when a booking applies: the day a one-off falls on, or the
+// span a recurring one runs over. The list showed the rhythm but never the
+// when, so a salary entered for June looked the same as one for August.
+func (r BookingRow) DateLabel(ctx context.Context) string {
+	if !r.Booking.Frequency.Recurring() {
+		if r.Booking.StartsOn == "" {
+			return ""
+		}
+		return FormatDate(r.Booking.StartsOn)
+	}
+
+	from, until := r.StartMonth(), r.EndMonth()
+	switch {
+	case from == "" && until == "":
+		return T(ctx, "bookings.always")
+	case from == "":
+		return Tf(ctx, "bookings.untilMonth", MonthShort(ctx, until))
+	case until == "":
+		return Tf(ctx, "bookings.fromMonth", MonthShort(ctx, from))
+	case from == until:
+		return MonthShort(ctx, from)
+	}
+	return MonthShort(ctx, from) + " – " + MonthShort(ctx, until)
+}
+
 // carrierIndex is a member's position among those carrying the booking, -1 for
 // anyone who carries none of it.
 func (r BookingRow) carrierIndex(id int64) int {

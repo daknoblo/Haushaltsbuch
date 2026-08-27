@@ -123,6 +123,9 @@ templ bookingRow(b BookingRow) {
 			}
 		</span>
 		<span class="hidden items-center gap-1.5 sm:flex">
+			if b.DateLabel(ctx) != "" {
+				<span class="date-chip">{ b.DateLabel(ctx) }</span>
+			}
 			if !b.ActiveInMonth() {
 				<span class="badge badge-muted">{ T(ctx, "bookings.notInMonth") }</span>
 			}

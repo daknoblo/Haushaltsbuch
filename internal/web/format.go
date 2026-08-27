@@ -134,6 +134,15 @@ func MonthShort(ctx context.Context, ym string) string {
 	return fmt.Sprintf("%s %02d", i18n.MonthAbbr(i18n.LangFrom(ctx), int(t.Month())), t.Year()%100)
 }
 
+// FormatDate renders a stored YYYY-MM-DD in German notation.
+func FormatDate(iso string) string {
+	t, err := time.Parse("2006-01-02", iso)
+	if err != nil {
+		return iso
+	}
+	return t.Format("02.01.2006")
+}
+
 // formatDecimal formats cents as a plain decimal (dot separator, no grouping),
 // suitable for a number input value (e.g. 123456 -> "1234.56").
 func formatDecimal(c int64) string {

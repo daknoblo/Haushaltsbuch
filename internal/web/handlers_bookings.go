@@ -72,6 +72,7 @@ func (s *Server) handleBookingCreate(w http.ResponseWriter, r *http.Request) {
 		name = T(ctx, "bookings.newIncome")
 	}
 	month := NormalizeMonth(r.URL.Query().Get("m"))
+	from, until := calendarYearBounds(month)
 	// Who pays and who carries it is left open on purpose: a guess here is one
 	// the user has to notice and undo.
 	b := store.Booking{
@@ -82,7 +83,8 @@ func (s *Server) handleBookingCreate(w http.ResponseWriter, r *http.Request) {
 		Frequency:   store.FreqMonthly,
 		Interval:    1,
 		DuePoint:    store.DueStart,
-		StartsOn:    month + "-01",
+		StartsOn:    from,
+		EndsOn:      until,
 		CostNature:  store.CostFix,
 		BudgetClass: store.ClassNeed,
 		SplitMode:   store.SplitEqual,
@@ -317,6 +319,14 @@ func (s *Server) categoryFromName(ctx context.Context, householdID int64, b stor
 		return contains[0], nil
 	}
 	return 0, nil
+}
+
+// calendarYearBounds is the range a new recurring booking runs over: the whole
+// year the user is looking at. Ending it in December is what turns the new year
+// into a deliberate review instead of a plan nobody ever revisits.
+func calendarYearBounds(month string) (from, until string) {
+	year := NormalizeMonth(month)[:4]
+	return year + "-01-01", year + "-12-31"
 }
 
 // clampInterval keeps a submitted recurrence interval sane.
