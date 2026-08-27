@@ -2,12 +2,16 @@ package api
 
 import (
 	"net/http"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/calc"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
+
+var hexColor = regexp.MustCompile(`^#[0-9a-f]{6}$`)
 
 // household resolves the household a request works on: the one named in the
 // query, or the active one. A script that only ever runs against one household
@@ -88,12 +92,90 @@ func (s *Server) handleCategories(w http.ResponseWriter, r *http.Request) {
 
 	out := make([]categoryOut, 0, len(cats))
 	for _, c := range cats {
-		out = append(out, categoryOut{
-			ID: c.ID, Name: c.Name, Classification: string(c.Classification),
-			Color: c.Color, Icon: c.Icon,
-		})
+		out = append(out, asCategoryOut(c))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"categories": out})
+}
+
+// categoryIn is a category as a caller writes it.
+type categoryIn struct {
+	Household      *int64  `json:"household"`
+	Name           *string `json:"name"`
+	Classification *string `json:"classification"`
+	Color          *string `json:"color"`
+	Icon           *string `json:"icon"`
+}
+
+// handleCreateCategory adds a category, or hands back the one that already
+// carries the name. A booking cannot be filed without a category, so a job
+// that sets up its own has to be able to run twice; the name is the natural
+// key because that is what the booking endpoint resolves against.
+func (s *Server) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
+	var in categoryIn
+	if err := decode(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, "ungültiger JSON-Body: "+err.Error())
+		return
+	}
+	id, ok := s.householdFor(w, r, in.Household)
+	if !ok {
+		return
+	}
+	if in.Name == nil || strings.TrimSpace(*in.Name) == "" {
+		writeError(w, http.StatusBadRequest, "name fehlt")
+		return
+	}
+	name := clip(*in.Name)
+
+	cats, err := s.store.ListCategories(r.Context(), id)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	for _, c := range cats {
+		if equalName(c.Name, name) {
+			writeJSON(w, http.StatusOK, asCategoryOut(c))
+			return
+		}
+	}
+
+	class := store.DirExpense
+	if in.Classification != nil {
+		if d := store.Direction(strings.TrimSpace(*in.Classification)); d.Valid() {
+			class = d
+		} else {
+			writeError(w, http.StatusBadRequest, "classification muss income oder expense sein")
+			return
+		}
+	}
+
+	c := store.Category{Name: name, Classification: class}
+	if in.Color != nil {
+		if col := strings.ToLower(strings.TrimSpace(*in.Color)); hexColor.MatchString(col) {
+			c.Color = col
+		} else if col != "" {
+			writeError(w, http.StatusBadRequest, "color muss ein Hex-Wert wie #6366f1 sein")
+			return
+		}
+	}
+	if in.Icon != nil {
+		c.Icon = strings.TrimSpace(*in.Icon)
+	}
+
+	// An unset color or icon is filled in when the page renders, so a caller
+	// that only knows the name still gets a category that looks like the rest.
+	created, err := s.store.CreateCategory(r.Context(), id, c)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, asCategoryOut(created))
+}
+
+func asCategoryOut(c store.Category) categoryOut {
+	return categoryOut{
+		ID: c.ID, Name: c.Name, Classification: string(c.Classification),
+		Color: c.Color, Icon: c.Icon,
+	}
 }
 
 type memberOut struct {

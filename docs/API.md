@@ -98,6 +98,7 @@ trimmed. Use whichever is more convenient:
 | --- | --- | --- |
 | `GET` | `/api/v1/households` | Households, with the active one marked |
 | `GET` | `/api/v1/categories` | Categories of a household |
+| `POST` | `/api/v1/categories` | Create a category, or return the one with that name |
 | `GET` | `/api/v1/members` | People of a household |
 | `GET` | `/api/v1/tags` | Tags of a household |
 | `GET` | `/api/v1/report` | Income, expenses, fixed costs, savings rate |
@@ -139,6 +140,38 @@ booking's `direction` — an income cannot be filed under an expense category.
   ]
 }
 ```
+
+### `POST /api/v1/categories` — create
+
+A booking cannot be filed without a category, so a job that brings its own has
+to be able to set one up.
+
+| Field | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `household` | integer | active household | Which household the category belongs to |
+| `name` | string | — | **Required.** Trimmed, max 120 characters |
+| `classification` | string | `expense` | `income` or `expense` |
+| `color` | string | picked on display | Hex like `#6366f1`, case is folded |
+| `icon` | string | guessed from the name | See the picker in the settings for the keys |
+
+```bash
+curl -X POST "$HB_URL/api/v1/categories" \
+  -H "Authorization: Bearer $HB_API_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "Restaurant", "color": "#f59e0b"}'
+```
+
+**The name is the key.** Creating a category that already exists returns the
+existing one with `200` instead of filing a twin, so the call can be repeated:
+that is the same name the booking endpoint resolves `category` against, and a
+household with two categories called Restaurant could not be reasoned about.
+Matching ignores case.
+
+`201` on create, `200` when the name was already taken.
+
+There is no way to rename or delete a category through the API. A category in
+use cannot be deleted at all, and renaming one breaks every caller that refers
+to it by name — both belong in the settings, where the consequences are visible.
 
 ### `GET /api/v1/members` and `GET /api/v1/tags`
 

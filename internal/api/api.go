@@ -54,6 +54,7 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("GET /api/v1/households", s.handleHouseholds)
 	mux.HandleFunc("GET /api/v1/categories", s.handleCategories)
+	mux.HandleFunc("POST /api/v1/categories", s.handleCreateCategory)
 	mux.HandleFunc("GET /api/v1/members", s.handleMembers)
 	mux.HandleFunc("GET /api/v1/tags", s.handleTags)
 	mux.HandleFunc("GET /api/v1/report", s.handleReport)

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
@@ -363,5 +364,77 @@ func TestUnknownHouseholdIsRejected(t *testing.T) {
 	}
 	if got := do(t, h, http.MethodGet, "/api/v1/categories?household=abc", token, nil).Code; got != http.StatusBadRequest {
 		t.Errorf("a household that is not a number = %d, want 400", got)
+	}
+}
+
+func TestCreateCategory(t *testing.T) {
+	_, h, _ := newTestAPI(t)
+
+	w := do(t, h, http.MethodPost, "/api/v1/categories", token, map[string]any{
+		"name":  "Restaurant",
+		"color": "#F59E0B",
+	})
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201: %s", w.Code, w.Body)
+	}
+	got := decodeBody[map[string]any](t, w)
+	if got["name"] != "Restaurant" {
+		t.Errorf("name = %v", got["name"])
+	}
+	if got["classification"] != "expense" {
+		t.Errorf("classification = %v, want expense by default", got["classification"])
+	}
+	if got["color"] != "#f59e0b" {
+		t.Errorf("color = %v, want the hex folded to lower case", got["color"])
+	}
+}
+
+// A job that sets up its own categories has to survive a second run, so the
+// name is the key: the same name gives back the same category, never a twin.
+func TestCreatingTheSameCategoryTwiceKeepsOne(t *testing.T) {
+	st, h, hh := newTestAPI(t)
+
+	first := decodeBody[map[string]any](t, do(t, h, http.MethodPost, "/api/v1/categories", token,
+		map[string]any{"name": "Restaurant"}))
+
+	w := do(t, h, http.MethodPost, "/api/v1/categories", token, map[string]any{"name": "restaurant"})
+	if w.Code != http.StatusOK {
+		t.Fatalf("second create status = %d, want 200: %s", w.Code, w.Body)
+	}
+	if again := decodeBody[map[string]any](t, w); again["id"] != first["id"] {
+		t.Errorf("id = %v, want the first one %v", again["id"], first["id"])
+	}
+
+	cats, err := st.ListCategories(t.Context(), hh.ID)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	var n int
+	for _, c := range cats {
+		if strings.EqualFold(c.Name, "Restaurant") {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("%d categories named Restaurant, want 1", n)
+	}
+}
+
+func TestCreateCategoryRefusesNonsense(t *testing.T) {
+	_, h, _ := newTestAPI(t)
+
+	cases := []struct {
+		name string
+		body map[string]any
+	}{
+		{"no name", map[string]any{"color": "#ffffff"}},
+		{"blank name", map[string]any{"name": "   "}},
+		{"unknown classification", map[string]any{"name": "X", "classification": "vielleicht"}},
+		{"color that is not hex", map[string]any{"name": "X", "color": "rot"}},
+	}
+	for _, c := range cases {
+		if w := do(t, h, http.MethodPost, "/api/v1/categories", token, c.body); w.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400", c.name, w.Code)
+		}
 	}
 }
