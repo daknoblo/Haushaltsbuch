@@ -13,6 +13,7 @@ import (
 
 	"github.com/daknoblo/Haushaltsbuch/internal/api"
 	"github.com/daknoblo/Haushaltsbuch/internal/i18n"
+	"github.com/daknoblo/Haushaltsbuch/internal/logsafe"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 	"github.com/daknoblo/Haushaltsbuch/internal/version"
 )
@@ -172,12 +173,13 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, c templ.Componen
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	if err := c.Render(r.Context(), w); err != nil {
-		s.logger.Error("render failed", "err", err, "path", r.URL.Path)
+		s.logger.Error("render failed", "err", err, "path", logsafe.Value(r.URL.Path))
 	}
 }
 
 func (s *Server) serverError(w http.ResponseWriter, r *http.Request, err error) {
-	s.logger.Error("request failed", "err", err, "path", r.URL.Path, "method", r.Method)
+	s.logger.Error("request failed", "err", err,
+		"path", logsafe.Value(r.URL.Path), "method", logsafe.Value(r.Method))
 	s.clientError(w, r, http.StatusInternalServerError, "error.internal")
 }
 

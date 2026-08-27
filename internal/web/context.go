@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/calc"
+	"github.com/daknoblo/Haushaltsbuch/internal/logsafe"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 	"github.com/daknoblo/Haushaltsbuch/internal/version"
 )
@@ -62,7 +63,7 @@ func (s *Server) writeStoreError(w http.ResponseWriter, r *http.Request, err err
 // truncated form into a request that blanks out the stored values.
 func (s *Server) parseForm(w http.ResponseWriter, r *http.Request) bool {
 	if err := r.ParseForm(); err != nil {
-		s.logger.Warn("invalid form", "err", err, "path", r.URL.Path)
+		s.logger.Warn("invalid form", "err", err, "path", logsafe.Value(r.URL.Path))
 		s.clientError(w, r, http.StatusBadRequest, "error.invalidInput")
 		return false
 	}

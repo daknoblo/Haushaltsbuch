@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/daknoblo/Haushaltsbuch/internal/logsafe"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
 
@@ -27,10 +28,6 @@ const maxBodyBytes = 2 << 20 // 2 MiB
 
 // Prefix is the path every route lives under.
 const Prefix = "/api/v1/"
-
-// sanitizeLog strips the characters that would let a request path forge a log
-// line of its own.
-var sanitizeLog = strings.NewReplacer("\n", "", "\r", "", "\t", " ")
 
 // Server holds what the API handlers need.
 type Server struct {
@@ -86,8 +83,8 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 		}
 
 		s.logger.Info("api request",
-			"method", sanitizeLog.Replace(r.Method),
-			"path", sanitizeLog.Replace(r.URL.Path),
+			"method", logsafe.Value(r.Method),
+			"path", logsafe.Value(r.URL.Path),
 			"status", rec.status,
 			"durationMs", time.Since(start).Milliseconds(),
 		)
@@ -145,7 +142,7 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, http.StatusNotFound, "nicht gefunden")
 	default:
 		s.logger.Error("api failed",
-			"path", sanitizeLog.Replace(r.URL.Path), "err", err)
+			"path", logsafe.Value(r.URL.Path), "err", err)
 		writeError(w, http.StatusInternalServerError, "interner Fehler")
 	}
 }

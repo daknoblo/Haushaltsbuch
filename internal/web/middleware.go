@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/i18n"
+	"github.com/daknoblo/Haushaltsbuch/internal/logsafe"
 )
 
 // maxRequestBody caps the size of request bodies. The application only accepts
@@ -209,7 +210,8 @@ func (s *Server) rateLimit(next http.Handler) http.Handler {
 			return
 		}
 		if !s.limiter.allow(clientIP(r), time.Now()) {
-			s.logger.Warn("rate limit exceeded", "path", r.URL.Path, "client", clientIP(r))
+			s.logger.Warn("rate limit exceeded",
+				"path", logsafe.Value(r.URL.Path), "client", logsafe.Value(clientIP(r)))
 			w.Header().Set("Retry-After", "1")
 			s.clientError(w, r, http.StatusTooManyRequests, "error.rateLimited")
 			return
@@ -244,8 +246,8 @@ func (s *Server) logRequests(next http.Handler) http.Handler {
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
 		s.logger.Info("request",
-			"method", r.Method,
-			"path", r.URL.Path,
+			"method", logsafe.Value(r.Method),
+			"path", logsafe.Value(r.URL.Path),
 			"status", rec.status,
 			"duration", time.Since(start).String(),
 		)
@@ -256,7 +258,7 @@ func (s *Server) recoverer(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if rec := recover(); rec != nil {
-				s.logger.Error("panic recovered", "err", rec, "path", r.URL.Path)
+				s.logger.Error("panic recovered", "err", rec, "path", logsafe.Value(r.URL.Path))
 				s.clientError(w, r, http.StatusInternalServerError, "error.internal")
 			}
 		}()
