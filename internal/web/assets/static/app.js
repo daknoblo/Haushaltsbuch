@@ -189,24 +189,39 @@
   });
 
   // Percentages that do not add up to a hundred leave part of a booking on
-  // nobody's tab. The report would show that much later, so the dialog counts
-  // along while the shares are typed.
-  function refreshSplitTotal() {
+  // nobody's tab, and a booking nobody carries at all only shows up as
+  // "unassigned" in the list. The dialog counts along while the shares are
+  // typed and says which pick is missing.
+  function refreshSplitState() {
     var dlg = currentDialog();
     if (!dlg) return;
-    var out = dlg.querySelector("[data-split-total]");
-    if (!out) return;
+    var picker = dlg.querySelector('select[name="split_mode"]');
+    var mode = picker ? picker.value : "equal";
     var sum = 0;
+    var carriers = 0;
+
     dlg.querySelectorAll(".split-member").forEach(function (row) {
       var on = row.querySelector('input[type="checkbox"]');
-      var val = row.querySelector("input[data-percent]");
-      if (on && on.checked && val) sum += parseFloat(val.value) || 0;
+      if (!on || !on.checked) return;
+      var percentField = row.querySelector("input[data-percent]");
+      var fixedField = row.querySelector("input[data-cents]");
+      var percent = percentField ? parseFloat(percentField.value) || 0 : 0;
+      var fixed = fixedField ? parseFloat(fixedField.value) || 0 : 0;
+      sum += percent;
+      // Outside an equal split a tick without a value carries nothing.
+      if (mode === "equal" || (mode === "percent" ? percent > 0 : fixed > 0)) {
+        carriers++;
+      }
     });
-    out.textContent = String(Math.round(sum * 10) / 10);
+
+    var total = dlg.querySelector("[data-split-total]");
+    if (total) total.textContent = String(Math.round(sum * 10) / 10);
     var hint = dlg.querySelector("[data-split-hint]");
     if (hint) hint.classList.toggle("split-off", Math.abs(sum - 100) > 0.05);
+    var warn = dlg.querySelector("[data-carrier-warn]");
+    if (warn) warn.classList.toggle("carrier-warn-on", carriers === 0);
   }
 
-  document.addEventListener("input", refreshSplitTotal);
-  document.addEventListener("change", refreshSplitTotal);
+  document.addEventListener("input", refreshSplitState);
+  document.addEventListener("change", refreshSplitState);
 })();

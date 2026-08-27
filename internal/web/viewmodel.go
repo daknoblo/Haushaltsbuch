@@ -190,6 +190,18 @@ func (r BookingRow) SplitValue(id int64) float64 {
 // the summary line shows.
 func (r BookingRow) ShareCount() int { return len(r.Splits) }
 
+// NobodyCarries reports whether the booking lands on nobody, which is what the
+// list flags as unassigned. Outside an equal split a ticked person with a share
+// of zero carries nothing either, so ticking alone is not enough.
+func (r BookingRow) NobodyCarries() bool {
+	for _, s := range r.Splits {
+		if r.Booking.SplitMode == store.SplitEqual || s.Value != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // PayerCarriesNothing reports whether the one who fronts the money has no
 // share in it, so the row has to name them on their own.
 func (r BookingRow) PayerCarriesNothing() bool {

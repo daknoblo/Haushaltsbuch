@@ -82,6 +82,8 @@ var english = Catalog{
 	"bookings.whoPays":             "Who pays for this?",
 	"bookings.whoPaysHint":         "Only the people ticked carry a share: both means half each, none leaves the expense unassigned.",
 	"bookings.whoGets":             "Who receives this?",
+	"bookings.nobodyCarries":       "Unassigned: nobody carries this expense. Pick at least one person with a share above zero.",
+	"bookings.nobodyGets":          "Unassigned: nobody receives this income. Pick at least one person with a share above zero.",
 	"bookings.fixedHint":           "Fixed amounts apply per %s and are normalized to one month for the reports.",
 	"bookings.confirmDelete":       "Really delete this booking?",
 	"bookings.shareOf":             "Share of %s",

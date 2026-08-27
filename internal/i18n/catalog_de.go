@@ -82,6 +82,8 @@ var german = Catalog{
 	"bookings.whoPays":             "Wer trägt die Ausgabe?",
 	"bookings.whoPaysHint":         "Nur angehakte Personen tragen mit: beide angehakt = jeder die Hälfte, keine = die Ausgabe bleibt unzugeordnet.",
 	"bookings.whoGets":             "Wem gehört die Einnahme?",
+	"bookings.nobodyCarries":       "Nicht zugeordnet: niemand trägt diese Ausgabe. Mindestens eine Person mit einem Anteil größer null auswählen.",
+	"bookings.nobodyGets":          "Nicht zugeordnet: niemand bekommt diese Einnahme. Mindestens eine Person mit einem Anteil größer null auswählen.",
 	"bookings.fixedHint":           "Feste Beträge gelten je %s und werden für die Auswertung auf einen Monat umgerechnet.",
 	"bookings.confirmDelete":       "Diese Buchung wirklich löschen?",
 	"bookings.shareOf":             "Anteil %s",

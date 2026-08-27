@@ -404,6 +404,14 @@
     @apply font-semibold text-amber-600 dark:text-amber-400;
   }
 
+  /* Named when the booking lands on nobody, which is all the list can say. */
+  .carrier-warn {
+    @apply mt-1 hidden text-xs font-medium text-amber-600 dark:text-amber-400;
+  }
+  .carrier-warn-on {
+    @apply block;
+  }
+
   .chip {
     @apply inline-flex cursor-pointer select-none;
   }

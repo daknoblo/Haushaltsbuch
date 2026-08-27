@@ -201,7 +201,7 @@ templ bookingSplit(f BookingFormVM) {
 				</div>
 				<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.payerHint") }</p>
 			</div>
-			<div>
+			<div class="carrier-group">
 				<span class="field-label">
 					if f.Row.IsIncome() {
 						{ T(ctx, "bookings.whoGets") }
@@ -248,6 +248,15 @@ templ bookingSplit(f BookingFormVM) {
 						</div>
 					}
 				</div>
+				// The list only flags a booking as unassigned; this is where it says
+				// which pick is missing.
+				<p class={ "carrier-warn", templ.KV("carrier-warn-on", f.Row.NobodyCarries()) } data-carrier-warn>
+					if f.Row.IsIncome() {
+						{ T(ctx, "bookings.nobodyGets") }
+					} else {
+						{ T(ctx, "bookings.nobodyCarries") }
+					}
+				</p>
 				// Both columns read label, chips, hint, so the two chip rows line up.
 				if !f.Row.IsIncome() {
 					<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.whoPaysHint") }</p>
