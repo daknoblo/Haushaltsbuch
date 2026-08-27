@@ -220,12 +220,12 @@ var german = Catalog{
 	"dash.surplus":            "Überschuss",
 	"dash.flow":               "Geldfluss",
 	"dash.flowHint":           "Von den Einnahmen über die Klassen bis zur einzelnen Kategorie.",
-	"dash.flowDeficit":        "Der Plan gibt mehr aus als er einnimmt. Die Differenz erscheint als Entnahme.",
+	"dash.flowDeficit":        "Der Plan gibt mehr aus als er einnimmt. Die Differenz fließt als überschrittenes Budget mit ein.",
 	"dash.byTag":              "Nach Tag",
 	"dash.noTagData":          "Keine getaggten Buchungen im Zeitraum.",
 
 	// Sankey nodes that have no counterpart elsewhere in the UI
-	"sankey.withdrawal": "Entnahme",
+	"sankey.withdrawal": "Budget überschritten",
 	"sankey.other":      "Sonstige",
 
 	// Settings

@@ -220,12 +220,12 @@ var english = Catalog{
 	"dash.surplus":            "Surplus",
 	"dash.flow":               "Money flow",
 	"dash.flowHint":           "From income through the classes down to the single category.",
-	"dash.flowDeficit":        "The plan spends more than it earns. The gap shows up as a withdrawal.",
+	"dash.flowDeficit":        "The plan spends more than it earns. The gap flows in as budget overrun.",
 	"dash.byTag":              "By tag",
 	"dash.noTagData":          "No tagged bookings in this period.",
 
 	// Sankey nodes that have no counterpart elsewhere in the UI
-	"sankey.withdrawal": "Withdrawal",
+	"sankey.withdrawal": "Over budget",
 	"sankey.other":      "Other",
 
 	// Settings
