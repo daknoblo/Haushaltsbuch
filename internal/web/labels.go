@@ -172,6 +172,39 @@ func BudgetClassDot(c store.BudgetClass) string {
 	}
 }
 
+// RuleBucketHint is the sentence that says what belongs in a pail of the rule.
+func RuleBucketHint(ctx context.Context, c store.BudgetClass) string {
+	switch c {
+	case store.ClassWant:
+		return T(ctx, "rule.wantHint")
+	case store.ClassSaving:
+		return T(ctx, "rule.savingHint")
+	default:
+		return T(ctx, "rule.needHint")
+	}
+}
+
+// RuleGapLabel is how far a pail is from its target.
+func RuleGapLabel(ctx context.Context, rep calc.MonthReport, class store.BudgetClass) string {
+	switch gap := rep.ByBudgetClass[class] - rep.TargetCents(class); {
+	case gap > 0:
+		return Tf(ctx, "rule.over", FormatEUR(gap))
+	case gap < 0:
+		return Tf(ctx, "rule.under", FormatEUR(-gap))
+	default:
+		return T(ctx, "rule.exact")
+	}
+}
+
+// RuleArcTitle names an arc of the ring. The leftover has no class, because it
+// is not a fourth pail but income no bucket consumed.
+func RuleArcTitle(ctx context.Context, a calc.RuleArc) string {
+	if a.Class == "" {
+		return T(ctx, "dash.surplus") + ": " + FormatEUR(a.Cents)
+	}
+	return BudgetClassLabel(ctx, a.Class) + ": " + FormatEUR(a.Cents)
+}
+
 // CostNatureOptions returns the selectable cost natures.
 func CostNatureOptions(ctx context.Context) []Option {
 	return []Option{

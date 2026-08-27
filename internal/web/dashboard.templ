@@ -1,6 +1,8 @@
 package web
 
 import (
+	"strconv"
+
 	"github.com/daknoblo/Haushaltsbuch/internal/calc"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
@@ -32,6 +34,7 @@ templ DashboardPage(nav Nav, vm DashboardVM) {
 					@fixedCostCard(vm)
 					@savingsCard(vm)
 				</div>
+				@ruleCard(vm)
 				@sankeyCard(vm)
 				@categoryCard(vm)
 				@tagCard(vm)
@@ -582,44 +585,93 @@ templ savingsCard(vm DashboardVM) {
 				</div>
 			</div>
 		</div>
-		<h3 class="mb-2 mt-5 text-sm font-medium text-slate-700 dark:text-slate-300">{ T(ctx, "dash.rule503020") }</h3>
-		@budgetClassBar(vm.Report)
 	</div>
 }
 
-// budgetClassBar measures against net income, because that is what the
-// 50/30/20 rule divides up. Spending past it therefore fills the bar and is
-// named underneath rather than being scaled away.
-templ budgetClassBar(rep calc.MonthReport) {
-	<div class="flex h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-		<div class="bg-indigo-500" style={ "width:" + BarWidth(rep.ByBudgetClass[store.ClassNeed], rep.IncomeCents) }></div>
-		<div class="bg-amber-500" style={ "width:" + BarWidth(rep.ByBudgetClass[store.ClassWant], rep.IncomeCents) }></div>
-		<div class="bg-sky-500" style={ "width:" + BarWidth(rep.ByBudgetClass[store.ClassSaving], rep.IncomeCents) }></div>
-	</div>
-	if rep.OverIncomeCents() > 0 {
-		<p class="mt-2 text-xs font-medium text-rose-600 dark:text-rose-400">
-			{ Tf(ctx, "dash.overIncome", FormatEUR(rep.OverIncomeCents())) }
-		</p>
-	}
-	<div class="mt-2 grid grid-cols-3 gap-2 text-xs">
-		@classLegend("bg-indigo-500", T(ctx, "class.need"), rep, store.ClassNeed)
-		@classLegend("bg-amber-500", T(ctx, "class.want"), rep, store.ClassWant)
-		@classLegend("bg-sky-500", T(ctx, "class.saving"), rep, store.ClassSaving)
+// ruleCard is the 50/30/20 rule as a picture: the ring is how income was really
+// divided, the two marks on its edge are where the rule wanted the boundaries.
+// The distance between an arc's end and its mark is the whole point.
+templ ruleCard(vm DashboardVM) {
+	<div class="card">
+		<div class="card-head">
+			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.rule503020") }</h2>
+			if vm.ViewName() != "" {
+				<span class="badge ml-auto">{ vm.ViewName() }</span>
+			}
+		</div>
+		<p class="mb-4 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.ruleHint") }</p>
+		if vm.Rule.Empty() {
+			<p class="text-sm text-slate-400 dark:text-slate-500">{ T(ctx, "dash.ruleNoIncome") }</p>
+		} else {
+			<div class="rule-layout">
+				@ruleRing(vm)
+				<div class="grid gap-2.5">
+					@ruleBucket(vm, store.ClassNeed, "bg-indigo-500", "border-indigo-500")
+					@ruleBucket(vm, store.ClassWant, "bg-amber-500", "border-amber-500")
+					@ruleBucket(vm, store.ClassSaving, "bg-sky-500", "border-sky-500")
+					if vm.Rule.Surplus > 0 {
+						<p class="text-xs text-slate-400 dark:text-slate-500">
+							{ Tf(ctx, "dash.ruleSurplus", FormatEUR(vm.Rule.Surplus)) }
+						</p>
+					}
+					if vm.Report.OverIncomeCents() > 0 {
+						<p class="text-xs font-medium text-rose-600 dark:text-rose-400">
+							{ Tf(ctx, "dash.overIncome", FormatEUR(vm.Report.OverIncomeCents())) }
+						</p>
+					}
+				</div>
+			</div>
+		}
 	</div>
 }
 
-templ classLegend(dot, label string, rep calc.MonthReport, class store.BudgetClass) {
-	<div>
-		<div class="flex items-center gap-1.5">
-			<span class={ "inline-block h-2 w-2 rounded-full", dot }></span>
-			<span class="text-slate-600 dark:text-slate-400">{ label }</span>
-		</div>
-		<div class="tnum mt-0.5 font-medium text-slate-900 dark:text-slate-100">{ SharePercent(rep.ByBudgetClass[class], rep.IncomeCents) }</div>
-		<div class="tnum text-slate-400 dark:text-slate-500">
-			{ TargetLabel(ctx, class.TargetPercent()) } · { FormatEUR(rep.TargetCents(class)) }
+templ ruleRing(vm DashboardVM) {
+	<div class="rule-ring">
+		<svg viewBox={ RuleViewBox(vm.Rule) } class="h-auto w-full" role="img" aria-label={ T(ctx, "dash.rule503020") }>
+			for _, a := range vm.Rule.Arcs {
+				<path d={ a.Path } class={ RuleFill(a.Class) }>
+					<title>{ RuleArcTitle(ctx, a) }</title>
+				</path>
+			}
+			for _, m := range vm.Rule.Marks {
+				<path d={ m.Path } class="stroke-slate-400 dark:stroke-slate-500" stroke-width="1.5" stroke-dasharray="3 2"></path>
+				<text
+					x={ Coord(m.LabelX) }
+					y={ Coord(m.LabelY) }
+					text-anchor="middle"
+					dominant-baseline="middle"
+					class="fill-slate-400 text-[10px] dark:fill-slate-500"
+				>{ strconv.Itoa(m.Percent) + " %" }</text>
+			}
+		</svg>
+		<div class="rule-center">
+			<div class="text-[0.65rem] uppercase tracking-wide text-slate-400 dark:text-slate-500">{ T(ctx, "dash.income") }</div>
+			<div class="tnum text-lg font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(vm.Report.IncomeCents) }</div>
 		</div>
 	</div>
 }
+
+// ruleBucket is one of the three pails of the rule, read against its target.
+templ ruleBucket(vm DashboardVM, class store.BudgetClass, dot, edge string) {
+	<div class={ "rule-bucket", edge }>
+		<div class="flex items-baseline gap-2">
+			<span class={ "inline-block h-2.5 w-2.5 shrink-0 rounded-full", dot }></span>
+			<span class="text-sm font-medium text-slate-800 dark:text-slate-200">{ BudgetClassLabel(ctx, class) }</span>
+			<span class="tnum ml-auto text-sm font-semibold text-slate-900 dark:text-slate-100">
+				{ SharePercent(vm.Report.ByBudgetClass[class], vm.Report.IncomeCents) }
+			</span>
+		</div>
+		<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{ RuleBucketHint(ctx, class) }</p>
+		<div class="tnum mt-1.5 flex items-baseline gap-1.5 text-xs">
+			<span class="font-medium text-slate-700 dark:text-slate-300">{ FormatEUR(vm.Report.ByBudgetClass[class]) }</span>
+			<span class="text-slate-400 dark:text-slate-500">
+				{ TargetLabel(ctx, class.TargetPercent()) } · { FormatEUR(vm.Report.TargetCents(class)) }
+			</span>
+			<span class={ "ml-auto font-medium", RuleGapTone(vm.Report, class) }>{ RuleGapLabel(ctx, vm.Report, class) }</span>
+		</div>
+	</div>
+}
+
 
 templ sankeyCard(vm DashboardVM) {
 	<div class="card">

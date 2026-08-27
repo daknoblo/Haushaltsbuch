@@ -585,6 +585,45 @@ func SankeyViewBox(s calc.Sankey) string {
 	return "0 0 " + Coord(s.Width) + " " + Coord(s.Height)
 }
 
+// RuleGapTone colors the distance to a target: green when a pail holds what the
+// rule would have it hold, amber when it does not. Saving is the one where more
+// than the target is the good news, so the comparison turns around.
+func RuleGapTone(rep calc.MonthReport, class store.BudgetClass) string {
+	if ruleMet(rep, class) {
+		return "text-emerald-600 dark:text-emerald-400"
+	}
+	return "text-amber-600 dark:text-amber-400"
+}
+
+func ruleMet(rep calc.MonthReport, class store.BudgetClass) bool {
+	got, want := rep.ByBudgetClass[class], rep.TargetCents(class)
+	if class == store.ClassSaving {
+		return got >= want
+	}
+	return got <= want
+}
+
+// RuleViewBox returns the SVG viewBox of the 50/30/20 ring.
+func RuleViewBox(r calc.RuleRing) string {
+	return "0 0 " + Coord(r.Size) + " " + Coord(r.Size)
+}
+
+// RuleFill is the color of one arc of the ring. It lives here because this is
+// the one Go file Tailwind scans, so the class names actually reach the sheet.
+// Unclaimed income is grey on purpose: it is not a fourth bucket.
+func RuleFill(c store.BudgetClass) string {
+	switch c {
+	case store.ClassNeed:
+		return "fill-indigo-500"
+	case store.ClassWant:
+		return "fill-amber-500"
+	case store.ClassSaving:
+		return "fill-sky-500"
+	default:
+		return "fill-slate-300 dark:fill-slate-700"
+	}
+}
+
 // SankeyValue is the figure a node carries next to its name, so reading the
 // diagram does not depend on hovering every box.
 func SankeyValue(s calc.Sankey, n calc.SankeyNode) string {
@@ -683,6 +722,7 @@ type DashboardVM struct {
 	Trend           []calc.MonthReport
 	Chart           calc.TrendChart
 	Stack           calc.StackChart
+	Rule            calc.RuleRing
 	Matrix          calc.Matrix
 	MatrixYear      string
 	Sankey          calc.Sankey

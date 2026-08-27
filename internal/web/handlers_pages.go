@@ -431,6 +431,7 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 
 	vm.Chart = calc.BuildTrendChart(vm.Trend, chartWidth, chartHeight)
 	vm.Stack = calc.BuildStackChart(data, months, member, grouping, stackWidth, stackHeight)
+	vm.Rule = calc.BuildRuleRing(vm.Report)
 	// The year block is a year block: it keeps the calendar year whatever the
 	// period control says, because one column of a single month tells nothing
 	// the tiles above do not already say.
