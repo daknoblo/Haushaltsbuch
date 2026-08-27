@@ -13,6 +13,7 @@ import (
 	"github.com/johnfercher/maroto/v2/pkg/config"
 	"github.com/johnfercher/maroto/v2/pkg/consts/align"
 	"github.com/johnfercher/maroto/v2/pkg/consts/fontstyle"
+	"github.com/johnfercher/maroto/v2/pkg/consts/orientation"
 	"github.com/johnfercher/maroto/v2/pkg/core"
 	"github.com/johnfercher/maroto/v2/pkg/props"
 
@@ -25,6 +26,17 @@ var pdfGrey = &props.Color{Red: 110, Green: 116, Blue: 130}
 func newPDF() core.Maroto {
 	cfg := config.NewBuilder().
 		WithPageNumber().
+		Build()
+	return maroto.New(cfg)
+}
+
+// newWidePDF turns the page sideways and widens the grid, because a year has
+// fifteen columns and none of them fit a portrait twelfth.
+func newWidePDF(columns int) core.Maroto {
+	cfg := config.NewBuilder().
+		WithPageNumber().
+		WithOrientation(orientation.Horizontal).
+		WithMaxGridSize(columns).
 		Build()
 	return maroto.New(cfg)
 }
@@ -240,6 +252,98 @@ func (s *Server) handleExportExpenses(w http.ResponseWriter, r *http.Request) {
 	pdfKV(m, T(ctx, "pdf.total"), FormatEUR(grand))
 
 	s.writePDF(w, r, m, T(ctx, "pdf.fileBookingList")+"-"+pdfSlug(hh.Name)+".pdf")
+}
+
+// matrixLabelCols is how much of the grid the row caption takes; the rest is
+// one column per month plus total, mean and median.
+const matrixLabelCols = 5
+
+// pdfMatrixRow prints one line of the year matrix.
+func pdfMatrixRow(m core.Maroto, label string, cells []string, style fontstyle.Type, color *props.Color) {
+	cols := make([]core.Col, 0, len(cells)+1)
+	cols = append(cols, text.NewCol(matrixLabelCols, label,
+		props.Text{Size: 7, Style: style, Color: color}))
+	for _, c := range cells {
+		cols = append(cols, text.NewCol(1, c,
+			props.Text{Size: 6, Align: align.Right, Style: style, Color: color}))
+	}
+	m.AddRow(5, cols...)
+}
+
+// matrixCells is a row's figures in the order the table shows them.
+func pdfCells(row calc.MatrixRow) []string {
+	out := make([]string, 0, len(row.Cents)+3)
+	for _, c := range row.Cents {
+		out = append(out, MatrixCell(c))
+	}
+	return append(out,
+		FormatEURShort(row.TotalCents),
+		FormatEURShort(row.MeanCents),
+		FormatEURShort(row.MedianCents))
+}
+
+// matrixShares is the percentage line printed under a category.
+func pdfShares(row calc.MatrixRow) []string {
+	out := make([]string, 0, len(row.Share)+3)
+	for _, p := range row.Share {
+		out = append(out, FormatPercent(p))
+	}
+	return append(out, FormatPercent(row.ShareTotal), "", "")
+}
+
+func (s *Server) handleExportYear(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	hh, ok := s.exportHousehold(w, r)
+	if !ok {
+		return
+	}
+	month := NormalizeMonth(r.URL.Query().Get("m"))
+	member := parseID(r.URL.Query().Get("view"))
+	vm, err := s.buildDashboardVM(ctx, hh.ID, month, periodYear, member, calc.GroupCategory)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+
+	subtitle := vm.RangeLabel
+	if name := vm.ViewName(); name != "" {
+		subtitle += "  ·  " + name
+	}
+	m := newWidePDF(matrixLabelCols + len(vm.Matrix.Months) + 3)
+	pdfHeader(ctx, m, T(ctx, "matrix.title"), hh.Name, subtitle)
+
+	head := make([]string, 0, len(vm.Matrix.Months)+3)
+	for _, mo := range vm.Matrix.Months {
+		head = append(head, MonthShort(ctx, mo))
+	}
+	head = append(head, T(ctx, "matrix.total"), T(ctx, "matrix.mean"), T(ctx, "matrix.median"))
+	pdfMatrixRow(m, T(ctx, "matrix.row"), head, fontstyle.Bold, nil)
+
+	for _, band := range vm.Matrix.Bands {
+		pdfHeading(m, MatrixBandLabel(ctx, band.Key))
+		for _, row := range band.Rows {
+			label := row.Label
+			if row.LabelKey != "" {
+				label = T(ctx, row.LabelKey)
+			}
+			pdfMatrixRow(m, label, pdfCells(row), fontstyle.Normal, nil)
+			// Print cannot be unfolded, so every booking is listed outright.
+			for _, child := range row.Children {
+				pdfMatrixRow(m, "   "+child.Label, pdfCells(child), fontstyle.Normal, pdfGrey)
+			}
+			if band.Key != calc.BandIncome {
+				pdfMatrixRow(m, "   "+MatrixShareLabel(ctx, band.Key), pdfShares(row), fontstyle.Italic, pdfGrey)
+			}
+		}
+		pdfMatrixRow(m, T(ctx, band.Total.LabelKey), pdfCells(band.Total), fontstyle.Bold, nil)
+	}
+
+	m.AddRow(4)
+	for _, row := range []calc.MatrixRow{vm.Matrix.Expense, vm.Matrix.Target, vm.Matrix.Surplus} {
+		pdfMatrixRow(m, T(ctx, row.LabelKey), pdfCells(row), fontstyle.Bold, nil)
+	}
+
+	s.writePDF(w, r, m, T(ctx, "pdf.fileYear")+"-"+vm.Matrix.Months[0][:4]+".pdf")
 }
 
 // groupByCategory rebuilds the category grouping the printed list is laid out

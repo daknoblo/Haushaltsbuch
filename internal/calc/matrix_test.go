@@ -122,6 +122,19 @@ func TestMatrixCategoryRowsAddUpFromTheirBookings(t *testing.T) {
 	}
 }
 
+// A category holding one booking already is that booking; unfolding it would
+// print the same row twice.
+func TestMatrixDoesNotUnfoldASingleBooking(t *testing.T) {
+	m := BuildMatrix(budgetBook(), calendarYear(), Everyone)
+	for _, band := range m.Bands {
+		for _, row := range band.Rows {
+			if len(row.Children) == 1 {
+				t.Errorf("%q was unfolded into a single child %q", row.Label, row.Children[0].Label)
+			}
+		}
+	}
+}
+
 // The class band is the same expenses seen a second way, so it has to come to
 // the same total.
 func TestMatrixClassBandCoversEveryExpense(t *testing.T) {
@@ -134,33 +147,27 @@ func TestMatrixClassBandCoversEveryExpense(t *testing.T) {
 	}
 }
 
-// In a person view every row is that person's share, so a booking split down
-// the middle halves the whole table.
+// In a person view every row is that person's share, so bookings split down
+// the middle halve the whole table.
 func TestMatrixPersonViewShowsOnlyTheOwnShare(t *testing.T) {
 	d := budgetBook()
 	d.Splits = map[int64][]store.BookingSplit{
 		4: {{BookingID: 4, MemberID: 1}, {BookingID: 4, MemberID: 2}},
+		5: {{BookingID: 5, MemberID: 1}, {BookingID: 5, MemberID: 2}},
 	}
-	whole := BuildMatrix(d, calendarYear(), Everyone)
-	mine := BuildMatrix(d, calendarYear(), 1)
+	wohnen := func(m Matrix) int64 {
+		for _, r := range m.Band(BandFixed).Rows {
+			if r.Label == "Wohnen" {
+				return r.TotalCents
+			}
+		}
+		return 0
+	}
 
-	var wholeRent, myRent int64
-	for _, r := range whole.Band(BandFixed).Rows {
-		for _, c := range r.Children {
-			if c.Label == "Miete" {
-				wholeRent = c.TotalCents
-			}
-		}
-	}
-	for _, r := range mine.Band(BandFixed).Rows {
-		for _, c := range r.Children {
-			if c.Label == "Miete" {
-				myRent = c.TotalCents
-			}
-		}
-	}
-	if wholeRent == 0 || myRent*2 != wholeRent {
-		t.Errorf("own share = %d, household = %d, want half", myRent, wholeRent)
+	whole := wohnen(BuildMatrix(d, calendarYear(), Everyone))
+	mine := wohnen(BuildMatrix(d, calendarYear(), 1))
+	if whole == 0 || mine*2 != whole {
+		t.Errorf("own share = %d, household = %d, want half", mine, whole)
 	}
 }
 

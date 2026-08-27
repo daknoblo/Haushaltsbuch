@@ -427,7 +427,11 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 
 	vm.Chart = calc.BuildTrendChart(vm.Trend, chartWidth, chartHeight)
 	vm.Stack = calc.BuildStackChart(data, months, member, grouping, stackWidth, stackHeight)
-	vm.Matrix = calc.BuildMatrix(data, months, member)
+	// The year block is a year block: it keeps the calendar year whatever the
+	// period control says, because one column of a single month tells nothing
+	// the tiles above do not already say.
+	vm.MatrixYear = NormalizeMonth(month)[:4]
+	vm.Matrix = calc.BuildMatrix(data, calendarYear(month), member)
 	vm.FixedTop = calc.FixedCosts(data, months, member, fixedCostTop)
 	vm.Sankey = calc.BuildSankey(ctx, data, vm.Report, months, sankeyWidth, sankeyHeight)
 	vm.Settlement = calc.Settlement(data, months)

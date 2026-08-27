@@ -91,6 +91,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /export/overview.pdf", s.handleExportOverview)
 	mux.HandleFunc("GET /export/statistics.pdf", s.handleExportStatistics)
 	mux.HandleFunc("GET /export/expenses.pdf", s.handleExportExpenses)
+	mux.HandleFunc("GET /export/year.pdf", s.handleExportYear)
 
 	// Order follows the repository standard: recover, log, cap the body, set
 	// security headers, reject cross-origin writes, then throttle. Language

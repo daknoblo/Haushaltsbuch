@@ -285,4 +285,6 @@ var german = Catalog{
 	"pdf.fileOverview":    "uebersicht",
 	"pdf.fileStatistics":  "statistiken",
 	"pdf.fileBookingList": "ausgaben",
+	"pdf.fileYear":        "jahresuebersicht",
+	"pdf.year":            "Jahr als PDF",
 }

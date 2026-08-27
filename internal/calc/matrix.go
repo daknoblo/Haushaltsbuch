@@ -151,12 +151,15 @@ func BuildMatrix(d Data, months []string, member int64) Matrix {
 			c := cats[key.cat]
 			row := summarize(MatrixRow{Key: key.cat, Label: c.Name, Color: c.Color, Icon: c.Icon}, cents, n)
 			row.Share, row.ShareTotal = shareOf(row, mb.Total)
-			for id, child := range byBooking[key] {
-				b := bookings[id]
-				kid := summarize(MatrixRow{Key: id, Label: b.Name}, child, n)
-				row.Children = append(row.Children, kid)
+			// A category holding a single booking already is that booking, so
+			// unfolding it would only repeat the row.
+			if len(byBooking[key]) > 1 {
+				for id, child := range byBooking[key] {
+					b := bookings[id]
+					row.Children = append(row.Children, summarize(MatrixRow{Key: id, Label: b.Name}, child, n))
+				}
+				sortRows(row.Children)
 			}
-			sortRows(row.Children)
 			mb.Rows = append(mb.Rows, row)
 		}
 		sortRows(mb.Rows)

@@ -285,4 +285,6 @@ var english = Catalog{
 	"pdf.fileOverview":    "overview",
 	"pdf.fileStatistics":  "statistics",
 	"pdf.fileBookingList": "expenses",
+	"pdf.fileYear":        "year-overview",
+	"pdf.year":            "Year as PDF",
 }

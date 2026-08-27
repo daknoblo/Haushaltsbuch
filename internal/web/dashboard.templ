@@ -11,6 +11,7 @@ templ DashboardPage(nav Nav, vm DashboardVM) {
 			<div class="ml-auto flex flex-wrap items-center gap-2 no-print">
 				<a class="btn-ghost" href={ templ.SafeURL("/export/overview.pdf?m=" + nav.Month) }>{ T(ctx, "pdf.overview") }</a>
 				<a class="btn-ghost" href={ templ.SafeURL("/export/expenses.pdf?m=" + nav.Month) }>{ T(ctx, "pdf.expenseList") }</a>
+				<a class="btn-ghost" href={ templ.SafeURL(vm.YearExportURL(nav.Month)) }>{ T(ctx, "pdf.year") }</a>
 				<a class="btn-primary" href={ templ.SafeURL("/export/statistics.pdf?m=" + nav.Month) }>{ T(ctx, "action.exportPDF") }</a>
 			</div>
 		}
@@ -150,7 +151,7 @@ templ matrixCard(vm DashboardVM) {
 	<div class="card">
 		<div class="card-head">
 			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "matrix.title") }</h2>
-			<span class="badge ml-auto">{ vm.RangeLabel }</span>
+			<span class="badge ml-auto">{ vm.MatrixYear }</span>
 		</div>
 		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "matrix.hint") }</p>
 		if vm.Matrix.Empty() {

@@ -641,6 +641,7 @@ type DashboardVM struct {
 	Chart           calc.TrendChart
 	Stack           calc.StackChart
 	Matrix          calc.Matrix
+	MatrixYear      string
 	Sankey          calc.Sankey
 	FixedTop        []calc.LabeledTotal
 	Periods         []PeriodOption
@@ -685,6 +686,22 @@ func (v DashboardVM) Ledger(member int64) []calc.LedgerLine {
 
 // HouseholdView reports whether the dashboard shows the whole household.
 func (v DashboardVM) HouseholdView() bool { return v.ViewMember == calc.Everyone }
+
+// ViewName is the selected person, empty in the household view. The screen has
+// the switch to say which one is active; a printed page has nothing.
+func (v DashboardVM) ViewName() string {
+	for _, o := range v.Views {
+		if o.Active && o.Member != calc.Everyone {
+			return o.Label
+		}
+	}
+	return ""
+}
+
+// YearExportURL prints the same year and the same person the page is showing.
+func (v DashboardVM) YearExportURL(month string) string {
+	return "/export/year.pdf?m=" + month + "&view=" + strconv.FormatInt(v.ViewMember, 10)
+}
 
 // SplitLabel names how a booking is divided, which is what tells a shared bill
 // apart from one a single member carries alone.
