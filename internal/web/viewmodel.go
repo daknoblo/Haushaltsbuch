@@ -718,6 +718,16 @@ func MatrixCell(cents int64) string {
 	return FormatEURShort(cents)
 }
 
+// MatrixAverage blanks the mean and the median for a line that ran in a single
+// month. There both would equal the total, and three columns saying the same
+// number read as a figure rather than as the absence of one.
+func MatrixAverage(row calc.MatrixRow, cents int64) string {
+	if row.ActiveMonths < 2 {
+		return ""
+	}
+	return FormatEURShort(cents)
+}
+
 // Coord formats a layout coordinate for an SVG attribute.
 func Coord(v float64) string {
 	return strconv.FormatFloat(v, 'f', 2, 64)

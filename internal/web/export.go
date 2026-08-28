@@ -278,8 +278,8 @@ func pdfCells(row calc.MatrixRow) []string {
 	}
 	return append(out,
 		FormatEURShort(row.TotalCents),
-		FormatEURShort(row.MeanCents),
-		FormatEURShort(row.MedianCents))
+		MatrixAverage(row, row.MeanCents),
+		MatrixAverage(row, row.MedianCents))
 }
 
 // matrixShares is the percentage line printed under a category.

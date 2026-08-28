@@ -43,6 +43,9 @@ type MatrixRow struct {
 	MeanCents   int64
 	MedianCents int64
 	ShareTotal  float64
+	// ActiveMonths is how many months of the range the line actually carried a
+	// figure. One of them means there is nothing to average.
+	ActiveMonths int
 	// Gain marks a row where a larger figure is the better news, which is what
 	// separates a raise from a rising cost.
 	Gain     bool
@@ -165,7 +168,7 @@ func BuildMatrix(d Data, months []string, member int64) Matrix {
 					b := bookings[id]
 					row.Children = append(row.Children, summarize(MatrixRow{Key: id, Label: b.Name}, child, n))
 				}
-				sortRows(row.Children)
+				sortChildren(row.Children)
 			}
 			mb.Rows = append(mb.Rows, row)
 		}
@@ -215,17 +218,26 @@ func BuildMatrix(d Data, months []string, member int64) Matrix {
 	return m
 }
 
-// summarize fills in the figures that only exist across the whole row. The mean
-// divides by every month of the range, empty ones included, matching
-// PeriodReport.
+// summarize fills in the figures that only exist across the whole row. Mean and
+// median count only the months the line actually ran: a month before a booking
+// started is not a month it cost nothing, it is a month there is nothing to say
+// about. Averaging over the calendar instead would report a salary that stopped
+// in August as a smaller salary paid all year.
 func summarize(row MatrixRow, cents []int64, n int) MatrixRow {
 	row.Cents = make([]int64, n)
 	copy(row.Cents, cents)
+	ran := make([]int64, 0, n)
 	for _, v := range row.Cents {
 		row.TotalCents += v
+		if v != 0 {
+			ran = append(ran, v)
+		}
 	}
-	row.MeanCents = row.TotalCents / int64(n)
-	row.MedianCents = median(row.Cents)
+	row.ActiveMonths = len(ran)
+	if row.ActiveMonths > 0 {
+		row.MeanCents = row.TotalCents / int64(row.ActiveMonths)
+		row.MedianCents = median(ran)
+	}
 	row.Trend = trendOf(row.Cents)
 	return row
 }
@@ -315,21 +327,48 @@ func median(v []int64) int64 {
 	return (s[mid-1] + s[mid]) / 2
 }
 
+// sortChildren orders the bookings inside a category by the month they first
+// appear in. A category holding a one-off per month — a salary paid separately
+// each time — reads as a diagonal down the table that way, where ordering by
+// amount scatters the months and hides that they are a series. Bookings that
+// all start together fall through to the same order as everywhere else.
+func sortChildren(rows []MatrixRow) {
+	sort.Slice(rows, func(i, j int) bool {
+		a, b := rows[i], rows[j]
+		if x, y := firstMonth(a.Cents), firstMonth(b.Cents); x != y {
+			return x < y
+		}
+		return lessByAmount(a, b)
+	})
+}
+
+// firstMonth is the index of the first month the row carries a figure, or the
+// length of the range when it carries none.
+func firstMonth(cents []int64) int {
+	for i, c := range cents {
+		if c != 0 {
+			return i
+		}
+	}
+	return len(cents)
+}
+
 // sortRows puts the expensive lines first. The tie-breaks matter as much as the
 // amount: the rows are collected out of a map, so two lines costing the same
 // would otherwise swap places between one page load and the next.
 func sortRows(rows []MatrixRow) {
-	sort.Slice(rows, func(i, j int) bool {
-		a, b := rows[i], rows[j]
-		if a.TotalCents != b.TotalCents {
-			return a.TotalCents > b.TotalCents
-		}
-		if a.Label != b.Label {
-			return a.Label < b.Label
-		}
-		if a.LabelKey != b.LabelKey {
-			return a.LabelKey < b.LabelKey
-		}
-		return a.Key < b.Key
-	})
+	sort.Slice(rows, func(i, j int) bool { return lessByAmount(rows[i], rows[j]) })
+}
+
+func lessByAmount(a, b MatrixRow) bool {
+	if a.TotalCents != b.TotalCents {
+		return a.TotalCents > b.TotalCents
+	}
+	if a.Label != b.Label {
+		return a.Label < b.Label
+	}
+	if a.LabelKey != b.LabelKey {
+		return a.LabelKey < b.LabelKey
+	}
+	return a.Key < b.Key
 }

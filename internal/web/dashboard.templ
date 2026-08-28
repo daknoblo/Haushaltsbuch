@@ -266,11 +266,11 @@ templ matrixCells(row calc.MatrixRow) {
 			{ MatrixCell(c) }
 		</td>
 	}
-	// The three summary columns spell out a zero: a median of nothing is the
-	// point of showing a median next to a mean.
+	// A line that ran in a single month has no average and no typical month; the
+	// two columns stay empty there rather than repeating the total three times.
 	<td class="matrix-cell text-right font-medium">{ FormatEURShort(row.TotalCents) }</td>
-	<td class="matrix-cell matrix-aside">{ FormatEURShort(row.MeanCents) }</td>
-	<td class="matrix-cell matrix-aside">{ FormatEURShort(row.MedianCents) }</td>
+	<td class="matrix-cell matrix-aside">{ MatrixAverage(row, row.MeanCents) }</td>
+	<td class="matrix-cell matrix-aside">{ MatrixAverage(row, row.MedianCents) }</td>
 }
 
 // matrixTrend marks a month against the one before it. The arrow is the fact

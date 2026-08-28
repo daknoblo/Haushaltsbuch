@@ -255,8 +255,9 @@ func TestPlausibilityTheYearTableReconciles(t *testing.T) {
 		}
 	}
 
-	if got := m.Expense.MeanCents; got != m.Expense.TotalCents/12 {
-		t.Errorf("mean %d is not the total %d over twelve months", got, m.Expense.TotalCents)
+	if got, want := m.Expense.MeanCents, m.Expense.TotalCents/int64(m.Expense.ActiveMonths); got != want {
+		t.Errorf("mean %d is not the total %d over the %d months it ran",
+			got, m.Expense.TotalCents, m.Expense.ActiveMonths)
 	}
 
 	// A category that unfolds has to equal the bookings underneath it, or the

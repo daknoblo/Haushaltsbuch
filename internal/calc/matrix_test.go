@@ -63,18 +63,22 @@ func TestMatrixSumsTheYearPerBand(t *testing.T) {
 	}
 }
 
-// The mean divides by the whole year, the median says what a typical month
-// looks like. Nine months without a salary make those two disagree, which is
-// exactly why both are shown.
-func TestMatrixMeanAndMedianDisagreeOnAnUnevenYear(t *testing.T) {
+// A salary paid in three months of the year is a salary of that size, not a
+// smaller one paid all year. Mean and median count the months the line ran, so
+// they answer what a month with a salary looked like; they still disagree when
+// one of those months is far off the others, which is why both are shown.
+func TestMatrixMeanAndMedianIgnoreTheMonthsALineDidNotRun(t *testing.T) {
 	m := BuildMatrix(budgetBook(), calendarYear(), Everyone)
 	income := m.Band(BandIncome).Total
 
-	if income.MeanCents != 98725 {
-		t.Errorf("mean = %d, want 98725", income.MeanCents)
+	if income.ActiveMonths != 3 {
+		t.Fatalf("active months = %d, want 3", income.ActiveMonths)
 	}
-	if income.MedianCents != 0 {
-		t.Errorf("median = %d, want 0 for nine empty months", income.MedianCents)
+	if got, want := income.MeanCents, income.TotalCents/3; got != want {
+		t.Errorf("mean = %d, want %d", got, want)
+	}
+	if income.MedianCents == 0 {
+		t.Error("median = 0, which is what averaging over the empty months used to produce")
 	}
 }
 
@@ -157,6 +161,52 @@ func TestMatrixCategoryRowsAddUpFromTheirBookings(t *testing.T) {
 	}
 	if wohnen.Children[0].Label != "Miete" {
 		t.Errorf("first booking is %q, want the largest one", wohnen.Children[0].Label)
+	}
+}
+
+// A salary entered once per month is a series, and a table that orders it by
+// amount hides that. The fixture pays 3.701, 4.541 and 3.605 in January,
+// February and March, so ordering by amount would read February, January,
+// March — three months in no order at all, next to columns that run left to
+// right in month order.
+func TestMatrixOrdersTheBookingsOfACategoryByMonth(t *testing.T) {
+	m := BuildMatrix(budgetBook(), calendarYear(), Everyone)
+
+	var gehalt MatrixRow
+	for _, r := range m.Band(BandIncome).Rows {
+		if r.Label == "Gehalt" {
+			gehalt = r
+		}
+	}
+	if len(gehalt.Children) != 3 {
+		t.Fatalf("Gehalt has %d bookings, want three", len(gehalt.Children))
+	}
+	for i, child := range gehalt.Children {
+		if got := firstMonth(child.Cents); got != i {
+			t.Errorf("booking %d starts in month %d, want %d", i, got, i)
+		}
+	}
+}
+
+// Averaging over a month a booking never ran in turns a one-off into a small
+// recurring cost. Each of these salaries is paid once, so there is no average
+// of it to report and the row says so instead of dividing by twelve.
+func TestMatrixDoesNotAverageAOneOffOverTheYear(t *testing.T) {
+	m := BuildMatrix(budgetBook(), calendarYear(), Everyone)
+
+	for _, r := range m.Band(BandIncome).Rows {
+		for _, child := range r.Children {
+			if child.ActiveMonths != 1 {
+				t.Fatalf("%q ran in %d months, want one", child.Label, child.ActiveMonths)
+			}
+			if child.MeanCents != child.TotalCents {
+				t.Errorf("%q: mean %d, want the one figure it was paid, %d",
+					child.Label, child.MeanCents, child.TotalCents)
+			}
+			if child.MedianCents != child.TotalCents {
+				t.Errorf("%q: median %d, want %d", child.Label, child.MedianCents, child.TotalCents)
+			}
+		}
 	}
 }
 

@@ -1627,9 +1627,9 @@ func matrixCells(row calc.MatrixRow) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var84 string
-		templ_7745c5c3_Var84, templ_7745c5c3_Err = templ.JoinStringErrs(FormatEURShort(row.MeanCents))
+		templ_7745c5c3_Var84, templ_7745c5c3_Err = templ.JoinStringErrs(MatrixAverage(row, row.MeanCents))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dashboard.templ`, Line: 272, Col: 69}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dashboard.templ`, Line: 272, Col: 73}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var84))
 		if templ_7745c5c3_Err != nil {
@@ -1640,9 +1640,9 @@ func matrixCells(row calc.MatrixRow) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var85 string
-		templ_7745c5c3_Var85, templ_7745c5c3_Err = templ.JoinStringErrs(FormatEURShort(row.MedianCents))
+		templ_7745c5c3_Var85, templ_7745c5c3_Err = templ.JoinStringErrs(MatrixAverage(row, row.MedianCents))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dashboard.templ`, Line: 273, Col: 71}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/dashboard.templ`, Line: 273, Col: 75}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var85))
 		if templ_7745c5c3_Err != nil {
