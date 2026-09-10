@@ -89,6 +89,8 @@ type bookingOut struct {
 	Shares       []shareOu `json:"shares"`
 	Tags         []int64   `json:"tags"`
 	UpdatedAt    string    `json:"updated_at"`
+
+	SettleEffective bool `json:"settle_effective"`
 }
 
 type shareOu struct {
@@ -630,6 +632,7 @@ func toBookingOut(b store.Booking, cats map[int64]string, splits []store.Booking
 		CostNature: string(b.CostNature), BudgetClass: string(b.BudgetClass),
 		SplitMode: string(b.SplitMode), Settle: b.Settle, Retired: b.Retired,
 		Shares: shares, Tags: tagIDs, UpdatedAt: b.UpdatedAt,
+		SettleEffective: calc.SettlementEnabled(b, splits, overrides, month),
 	}
 	if b.PayerMemberID != nil {
 		out.PayerID = *b.PayerMemberID

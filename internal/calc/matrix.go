@@ -118,7 +118,7 @@ func BuildMatrix(d Data, months []string, member int64) Matrix {
 		for _, value := range bookingValues(d, month) {
 			b := value.Booking
 			cents, ok := value.scoped(member)
-			if !ok {
+			if !ok && !incomeForScope(b, d.Splits[b.ID], member) {
 				continue
 			}
 
@@ -172,7 +172,13 @@ func BuildMatrix(d Data, months []string, member int64) Matrix {
 	expense := addRows(m.Band(BandFixed).Total, m.Band(BandVariable).Total, n)
 	expenseActive := mergeActive(activeBand[BandFixed], activeBand[BandVariable], n)
 	m.Expense = summarize(MatrixRow{LabelKey: "matrix.total.expense"}, expense, expenseActive, n)
-	m.Surplus = summarize(MatrixRow{LabelKey: "matrix.surplus"}, diffRows(income.Cents, expense, n), mergeActive(income.Active, expenseActive, n), n)
+	surplus := diffRows(income.Cents, expense, n)
+	for i := range surplus {
+		if !income.Active[i] {
+			surplus[i] = 0
+		}
+	}
+	m.Surplus = summarize(MatrixRow{LabelKey: "matrix.surplus"}, surplus, income.Active, n)
 	m.Surplus.Gain = true
 
 	// Income is the one band where more is the good news, and the surplus rides

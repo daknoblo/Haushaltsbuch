@@ -21,8 +21,9 @@ type ChartGridLine struct {
 
 // ChartTick labels one month below the plot.
 type ChartTick struct {
-	Month string
-	X     float64
+	Month          string
+	X              float64
+	IncomeRecorded bool
 }
 
 // ChartPoint is one month of the surplus line, carrying its own label because
@@ -51,6 +52,8 @@ type TrendChart struct {
 	Line  []ChartPoint
 	Grid  []ChartGridLine
 	Ticks []ChartTick
+	// Segments stop at missing-income months instead of drawing through gaps.
+	Segments [][]ChartPoint
 }
 
 // Empty reports whether there is nothing to draw.
@@ -81,8 +84,20 @@ func BuildTrendChart(reps []MonthReport, width, height float64) TrendChart {
 
 	var peak, low int64
 	for _, r := range reps {
-		peak = max(peak, r.IncomeCents, r.ExpenseCents, r.BalanceCents)
-		low = min(low, r.BalanceCents)
+		peak = max(peak, r.IncomeCents, r.ExpenseCents)
+		if r.IncomeRecorded {
+			peak = max(peak, r.BalanceCents)
+			low = min(low, r.BalanceCents)
+		}
+	}
+	// Give a recorded all-zero month a one-euro axis, not an empty chart.
+	if peak == 0 && low == 0 {
+		for _, r := range reps {
+			if r.IncomeRecorded {
+				peak = 100
+				break
+			}
+		}
 	}
 	floor, top, step := niceBounds(low, peak, gridLines)
 	if top <= floor {
@@ -101,10 +116,16 @@ func BuildTrendChart(reps []MonthReport, width, height float64) TrendChart {
 	barW := math.Min(slot*0.34, 26)
 	for i, r := range reps {
 		center := c.Left + slot*(float64(i)+0.5)
-		c.Ticks = append(c.Ticks, ChartTick{Month: r.Month, X: center})
-		c.Line = append(c.Line, ChartPoint{
-			Month: r.Month, Cents: r.BalanceCents, X: center, Y: at(r.BalanceCents),
-		})
+		c.Ticks = append(c.Ticks, ChartTick{Month: r.Month, X: center, IncomeRecorded: r.IncomeRecorded})
+		if r.IncomeRecorded {
+			point := ChartPoint{Month: r.Month, Cents: r.BalanceCents, X: center, Y: at(r.BalanceCents)}
+			c.Line = append(c.Line, point)
+			if i == 0 || !reps[i-1].IncomeRecorded {
+				c.Segments = append(c.Segments, nil)
+			}
+			last := len(c.Segments) - 1
+			c.Segments[last] = append(c.Segments[last], point)
+		}
 		for _, bar := range []struct {
 			income bool
 			cents  int64
@@ -113,6 +134,9 @@ func BuildTrendChart(reps []MonthReport, width, height float64) TrendChart {
 			{true, r.IncomeCents, center - barW - 1},
 			{false, r.ExpenseCents, center + 1},
 		} {
+			if bar.income && !r.IncomeRecorded {
+				continue
+			}
 			h := math.Max(float64(bar.cents)*scale, 0)
 			c.Bars = append(c.Bars, ChartBar{
 				Month:  r.Month,

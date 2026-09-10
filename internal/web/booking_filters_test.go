@@ -18,6 +18,9 @@ func TestBookingFilters(t *testing.T) {
 		{Month: "2026-09", Booking: store.Booking{Name: "Miete neu", Frequency: store.FreqMonthly, StartsOn: "2026-10-01"}},
 		{Month: "2026-09", Booking: store.Booking{Name: "Öl", Frequency: store.FreqMonthly}},
 	}
+	for i := range rows {
+		rows[i].Search = bookingSearch(t.Context(), rows[i], nil)
+	}
 	for _, tc := range []struct {
 		query string
 		all   bool
@@ -89,7 +92,7 @@ func TestBookingFilterURLsAndRendering(t *testing.T) {
 		}
 	}
 	body := get(t, h, "/bookings?m=2026-05").Body.String()
-	if !strings.Contains(body, `aria-pressed="true"`) ||
+	if !strings.Contains(body, `type="checkbox" id="booking-active-filter" checked`) ||
 		!strings.Contains(body, `data-booking-name="Bonus" data-booking-active="false" hidden`) {
 		t.Error("active-month filter not enabled by default")
 	}

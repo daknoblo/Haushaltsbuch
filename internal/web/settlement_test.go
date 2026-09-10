@@ -65,8 +65,9 @@ func TestDashboardSettlementUsesElapsedYearTotals(t *testing.T) {
 		if !reflect.DeepEqual(vm.Settlement, want) {
 			t.Errorf("%s: settlement is not in the expected unit", period)
 		}
-		if !reflect.DeepEqual(vm.Report, calc.PeriodReport(data, months, calc.Everyone)) {
-			t.Errorf("%s: unrelated dashboard figures changed", period)
+		recorded := calc.MonthsWithIncome(data, months, calc.Everyone)
+		if !reflect.DeepEqual(vm.Report, calc.PeriodReport(data, recorded, calc.Everyone)) {
+			t.Errorf("%s: dashboard figures must use months with recorded income", period)
 		}
 	}
 }

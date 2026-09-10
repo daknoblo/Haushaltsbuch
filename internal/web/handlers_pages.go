@@ -118,6 +118,10 @@ func (s *Server) buildBookingsVM(ctx context.Context, householdID int64, month, 
 	for _, m := range data.Members {
 		members[m.ID] = m
 	}
+	tags := make(map[int64]store.Tag, len(data.Tags))
+	for _, tag := range data.Tags {
+		tags[tag.ID] = tag
+	}
 
 	vm := BookingsVM{
 		Month:    month,
@@ -139,6 +143,7 @@ func (s *Server) buildBookingsVM(ctx context.Context, householdID int64, month, 
 			row.Payer = members[*b.PayerMemberID]
 		}
 		row.Carriers = carriers(b, data.Members, row.Splits)
+		row.Search = bookingSearch(ctx, row, tags)
 		vm.Bookings = append(vm.Bookings, row)
 	}
 	sortBookings(vm.Bookings, vm.Sort)
@@ -417,24 +422,26 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 	span := len(months)
 	year := calendarYear(month)
 	elapsed := elapsedYearMonths(month, NormalizeMonth(""))
-	data = calc.Prepare(data, months, year, elapsed)
+	recorded := calc.MonthsWithIncome(data, months, member)
+	data = calc.Prepare(data, months, year, elapsed, recorded)
 
 	vm := DashboardVM{
-		Report:     calc.PeriodReport(data, months, member),
-		Trend:      calc.Trend(data, months, member),
-		PeriodKey:  period,
-		ViewMember: member,
-		Grouping:   grouping,
-		PrevURL:    dashboardURL(ShiftMonth(month, -span), period, member, grouping),
-		NextURL:    dashboardURL(ShiftMonth(month, span), period, member, grouping),
-		RangeLabel: rangeLabel(ctx, months),
-		Periods:    periodChoices(ctx, month, period, member, grouping),
+		Report:         calc.PeriodReport(data, recorded, member),
+		RecordedMonths: recorded,
+		Trend:          calc.Trend(data, months, member),
+		PeriodKey:      period,
+		ViewMember:     member,
+		Grouping:       grouping,
+		PrevURL:        dashboardURL(ShiftMonth(month, -span), period, member, grouping),
+		NextURL:        dashboardURL(ShiftMonth(month, span), period, member, grouping),
+		RangeLabel:     rangeLabel(ctx, months),
+		Periods:        periodChoices(ctx, month, period, member, grouping),
 	}
 	// In the household view both scopes are the same figure, so it is only
 	// aggregated a second time when a person is selected.
 	vm.HouseholdReport = vm.Report
 	if member != calc.Everyone {
-		vm.HouseholdReport = calc.PeriodReport(data, months, calc.Everyone)
+		vm.HouseholdReport = calc.PeriodReport(data, recorded, calc.Everyone)
 	}
 
 	for _, p := range periodOrder {
@@ -478,9 +485,9 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 	vm.MatrixYear = NormalizeMonth(month)[:4]
 	vm.Matrix = calc.BuildMatrix(data, year, member)
 
-	vm.FixedTop = calc.FixedCosts(data, months, member, fixedCostTop)
+	vm.FixedTop = calc.FixedCosts(data, recorded, member, fixedCostTop)
 	vm.Rule = calc.BuildRuleRing(vm.Report)
-	vm.Sankey = calc.BuildSankey(ctx, data, vm.Report, months, sankeyWidth, sankeyHeight)
+	vm.Sankey = calc.BuildSankey(ctx, data, vm.Report, recorded, sankeyWidth, sankeyHeight)
 	vm.SettlementRange = vm.RangeLabel
 	if period == periodYear {
 		vm.Settlement = calc.SettlementTotal(data, elapsed)

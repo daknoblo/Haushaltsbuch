@@ -6,8 +6,8 @@ import "testing"
 // off at the bottom of the plot.
 func TestTrendChartMakesRoomForADeficit(t *testing.T) {
 	reps := []MonthReport{
-		{Month: "2026-01", IncomeCents: 300000, ExpenseCents: 200000, BalanceCents: 100000},
-		{Month: "2026-02", IncomeCents: 0, ExpenseCents: 340000, BalanceCents: -340000},
+		{Month: "2026-01", IncomeRecorded: true, IncomeCents: 300000, ExpenseCents: 200000, BalanceCents: 100000},
+		{Month: "2026-02", IncomeRecorded: true, IncomeCents: 0, ExpenseCents: 340000, BalanceCents: -340000},
 	}
 	c := BuildTrendChart(reps, 760, 260)
 
@@ -31,7 +31,7 @@ func TestTrendChartMakesRoomForADeficit(t *testing.T) {
 // Without a deficit the baseline stays at the foot of the plot, so the chart
 // looks the way it always did.
 func TestTrendChartKeepsTheBaselineWithoutADeficit(t *testing.T) {
-	reps := []MonthReport{{Month: "2026-01", IncomeCents: 300000, ExpenseCents: 200000, BalanceCents: 100000}}
+	reps := []MonthReport{{Month: "2026-01", IncomeRecorded: true, IncomeCents: 300000, ExpenseCents: 200000, BalanceCents: 100000}}
 	if c := BuildTrendChart(reps, 760, 260); c.Zero != c.Bottom {
 		t.Errorf("baseline at %.1f, want the foot of the plot %.1f", c.Zero, c.Bottom)
 	}

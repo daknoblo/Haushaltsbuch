@@ -170,6 +170,9 @@ func settlement(d Data, months []string, averaged bool) SettlementReport {
 			rep.InvalidBookings = append(rep.InvalidBookings, b)
 			continue
 		}
+		if payerCarriesAlone(value) {
+			continue
+		}
 		if value.Cents != 0 {
 			rep.Lines = append(rep.Lines, ShareLine{
 				Booking: b, Payer: payer, Cents: value.Cents,

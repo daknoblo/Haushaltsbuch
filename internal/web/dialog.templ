@@ -10,7 +10,7 @@ import (
 // button: the draft already exists, every field posts itself and the server
 // answers without markup, so nothing the user is typing in is ever replaced.
 templ BookingDialog(f BookingFormVM) {
-	<dialog class="dlg" data-dialog aria-label={ f.Title(ctx) } data-discard-url={ f.DiscardURL() }>
+	<dialog class="dlg" data-dialog data-month={ f.Row.Month } aria-label={ f.Title(ctx) } data-discard-url={ f.DiscardURL() }>
 		<form
 			class="dlg-form"
 			hx-post={ f.Row.PostURL() }
@@ -283,12 +283,23 @@ templ bookingSplit(f BookingFormVM) {
 			</select>
 		</div>
 		if !f.Row.IsIncome() {
+			if f.Row.Booking.Settle {
+				<input type="hidden" name="settle" value="1" data-settle-preference/>
+			} else {
+				<input type="hidden" name="settle" value="" data-settle-preference/>
+			}
 			<label class="switch mt-4">
-				<input type="checkbox" name="settle" value="1" checked?={ f.Row.Booking.Settle }/>
+				<input type="checkbox" data-settle-toggle checked?={ f.Row.SettlementEnabled() } disabled?={ f.Row.AutoSettlementOff() }/>
 				<span class="switch-track"><span class="switch-knob"></span></span>
 				<span>
 					<span class="block text-sm font-medium text-slate-800 dark:text-slate-200">{ T(ctx, "bookings.settle") }</span>
-					<span class="block text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.settleHint") }</span>
+					<span class="block text-xs text-slate-500 dark:text-slate-400" data-settle-hint data-default={ T(ctx, "bookings.settleHint") } data-auto={ T(ctx, "bookings.settleAutoHint") }>
+						if f.Row.AutoSettlementOff() {
+							{ T(ctx, "bookings.settleAutoHint") }
+						} else {
+							{ T(ctx, "bookings.settleHint") }
+						}
+					</span>
 				</span>
 			</label>
 		}

@@ -26,18 +26,25 @@
     var input = document.getElementById("booking-search");
     var toggle = document.getElementById("booking-active-filter");
     if (!input || !toggle) return;
-    var activeOnly = toggle.getAttribute("aria-pressed") === "true";
+    var activeOnly = toggle.checked;
     var query = input.value.trim().toLowerCase();
     var searching = Array.from(query).length >= 2;
+    var terms = query.split(/\s+/);
     var count = 0;
     var suggestions = new Set();
     document.querySelectorAll("[data-booking-name]").forEach(function (row) {
-      var name = row.getAttribute("data-booking-name");
+      var text = row.getAttribute("data-booking-search");
       var active = !activeOnly || row.getAttribute("data-booking-active") === "true";
-      var matches = !searching || name.toLowerCase().includes(query);
+      var matches = !searching || terms.every(function (term) { return text.includes(term); });
       row.hidden = !active || !matches;
       if (!row.hidden) count++;
-      if (active && searching && matches && name) suggestions.add(name);
+      if (active && searching && matches) {
+        JSON.parse(row.getAttribute("data-booking-suggestions")).forEach(function (value) {
+          if (terms.every(function (term) { return value.toLowerCase().includes(term); })) {
+            suggestions.add(value);
+          }
+        });
+      }
     });
     var empty = document.querySelector("[data-booking-no-matches]");
     if (empty) empty.hidden = count !== 0;
@@ -48,7 +55,6 @@
       option.value = name;
       list.appendChild(option);
     });
-    toggle.classList.toggle("period-chip-active", activeOnly);
     document.querySelector("[data-booking-clear]").disabled = input.value === "";
 
     function withFilters(href) {
@@ -69,12 +75,11 @@
     if (e.target.id === "booking-search") filterBookings();
   });
 
+  document.addEventListener("change", function (e) {
+    if (e.target.id === "booking-active-filter") filterBookings();
+  });
+
   document.addEventListener("click", function (e) {
-    var toggle = e.target.closest("#booking-active-filter");
-    if (toggle) {
-      toggle.setAttribute("aria-pressed", toggle.getAttribute("aria-pressed") === "true" ? "false" : "true");
-      filterBookings();
-    }
     if (e.target.closest("[data-booking-clear]")) {
       var input = document.getElementById("booking-search");
       input.value = "";
@@ -169,6 +174,7 @@
     if (!dlg.open) dlg.showModal();
     dialogTouched = false;
     saveErrors.clear();
+    refreshSplitState();
     // A modal focuses its first field anyway, so a suggested name is selected
     // rather than cleared: typing replaces it, clicking into the field wipes it.
     var name = dlg.querySelector("input[data-clear-on-focus]");
@@ -281,13 +287,16 @@
   // nobody's tab, and a booking nobody carries at all only shows up as
   // "unassigned" in the list. The dialog counts along while the shares are
   // typed and says which pick is missing.
-  function refreshSplitState() {
+  function refreshSplitState(e) {
     var dlg = currentDialog();
     if (!dlg) return;
     var picker = dlg.querySelector('select[name="split_mode"]');
     var mode = picker ? picker.value : "equal";
     var sum = 0;
     var carriers = 0;
+    var carrier = "";
+    var fixedCents = 0;
+    var sharesValid = true;
 
     dlg.querySelectorAll(".split-member").forEach(function (row) {
       var on = row.querySelector('input[type="checkbox"]');
@@ -296,10 +305,14 @@
       var fixedField = row.querySelector("input[data-cents]");
       var percent = percentField ? parseFloat(percentField.value) || 0 : 0;
       var fixed = fixedField ? parseFloat(fixedField.value) || 0 : 0;
+      var activeField = mode === "percent" ? percentField : mode === "fixed" ? fixedField : null;
+      if (activeField && !activeField.validity.valid) sharesValid = false;
       sum += percent;
+      fixedCents += Math.round(fixed * 100);
       // Outside an equal split a tick without a value carries nothing.
       if (mode === "equal" || (mode === "percent" ? percent > 0 : fixed > 0)) {
         carriers++;
+        carrier = on.name.slice(2);
       }
     });
 
@@ -309,10 +322,48 @@
     if (hint) hint.classList.toggle("split-off", Math.abs(sum - 100) > 0.05);
     var warn = dlg.querySelector("[data-carrier-warn]");
     if (warn) warn.classList.toggle("carrier-warn-on", carriers === 0);
+
+    var settle = dlg.querySelector("[data-settle-toggle]");
+    var preference = dlg.querySelector("[data-settle-preference]");
+    if (!settle || !preference) return;
+    if (e && e.target === settle && !settle.disabled) {
+      preference.value = settle.checked ? "1" : "";
+    }
+    var payer = dlg.querySelector('input[name="payer_member_id"]:checked');
+    var complete = sharesValid && (mode === "equal" || (mode === "percent" ?
+      Math.abs(sum - 100) < 1e-9 : fixedCents === settlementAmount(dlg)));
+    var automatic = complete && carriers === 1 && payer && payer.value === carrier;
+    settle.disabled = Boolean(automatic);
+    settle.checked = !automatic && preference.value === "1";
+    var settleHint = dlg.querySelector("[data-settle-hint]");
+    if (settleHint) {
+      settleHint.textContent = settleHint.getAttribute(automatic ? "data-auto" : "data-default");
+    }
   }
 
-  document.addEventListener("input", refreshSplitState);
-  document.addEventListener("change", refreshSplitState);
+  function settlementAmount(dlg) {
+    var field = dlg.querySelector('input[name="amount"]');
+    var amount = field.validity.valid ? Math.round(Number(field.value) * 100) : NaN;
+    var recurring = dlg.querySelector('input[name="recurring"]');
+    if (!recurring || !recurring.checked) return amount;
+    var month = dlg.getAttribute("data-month");
+    dlg.querySelectorAll(".override-row:not(.override-add)").forEach(function (row) {
+      var from = row.querySelector('input[name="starts_on"]');
+      var until = row.querySelector('input[name="ends_on"]');
+      var value = row.querySelector('input[name="amount"]');
+      if (from.validity.badInput || until.validity.badInput || value.validity.badInput) {
+        amount = NaN;
+      } else if ((!from.value || from.value.slice(0, 7) <= month) &&
+                 (!until.value || until.value.slice(0, 7) >= month)) {
+        amount = Math.round(Number(value.value) * 100);
+      }
+    });
+    return amount;
+  }
+
+  // Update the saved preference before HTMX collects the form on change.
+  document.addEventListener("input", refreshSplitState, true);
+  document.addEventListener("change", refreshSplitState, true);
 
   // A period picker carries the whole target URL in each option, so following
   // it needs no knowledge of the page. The handler lives here because the

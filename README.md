@@ -44,10 +44,13 @@ _Not captured yet._
   - **permanent price changes** that close the predecessor and exclude it from
     annual carry-over, preventing the old and new price from being added
     together,
-  - an active-month filter enabled by default, plus instant name search from
-    two characters with completion suggestions and a clear button. Turn off
-    **Hide old bookings** to include past and future bookings. Filters affect
-    the list only, not the monthly balance.
+  - left-aligned sorting, with full-text search and the **Hide old bookings**
+    checkbox on the right. Search starts at two characters and covers names,
+    categories, tags, involved people, notes, amounts, dates, recurrence and
+    allocation values, including overrides. Multiple words can match different
+    fields. Completion suggestions and a centered clear icon assist searching.
+    The month checkbox is enabled by default; untick it to include past and
+    future bookings. Filters affect only the list, not the monthly balance.
 - **Overview** per month: income, expenses and balance – in total and per
   person, broken down by category, cost nature and 50/30/20.
 - **Dashboard** with a selectable period (month, two months, quarter, half year,
@@ -68,6 +71,12 @@ _Not captured yet._
     Shares are rounded without losing cents, including transfers below one
     euro. Incomplete or excessive splits are explicitly listed and block
     transfer suggestions until corrected,
+  - **automatic settlement exclusion** when the payer carries the entire cost
+    alone. The switch turns off with an explanation, including for existing
+    bookings. Adding another carrier or changing the payer restores the
+    previous preference; a deliberate manual exclusion stays off. Budget
+    reports continue to include these costs. The settlement indicator sits next
+    to the shared/sole badge; both are red for shared expenses without settlement,
   - **fixed costs** with their share of income and the largest items,
   - **savings rate** — deliberate savings plus surplus against net income — and
     the 50/30/20 split against its targets,
@@ -93,11 +102,23 @@ splits keep an explicit unassigned remainder rather than being silently
 rescaled. Percent splits show the configured percentages; fixed splits are
 labelled as fixed amounts, not as equal divisions.
 
-Period averages divide by every month in the selected period. Their remaining
-cents are distributed at booking level before categories and member figures
-are summed. The year matrix's **mean and median** instead describe the months a
+Dashboard metrics use only months with an income entry for the selected scope.
+An explicitly recorded zero counts; a missing income entry is not treated as
+zero. Income, costs, ratios and breakdowns use the same included months, listed
+beside the metrics. Without any income entries, metrics display as unavailable.
+Percentages with zero income are undefined and display as a dash.
+The full expense plan remains visible in charts and the year matrix, but no
+surplus is drawn for incomplete months or across gaps. Settlement still uses
+its own expense-based period, independent of whether income has been entered.
+
+Period averages divide by the number of included months. Their remaining cents
+are distributed at booking level before categories and member figures are
+summed. The monthly overview and HTTP API remain planning reports. The year
+matrix's **mean and median** describe the months a
 row was active: a genuine zero month counts, while months outside the active
 range do not. An active zero displays as `0 €`; inactive cells stay blank.
+Its surplus row requires recorded income and leaves incomplete months blank.
+The statistics PDF keeps the selected person, period and calculation basis.
 The dashboard reuses a single request-local evaluation rather than repeatedly
 calculating the same monthly allocations.
 

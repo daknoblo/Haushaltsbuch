@@ -64,6 +64,12 @@ their remainder at booking level before aggregation. `calc.Prepare` creates a
 read-only, request-local evaluation for dashboard reuse, never database rows.
 The year matrix tracks active months separately from amounts: genuine zeros
 count towards its mean and median, inactive months do not.
+Dashboard metrics use only months with an income entry for the selected scope;
+explicit zero income counts. `MonthReport.IncomeRecorded` distinguishes missing
+income from zero without altering the underlying monthly planning amounts.
+Expense plans remain visible over the full period, while surplus charts and
+matrix cells omit months without income entries. Settlement is independent of
+income coverage.
 
 Every write is scoped to the active household in SQL — the household id is part
 of the store method signature, and section and category references are resolved

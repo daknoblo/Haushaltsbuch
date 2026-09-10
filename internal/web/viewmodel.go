@@ -137,6 +137,7 @@ type BookingRow struct {
 	Booking  store.Booking
 	Category store.Category
 	Payer    store.Member
+	Search   BookingSearch
 	// Carriers are the members who carry the booking, in household order.
 	Carriers  []store.Member
 	Splits    []store.BookingSplit
@@ -185,6 +186,22 @@ func (r BookingRow) HasMember(id int64) bool {
 // IsPayer reports whether the member fronts this booking.
 func (r BookingRow) IsPayer(id int64) bool {
 	return r.Booking.PayerMemberID != nil && *r.Booking.PayerMemberID == id
+}
+
+// AutoSettlementOff distinguishes a sole payer from an explicitly disabled
+// settlement, keeping the saved preference available for later sharing.
+func (r BookingRow) AutoSettlementOff() bool {
+	return calc.PayerCarriesAlone(r.Booking, r.Splits, r.Overrides, r.Month)
+}
+
+// SettlementEnabled reports the effective setting for the displayed month.
+func (r BookingRow) SettlementEnabled() bool {
+	return calc.SettlementEnabled(r.Booking, r.Splits, r.Overrides, r.Month)
+}
+
+// SharedWithoutSettlement flags shared expenses that will not be reimbursed.
+func (r BookingRow) SharedWithoutSettlement() bool {
+	return !r.IsIncome() && r.IsShared() && !r.SettlementEnabled()
 }
 
 // HasTag reports whether the booking carries the given tag.
@@ -477,11 +494,20 @@ type BookingsVM struct {
 	ShowAll  bool
 }
 
-// Visible combines the selected month and the two-character name search.
+// Visible combines the selected month and the two-character full-text search.
 func (v BookingsVM) Visible(row BookingRow) bool {
 	query := strings.TrimSpace(v.Search)
-	return (v.ShowAll || row.ActiveInMonth()) &&
-		(utf8.RuneCountInString(query) < 2 || strings.Contains(strings.ToLower(row.Booking.Name), strings.ToLower(query)))
+	if !v.ShowAll && !row.ActiveInMonth() {
+		return false
+	}
+	if utf8.RuneCountInString(query) >= 2 {
+		for _, term := range strings.Fields(strings.ToLower(query)) {
+			if !strings.Contains(row.Search.Text, term) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // NoMatches distinguishes a filtered empty result from an empty household.
@@ -700,9 +726,9 @@ func StackViewBox(c calc.StackChart) string {
 }
 
 // ChartLinePoints joins the surplus points into a polyline.
-func ChartLinePoints(c calc.TrendChart) string {
+func ChartLinePoints(points []calc.ChartPoint) string {
 	var b strings.Builder
-	for i, p := range c.Line {
+	for i, p := range points {
 		if i > 0 {
 			b.WriteString(" ")
 		}
@@ -743,6 +769,14 @@ func MatrixCell(cents int64, active bool) string {
 	return FormatEURShort(cents)
 }
 
+// MatrixTotal distinguishes missing income or surplus from a recorded zero.
+func MatrixTotal(row calc.MatrixRow) string {
+	if row.Gain && row.ActiveMonths == 0 {
+		return "—"
+	}
+	return FormatEURShort(row.TotalCents)
+}
+
 // MatrixAverage blanks the mean and the median for a line that ran in a single
 // month. There both would equal the total, and three columns saying the same
 // number read as a figure rather than as the absence of one.
@@ -779,7 +813,8 @@ type ViewOption struct {
 // typical month of the selected period, so every card answers for the whole
 // range rather than only its last month.
 type DashboardVM struct {
-	Report calc.MonthReport
+	RecordedMonths []string
+	Report         calc.MonthReport
 	// HouseholdReport is always the whole household, so a person view can put
 	// its own share next to what the household spends in total.
 	HouseholdReport   calc.MonthReport

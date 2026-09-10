@@ -14,7 +14,7 @@ templ DashboardPage(nav Nav, vm DashboardVM) {
 				<a class="btn-ghost" href={ templ.SafeURL("/export/overview.pdf?m=" + nav.Month) }>{ T(ctx, "pdf.overview") }</a>
 				<a class="btn-ghost" href={ templ.SafeURL("/export/expenses.pdf?m=" + nav.Month) }>{ T(ctx, "pdf.expenseList") }</a>
 				<a class="btn-ghost" href={ templ.SafeURL(vm.YearExportURL(nav.Month)) }>{ T(ctx, "pdf.year") }</a>
-				<a class="btn-primary" href={ templ.SafeURL("/export/statistics.pdf?m=" + nav.Month) }>{ T(ctx, "action.exportPDF") }</a>
+				<a class="btn-primary" href={ templ.SafeURL(vm.StatisticsExportURL(nav.Month)) }>{ T(ctx, "action.exportPDF") }</a>
 			</div>
 		}
 		if nav.ActiveHousehold.ID == 0 {
@@ -23,6 +23,7 @@ templ DashboardPage(nav Nav, vm DashboardVM) {
 			<div class="grid gap-4">
 				@viewSwitch(vm)
 				@chartCard(vm)
+				<p class="alert-info" data-calculation-basis>{ vm.CalculationBasis(ctx) }</p>
 				@headlineTiles(vm)
 				@matrixCard(vm)
 				@stackCard(vm)
@@ -30,14 +31,16 @@ templ DashboardPage(nav Nav, vm DashboardVM) {
 					@settlementCard(vm)
 					@shareCard(vm)
 				}
-				<div class="grid gap-4 lg:grid-cols-2">
-					@fixedCostCard(vm)
-					@savingsCard(vm)
-				</div>
-				@ruleCard(vm)
-				@sankeyCard(vm)
-				@categoryCard(vm)
-				@tagCard(vm)
+				if vm.HasRecordedIncome() {
+					<div class="grid gap-4 lg:grid-cols-2">
+						@fixedCostCard(vm)
+						@savingsCard(vm)
+					</div>
+					@ruleCard(vm)
+					@sankeyCard(vm)
+					@categoryCard(vm)
+					@tagCard(vm)
+				}
 			</div>
 		}
 	}
@@ -93,9 +96,10 @@ templ chartCard(vm DashboardVM) {
 			@trendChart(vm.Chart)
 			<div class="mt-3 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-500 dark:text-slate-400">
 				<span class="flex items-center gap-1.5"><span class="dot bg-emerald-500"></span>{ T(ctx, "overview.income") }</span>
-				<span class="flex items-center gap-1.5"><span class="dot bg-indigo-500"></span>{ T(ctx, "overview.expenses") }</span>
+				<span class="flex items-center gap-1.5"><span class="dot bg-indigo-500"></span>{ T(ctx, "dash.plannedExpenses") }</span>
 				<span class="flex items-center gap-1.5"><span class="dot bg-slate-500"></span>{ T(ctx, "dash.surplus") }</span>
 			</div>
+			<p class="mt-3 text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "dash.incomeCoverageHint") }</p>
 		}
 	</div>
 }
@@ -128,7 +132,9 @@ templ trendChart(c calc.TrendChart) {
 		</g>
 		<g>
 			<line class="chart-zero" x1={ Coord(c.Left) } y1={ Coord(c.Zero) } x2={ Coord(c.Right) } y2={ Coord(c.Zero) }></line>
-			<polyline class="chart-line" points={ ChartLinePoints(c) }></polyline>
+			for _, segment := range c.Segments {
+				<polyline class="chart-line" points={ ChartLinePoints(segment) }></polyline>
+			}
 			for _, p := range c.Line {
 				<circle class="chart-dot" cx={ Coord(p.X) } cy={ Coord(p.Y) } r="3"></circle>
 				<text class="chart-value" x={ Coord(p.X) } y={ Coord(ChartLabelY(p)) } text-anchor="middle">
@@ -139,6 +145,9 @@ templ trendChart(c calc.TrendChart) {
 		<g>
 			for _, t := range c.Ticks {
 				<text class="chart-label" x={ Coord(t.X) } y={ Coord(c.Bottom + 15) } text-anchor="middle">
+					if !t.IncomeRecorded {
+						<title>{ T(ctx, "dash.incomeMissing") }</title>
+					}
 					{ MonthShort(ctx, t.Month) }
 				</text>
 			}
@@ -268,7 +277,7 @@ templ matrixCells(row calc.MatrixRow) {
 	}
 	// A line that ran in a single month has no average and no typical month; the
 	// two columns stay empty there rather than repeating the total three times.
-	<td class="matrix-cell text-right font-medium">{ FormatEURShort(row.TotalCents) }</td>
+	<td class="matrix-cell text-right font-medium">{ MatrixTotal(row) }</td>
 	<td class="matrix-cell matrix-aside">{ MatrixAverage(row, row.MeanCents) }</td>
 	<td class="matrix-cell matrix-aside">{ MatrixAverage(row, row.MedianCents) }</td>
 }
@@ -377,10 +386,10 @@ templ stackChart(c calc.StackChart) {
 // view carries of them, which is the difference a person view is opened for.
 templ headlineTiles(vm DashboardVM) {
 	<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-		@statTile(T(ctx, "overview.income"), FormatEUR(vm.Report.IncomeCents), T(ctx, "dash.perMonth"), "text-emerald-600 dark:text-emerald-400")
-		@statTile(T(ctx, "dash.fixedCosts"), FormatEUR(vm.HouseholdReport.FixedCents()), FormatPercent(vm.HouseholdReport.FixedCostRate())+" "+T(ctx, "dash.fixedShare"), "text-indigo-600 dark:text-indigo-400")
-		@statTile(T(ctx, "dash.ownFixedCosts"), FormatEUR(vm.Report.FixedCents()), T(ctx, "dash.ownFixedHint"), "text-violet-600 dark:text-violet-400")
-		@statTile(T(ctx, "dash.savingsRate"), FormatPercent(vm.Report.SavingsRate()), T(ctx, "dash.perMonth"), "text-sky-600 dark:text-sky-400")
+		@statTile(T(ctx, "overview.income"), vm.ReportMoney(vm.Report.IncomeCents), T(ctx, "dash.perMonth"), "text-emerald-600 dark:text-emerald-400")
+		@statTile(T(ctx, "dash.fixedCosts"), vm.ReportMoney(vm.HouseholdReport.FixedCents()), IncomeRate(vm.HouseholdReport.IncomeCents, vm.HouseholdReport.FixedCostRate())+" "+T(ctx, "dash.fixedShare"), "text-indigo-600 dark:text-indigo-400")
+		@statTile(T(ctx, "dash.ownFixedCosts"), vm.ReportMoney(vm.Report.FixedCents()), T(ctx, "dash.ownFixedHint"), "text-violet-600 dark:text-violet-400")
+		@statTile(T(ctx, "dash.savingsRate"), IncomeRate(vm.Report.IncomeCents, vm.Report.SavingsRate()), T(ctx, "dash.perMonth"), "text-sky-600 dark:text-sky-400")
 	</div>
 }
 
@@ -602,7 +611,7 @@ templ fixedCostCard(vm DashboardVM) {
 	<div class="card">
 		<div class="card-head">
 			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.fixedCosts") }</h2>
-			<span class="badge badge-info ml-auto">{ FormatPercent(vm.Report.FixedCostRate()) }</span>
+			<span class="badge badge-info ml-auto">{ IncomeRate(vm.Report.IncomeCents, vm.Report.FixedCostRate()) }</span>
 		</div>
 		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.fixedHint") }</p>
 		<div class="mb-4 flex items-baseline gap-3">
@@ -625,7 +634,7 @@ templ savingsCard(vm DashboardVM) {
 	<div class="card">
 		<div class="card-head">
 			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.savingsRate") }</h2>
-			<span class="badge badge-ok ml-auto">{ FormatPercent(vm.Report.SavingsRate()) }</span>
+			<span class="badge badge-ok ml-auto">{ IncomeRate(vm.Report.IncomeCents, vm.Report.SavingsRate()) }</span>
 		</div>
 		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.savingsHint") }</p>
 		<div class="grid grid-cols-2 gap-3">
@@ -732,7 +741,7 @@ templ sankeyCard(vm DashboardVM) {
 	<div class="card">
 		<div class="card-head">
 			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.flow") }</h2>
-			<span class="badge ml-auto">{ vm.RangeLabel }</span>
+			<span class="badge ml-auto">{ Tf(ctx, "dash.recordedMonths", len(vm.RecordedMonths)) }</span>
 		</div>
 		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.flowHint") }</p>
 		if vm.Sankey.Empty() {
@@ -790,7 +799,7 @@ templ categoryCard(vm DashboardVM) {
 	<div class="card">
 		<div class="card-head">
 			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.topCategories") }</h2>
-			<span class="badge ml-auto">{ vm.RangeLabel }</span>
+			<span class="badge ml-auto">{ Tf(ctx, "dash.recordedMonths", len(vm.RecordedMonths)) }</span>
 		</div>
 		if len(vm.Report.Categories) == 0 {
 			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.noCategories") }</p>

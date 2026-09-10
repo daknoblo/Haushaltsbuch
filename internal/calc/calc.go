@@ -55,6 +55,8 @@ type LabeledTotal struct {
 // MonthReport is the aggregated result for one month of one household.
 type MonthReport struct {
 	Month string
+	// IncomeRecorded also holds true for an explicitly entered zero income.
+	IncomeRecorded bool
 	// Member is the scope the figures were built for, Everyone for the whole
 	// household.
 	Member           int64
@@ -208,6 +210,7 @@ func buildReport(d Data, values []bookingValue, month string, member int64) Mont
 
 	for _, value := range values {
 		b := value.Booking
+		rep.IncomeRecorded = rep.IncomeRecorded || incomeForScope(b, d.Splits[b.ID], member)
 		amount, ok := value.scoped(member)
 		if !ok {
 			continue

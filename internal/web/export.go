@@ -175,7 +175,8 @@ func (s *Server) handleExportStatistics(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	month := NormalizeMonth(r.URL.Query().Get("m"))
-	vm, err := s.buildDashboardVM(r.Context(), hh.ID, month, periodYear, calc.Everyone, calc.GroupCategory)
+	q := r.URL.Query()
+	vm, err := s.buildDashboardVM(r.Context(), hh.ID, month, q.Get("p"), parseID(q.Get("view")), calc.GroupCategory)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -183,18 +184,24 @@ func (s *Server) handleExportStatistics(w http.ResponseWriter, r *http.Request) 
 
 	m := newPDF()
 	pdfHeader(ctx, m, T(ctx, "pdf.statistics"), hh.Name, vm.RangeLabel)
+	if vm.ViewName() != "" {
+		m.AddAutoRow(text.NewCol(12, vm.ViewName(), props.Text{Size: 10}))
+	}
+	m.AddAutoRow(text.NewCol(12, vm.CalculationBasis(ctx), props.Text{Size: 9, Color: pdfGrey}))
+	m.AddRow(3)
 
-	pdfKV(m, T(ctx, "pdf.avgIncome"), FormatEUR(vm.Report.IncomeCents))
-	pdfKV(m, T(ctx, "pdf.avgExpenses"), FormatEUR(vm.Report.ExpenseCents))
-	pdfKV(m, T(ctx, "pdf.avgBalance"), FormatEUR(vm.Report.BalanceCents))
+	pdfKV(m, T(ctx, "pdf.avgIncome"), vm.ReportMoney(vm.Report.IncomeCents))
+	pdfKV(m, T(ctx, "pdf.avgExpenses"), vm.ReportMoney(vm.Report.ExpenseCents))
+	pdfKV(m, T(ctx, "pdf.avgBalance"), vm.ReportMoney(vm.Report.BalanceCents))
 
 	pdfHeading(m, T(ctx, "pdf.monthCourse"))
-	pdfRow4(m, T(ctx, "pdf.month"), T(ctx, "overview.income"), T(ctx, "overview.expenses"), T(ctx, "overview.balance"), true)
+	pdfRow4(m, T(ctx, "pdf.month"), T(ctx, "overview.income"), T(ctx, "dash.plannedExpenses"), T(ctx, "overview.balance"), true)
 	for _, rep := range vm.Trend {
-		pdfRow4(m, MonthLabel(ctx, rep.Month),
-			FormatEUR(rep.IncomeCents),
-			FormatEUR(rep.ExpenseCents),
-			FormatEUR(rep.BalanceCents), false)
+		income, balance := "—", "—"
+		if rep.IncomeRecorded {
+			income, balance = FormatEUR(rep.IncomeCents), FormatEUR(rep.BalanceCents)
+		}
+		pdfRow4(m, MonthLabel(ctx, rep.Month), income, FormatEUR(rep.ExpenseCents), balance, false)
 	}
 
 	if vm.ShowSettlement() {
@@ -289,7 +296,7 @@ func pdfCells(row calc.MatrixRow) []string {
 		out = append(out, MatrixCell(c, row.Active[i]))
 	}
 	return append(out,
-		FormatEURShort(row.TotalCents),
+		MatrixTotal(row),
 		MatrixAverage(row, row.MeanCents),
 		MatrixAverage(row, row.MedianCents))
 }

@@ -49,7 +49,7 @@ templ BookingList(vm BookingsVM) {
 				<div class="card-tight">
 					<div class="card-body grid gap-1.5">
 						for _, b := range vm.Bookings {
-							<div class="min-w-0" data-booking-name={ b.Booking.Name } data-booking-active={ strconv.FormatBool(b.ActiveInMonth()) } hidden?={ !vm.Visible(b) }>
+							<div class="min-w-0" data-booking-search={ b.Search.Text } data-booking-suggestions={ b.Search.SuggestionsJSON() } data-booking-name={ b.Booking.Name } data-booking-active={ strconv.FormatBool(b.ActiveInMonth()) } hidden?={ !vm.Visible(b) }>
 								@bookingRow(b)
 							</div>
 						}
@@ -63,15 +63,9 @@ templ BookingList(vm BookingsVM) {
 
 // sortBar lets the list be read the way the question of the moment needs it.
 templ sortBar(vm BookingsVM) {
-	<div class="card-head no-print">
-		<div class="relative w-full min-w-0 sm:w-72">
-			<input id="booking-search" class="input pr-10" type="search" value={ vm.Search } placeholder={ T(ctx, "bookings.searchPlaceholder") } aria-label={ T(ctx, "bookings.search") } title={ T(ctx, "bookings.search") } list="booking-suggestions" autocomplete="off"/>
-			<button type="button" class="btn-icon absolute right-1 top-1/2 -translate-y-1/2" data-booking-clear aria-label={ T(ctx, "bookings.clearSearch") }>×</button>
-			<datalist id="booking-suggestions"></datalist>
-		</div>
-		<button type="button" id="booking-active-filter" class={ "period-chip", templ.KV("period-chip-active", !vm.ShowAll) } aria-pressed={ strconv.FormatBool(!vm.ShowAll) } title={ T(ctx, "bookings.hideOldHint") }>{ T(ctx, "bookings.hideOld") }</button>
-		<span class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.sort") }</span>
-		<div class="flex flex-wrap items-center gap-1">
+	<div class="booking-toolbar no-print">
+		<div class="booking-sort-options" role="group" aria-label={ T(ctx, "bookings.sort") }>
+			<span class="mr-2 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.sort") }</span>
 			for _, o := range vm.SortOptions(ctx) {
 				if o.Active {
 					<span class="period-chip period-chip-active">{ o.Label }</span>
@@ -79,6 +73,21 @@ templ sortBar(vm BookingsVM) {
 					<a class="period-chip" href={ templ.SafeURL(o.URL) }>{ o.Label }</a>
 				}
 			}
+		</div>
+		<div class="booking-filters">
+			<div class="booking-search">
+				<input id="booking-search" class="input pr-10" type="search" value={ vm.Search } placeholder={ T(ctx, "bookings.searchPlaceholder") } aria-label={ T(ctx, "bookings.search") } title={ T(ctx, "bookings.search") } list="booking-suggestions" autocomplete="off"/>
+				<button type="button" class="booking-search-clear" data-booking-clear aria-label={ T(ctx, "bookings.clearSearch") }>
+					<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+						<path d="M6 6l12 12M18 6 6 18" stroke-linecap="round"></path>
+					</svg>
+				</button>
+				<datalist id="booking-suggestions"></datalist>
+			</div>
+			<label class="booking-active-filter" title={ T(ctx, "bookings.hideOldHint") }>
+				<input type="checkbox" id="booking-active-filter" checked?={ !vm.ShowAll }/>
+				<span>{ T(ctx, "bookings.hideOld") }</span>
+			</label>
 		</div>
 	</div>
 }
@@ -145,9 +154,6 @@ templ bookingRow(b BookingRow) {
 			if b.ShowDuePoint() {
 				<span class="badge badge-muted">{ DuePointLabel(ctx, b.Booking.DuePoint) }</span>
 			}
-			if !b.IsIncome() && !b.Booking.Settle {
-				<span class="badge badge-muted">{ T(ctx, "bookings.noSettle") }</span>
-			}
 			if b.MemberCount() > 1 && len(b.Carriers) == 0 {
 				<span class="badge badge-warn">{ T(ctx, "overview.unassigned") }</span>
 			}
@@ -166,10 +172,15 @@ templ bookingRow(b BookingRow) {
 			<span class="meta-cell meta-split">
 				if b.MemberCount() > 1 {
 					if b.IsShared() {
-						<span class="badge badge-sky">{ T(ctx, "bookings.shared") }</span>
+						<span class={ "badge", templ.KV("badge-danger", b.SharedWithoutSettlement()), templ.KV("badge-sky", !b.SharedWithoutSettlement()) }>{ T(ctx, "bookings.shared") }</span>
 					} else if len(b.Carriers) == 1 {
 						<span class="badge badge-muted">{ T(ctx, "bookings.alone") }</span>
 					}
+				}
+			</span>
+			<span class="meta-cell meta-settle">
+				if !b.IsIncome() && !b.SettlementEnabled() {
+					<span class={ "badge", templ.KV("badge-danger", b.SharedWithoutSettlement()), templ.KV("badge-muted", !b.SharedWithoutSettlement()) }>{ T(ctx, "bookings.noSettle") }</span>
 				}
 			</span>
 			<span class="meta-cell meta-class">

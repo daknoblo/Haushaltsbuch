@@ -258,7 +258,7 @@ and tags included. On `POST` only `name` and a category are required.
 | `cost_nature` | string | `fix` | `fix` \| `variable`. Expenses only |
 | `budget_class` | string | `need` | `need` \| `want` \| `saving` — the thirds of the 50/30/20 rule |
 | `split_mode` | string | `equal` | `equal` \| `percent` \| `fixed` |
-| `settle` | boolean | `true` | `false` keeps the booking out of the settlement |
+| `settle` | boolean | `true` | saved preference; `false` always keeps the booking out of settlement |
 | `payer` / `payer_id` | string / integer | none | Who fronts the money. `null` or `""` takes it back |
 | `shares` | array | — | Who carries it, see below |
 | `tags` | array of strings | — | Tag names; unknown ones are `400` |
@@ -327,6 +327,7 @@ existing one. The response is the booking as stored:
   "budget_class": "need",
   "split_mode": "equal",
   "settle": true,
+  "settle_effective": true,
   "retired": false,
   "payer_id": 1,
   "shares": [ { "member": 1, "value": 0 }, { "member": 2, "value": 0 } ],
@@ -341,6 +342,17 @@ its `month` parameter when supplied; otherwise the list, individual reads and
 create/update/upsert responses use the current month. A stored override applies
 to all these responses; the last matching override wins. `amount_cents` remains
 the base figure as entered.
+
+`settle` retains the user's preference. `settle_effective` is read-only and
+reports the effective switch setting for the same month as `monthly_cents`.
+It is automatically `false` when the payer carries the complete expense alone
+(including a 100% share or a matching fixed amount). Adding another carrier or
+changing the payer restores the saved preference; an explicit `settle: false`
+never gets re-enabled automatically. Incomplete or excessive shares do not
+trigger automatic exclusion, so allocation errors remain visible. Income has
+no effective settlement. As before, a booking still needs a payer, assigned
+shares and an active month to contribute to an actual settlement report.
+Do not send `settle_effective` in writes: it is rejected as an unknown field.
 
 `retired` is a read-only boolean identifying the predecessor of a lasting price
 change. Historical months still count that booking in its active range, but it

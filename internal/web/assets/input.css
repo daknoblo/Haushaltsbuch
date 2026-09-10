@@ -91,6 +91,28 @@
   #booking-search::-webkit-search-cancel-button {
     -webkit-appearance: none;
   }
+  .booking-toolbar {
+    @apply flex flex-wrap items-center gap-x-4 gap-y-3 px-5 py-3;
+  }
+  .booking-sort-options {
+    @apply flex min-w-0 flex-wrap items-center justify-start gap-1;
+    flex: 1 1 40rem;
+  }
+  .booking-filters {
+    @apply ml-auto flex max-w-full flex-wrap items-center justify-end gap-3;
+  }
+  .booking-search {
+    @apply relative w-64 min-w-0 max-w-full;
+  }
+  .booking-search-clear {
+    @apply absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-lg text-slate-500 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 disabled:opacity-40 dark:text-slate-400 dark:hover:text-slate-100;
+  }
+  .booking-active-filter {
+    @apply flex cursor-pointer items-center gap-2 text-sm text-slate-600 dark:text-slate-300;
+  }
+  .booking-active-filter input {
+    @apply h-4 w-4 shrink-0 accent-indigo-500;
+  }
   .field-label {
     @apply mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400;
   }
@@ -235,16 +257,19 @@
     @apply hidden shrink-0 items-center overflow-hidden;
   }
   .meta-date {
-    @apply flex w-[6.25rem] justify-end;
+    @apply w-[6.25rem] justify-end lg:flex;
   }
   .meta-rhythm {
-    @apply flex w-[7.25rem];
+    @apply w-[7.25rem] md:flex;
   }
   .meta-split {
     @apply flex w-[3.75rem];
   }
+  .meta-settle {
+    @apply flex w-28;
+  }
   .meta-member {
-    @apply w-24 md:flex;
+    @apply w-24 xl:flex;
   }
   .meta-class {
     @apply w-[6.25rem] lg:flex;
@@ -283,6 +308,9 @@
   }
   .switch input {
     @apply sr-only;
+  }
+  .switch:has(input:disabled) {
+    @apply cursor-default;
   }
   .switch-track {
     @apply relative block h-6 w-11 shrink-0 rounded-full bg-slate-300 transition dark:bg-slate-700;

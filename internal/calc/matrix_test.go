@@ -132,6 +132,12 @@ func TestMatrixSurplusIsIncomeLessExpenses(t *testing.T) {
 	income := m.Band(BandIncome).Total
 	for i := range m.Months {
 		want := income.Cents[i] - m.Expense.Cents[i]
+		if !income.Active[i] {
+			want = 0
+			if m.Surplus.Active[i] {
+				t.Errorf("surplus of %s must be unavailable without income", m.Months[i])
+			}
+		}
 		if m.Surplus.Cents[i] != want {
 			t.Errorf("surplus of %s = %d, want %d", m.Months[i], m.Surplus.Cents[i], want)
 		}

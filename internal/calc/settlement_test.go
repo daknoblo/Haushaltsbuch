@@ -103,8 +103,8 @@ func TestSettlementTotalIncludesOverridesAndOneOffs(t *testing.T) {
 	}
 	rep := SettlementTotal(d, []string{"2026-01", "2026-02", "2026-03"})
 	assertSettlementBalances(t, rep)
-	if p := rep.Positions[0]; p.PaidCents != 185000 || p.OwedCents != 95000 {
-		t.Errorf("payer = %+v, want 185000 fronted and 95000 carried", p)
+	if p := rep.Positions[0]; p.PaidCents != 180000 || p.OwedCents != 90000 {
+		t.Errorf("payer = %+v, want 180000 fronted and 90000 carried; own policy excluded", p)
 	}
 	if l := rep.Ledger(2)[0]; l.TotalCents != 180000 || l.PaidCents != 0 || l.OwedCents != 90000 {
 		t.Errorf("rent ledger = %+v", l)
@@ -149,7 +149,7 @@ func TestSettlementFixedSplitOverrideInvalidatesWholePeriod(t *testing.T) {
 		1: {{StartsOn: "2026-02-01", EndsOn: "2026-02-28", AmountCents: 80000}},
 	}
 	rep := SettlementTotal(d, []string{"2026-01", "2026-02"})
-	if len(rep.InvalidBookings) != 1 || len(rep.Lines) != 1 || rep.Lines[0].Booking.ID != 2 {
+	if len(rep.InvalidBookings) != 1 || len(rep.Lines) != 0 {
 		t.Errorf("invalid booking must not leave a partial period: %+v", rep)
 	}
 }

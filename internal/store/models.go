@@ -207,8 +207,8 @@ type Booking struct {
 	CostNature    CostNature
 	BudgetClass   BudgetClass
 	SplitMode     SplitMode
-	// Settle keeps the booking out of the settlement when false, for costs that
-	// are shared on paper but never squared between the members.
+	// Settle is the user's saved preference. Sole payer/carrier expenses are
+	// automatically excluded by calc without discarding this preference.
 	Settle bool
 	// Retired marks a price-change predecessor. It remains in historical reports,
 	// but ordinary saves cannot clear it and the annual carry never extends it.
