@@ -83,7 +83,7 @@ var english = Catalog{
 	"bookings.splitSection":        "Paid & split",
 	"bookings.splitHint":           "First pick who pays the bill, then who carries it.",
 	"bookings.whoPays":             "Who pays for this?",
-	"bookings.whoPaysHint":         "Only the people ticked carry a share: both means half each, none leaves the expense unassigned.",
+	"bookings.whoPaysHint":         "Only ticked people carry a share. Equal divides evenly; otherwise the entered percentages or amounts apply. No selection leaves the expense unassigned.",
 	"bookings.whoGets":             "Who receives this?",
 	"bookings.nobodyCarries":       "Unassigned: nobody carries this expense. Pick at least one person with a share above zero.",
 	"bookings.nobodyGets":          "Unassigned: nobody receives this income. Pick at least one person with a share above zero.",
@@ -138,6 +138,12 @@ var english = Catalog{
 	"bookings.sortUpdated":         "Last changed",
 	"bookings.allExpenses":         "All expenses",
 	"bookings.left":                "Left",
+	"bookings.search":              "Search bookings (at least 2 characters)",
+	"bookings.searchPlaceholder":   "Search bookings",
+	"bookings.clearSearch":         "Clear search",
+	"bookings.hideOld":             "Hide old bookings",
+	"bookings.hideOldHint":         "Only show bookings active in the selected month.",
+	"bookings.noMatches":           "No matching bookings.",
 
 	// Dashboard
 	"dash.title":            "Insights",
@@ -164,7 +170,7 @@ var english = Catalog{
 	"dash.paid":             "Fronted",
 	"dash.owed":             "Own share",
 	"dash.shares":           "Who carries what?",
-	"dash.sharesHint":       "What the settlement is built from: split expenses count pro rata, expenses carried alone stay with the payer.",
+	"dash.sharesHint":       "Settlement basis: only expenses marked for settlement with a payer and valid shares. Sole costs belong to the person carrying them.",
 	"dash.sharedTotal":      "Shared costs",
 	"dash.soleTotal":        "Own costs",
 	"dash.splitAlone":       "alone",
@@ -224,6 +230,13 @@ var english = Catalog{
 	"dash.flowDeficit":      "The plan spends more than it earns. The gap flows in as budget overrun.",
 	"dash.byTag":            "By tag",
 	"dash.noTagData":        "No tagged bookings in this period.",
+
+	"dash.bookingTotal":          "Full amount",
+	"dash.periodTotal":           "Period total",
+	"dash.settlementTotalHint":   "Sum of planned monthly amounts: %s. Not recorded actual payments; previous settlement transfers have not been deducted.",
+	"dash.settlementAverageHint": "Monthly planning average: %s.",
+	"dash.settlementFuture":      "This year is in the future; there are no elapsed monthly amounts yet.",
+	"dash.settlementInvalid":     "The shares of these bookings do not match their amounts. They are excluded here; no transfers will be suggested until they are corrected:",
 
 	// Sankey nodes that have no counterpart elsewhere in the UI
 	"sankey.withdrawal": "Over budget",
@@ -301,6 +314,9 @@ var english = Catalog{
 
 	// Errors shown to the user
 	"error.internal":           "Internal server error",
+	"error.saveFailed":         "Change not saved. Please check your input and connection.",
+	"error.invalidDateRange":   "Please enter valid dates. The end must not precede the start.",
+	"error.categoryDirection":  "The category does not match the booking direction.",
 	"error.noHousehold":        "No active household",
 	"error.nameMissing":        "Name is missing",
 	"error.backupTooLarge":     "The file is too large.",

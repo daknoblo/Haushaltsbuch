@@ -52,6 +52,9 @@ the rate limit still apply.
   `amount` (Euro, may have decimals) or `amount_cents` (integer). If both are
   given, `amount_cents` wins.
 - Dates are `YYYY-MM-DD`, months are `YYYY-MM`.
+- Date ranges allow empty, open bounds and include both endpoints. A nonempty
+  end must not precede the start; invalid dates or reversed ranges return `400`.
+  Partial updates validate the resulting range, including any unchanged bound.
 - Errors always have the same shape:
 
 ```json
@@ -129,6 +132,8 @@ Anywhere `{id}` is accepted, `ext:<external_id>` works too — see
 
 A booking needs a category, and the category's `classification` has to match the
 booking's `direction` — an income cannot be filed under an expense category.
+This is checked on every create, update and upsert, including a direction-only
+update. Change the category together with the direction when necessary.
 
 ```json
 {
@@ -322,6 +327,7 @@ existing one. The response is the booking as stored:
   "budget_class": "need",
   "split_mode": "equal",
   "settle": true,
+  "retired": false,
   "payer_id": 1,
   "shares": [ { "member": 1, "value": 0 }, { "member": 2, "value": 0 } ],
   "tags": [],
@@ -330,7 +336,16 @@ existing one. The response is the booking as stored:
 ```
 
 `monthly_cents` is what the booking contributes to a single month, overrides
-and rhythm applied. `amount_cents` is the figure as entered.
+and rhythm applied, using the same calculation as the report. The list uses
+its `month` parameter when supplied; otherwise the list, individual reads and
+create/update/upsert responses use the current month. A stored override applies
+to all these responses; the last matching override wins. `amount_cents` remains
+the base figure as entered.
+
+`retired` is a read-only boolean identifying the predecessor of a lasting price
+change. Historical months still count that booking in its active range, but it
+is not offered for carry-forward. Updates preserve this marker; including
+`retired` in a request is rejected as an unknown field (`400`).
 
 ### `PUT /api/v1/bookings/{id}` — update
 

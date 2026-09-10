@@ -164,21 +164,13 @@ func stackTotals(d Data, months []string, member int64, grouping string) ([]Stac
 	}
 
 	for i, month := range months {
-		for _, b := range d.Bookings {
-			if b.Direction != store.DirExpense || !ActiveIn(b, month) {
+		for _, value := range bookingValues(d, month) {
+			b := value.Booking
+			if b.Direction != store.DirExpense {
 				continue
 			}
-			amount := float64(AmountFor(b, d.Overrides[b.ID], month)) * monthlyFactor(b)
-			if member != Everyone {
-				shares, _ := allocate(amount, b, d.Splits[b.ID])
-				share, ok := shares[member]
-				if !ok {
-					continue
-				}
-				amount = share
-			}
-			v := round(amount)
-			if v == 0 {
+			v, ok := value.scoped(member)
+			if !ok || v == 0 {
 				continue
 			}
 

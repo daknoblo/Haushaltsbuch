@@ -37,14 +37,15 @@ type MatrixRow struct {
 	Color       string
 	Icon        string
 	Cents       []int64
+	Active      []bool
 	Share       []float64
 	Trend       []MatrixTrend
 	TotalCents  int64
 	MeanCents   int64
 	MedianCents int64
 	ShareTotal  float64
-	// ActiveMonths is how many months of the range the line actually carried a
-	// figure. One of them means there is nothing to average.
+	// ActiveMonths includes active zero months, but not months outside a
+	// booking's range. One of them means there is nothing to average.
 	ActiveMonths int
 	// Gain marks a row where a larger figure is the better news, which is what
 	// separates a raise from a rising cost.
@@ -70,13 +71,9 @@ type Matrix struct {
 
 // Empty reports whether the matrix has nothing to show.
 func (m Matrix) Empty() bool {
-	return len(m.Months) == 0 || (m.Expense.TotalCents == 0 && m.incomeEmpty())
-}
-
-func (m Matrix) incomeEmpty() bool {
 	for _, b := range m.Bands {
-		if b.Key == BandIncome {
-			return b.Total.TotalCents == 0
+		if len(b.Rows) > 0 {
+			return false
 		}
 	}
 	return true
@@ -113,23 +110,15 @@ func BuildMatrix(d Data, months []string, member int64) Matrix {
 	byBooking := make(map[rowKey]map[int64][]int64)
 	bookings := make(map[int64]store.Booking, len(d.Bookings))
 	byBand := make(map[string][]int64)
+	activeCategory := make(map[rowKey][]bool)
+	activeBooking := make(map[int64][]bool)
+	activeBand := make(map[string][]bool)
 
 	for i, month := range months {
-		for _, b := range d.Bookings {
-			if !ActiveIn(b, month) {
-				continue
-			}
-			amount := float64(AmountFor(b, d.Overrides[b.ID], month)) * monthlyFactor(b)
-			if member != Everyone {
-				shares, _ := allocate(amount, b, d.Splits[b.ID])
-				share, ok := shares[member]
-				if !ok {
-					continue
-				}
-				amount = share
-			}
-			cents := round(amount)
-			if cents == 0 {
+		for _, value := range bookingValues(d, month) {
+			b := value.Booking
+			cents, ok := value.scoped(member)
+			if !ok {
 				continue
 			}
 
@@ -144,6 +133,9 @@ func BuildMatrix(d Data, months []string, member int64) Matrix {
 			k := rowKey{band, b.CategoryID}
 			addAt(byCategory, k, i, n, cents)
 			addAt(byBand, band, i, n, cents)
+			markAt(activeCategory, k, i, n)
+			markAt(activeBooking, b.ID, i, n)
+			markAt(activeBand, band, i, n)
 			if byBooking[k] == nil {
 				byBooking[k] = make(map[int64][]int64)
 			}
@@ -154,19 +146,19 @@ func BuildMatrix(d Data, months []string, member int64) Matrix {
 
 	m := Matrix{Months: months}
 	for _, band := range []string{BandIncome, BandFixed, BandVariable} {
-		mb := MatrixBand{Key: band, Total: summarize(MatrixRow{LabelKey: "matrix.total." + band}, byBand[band], n)}
+		mb := MatrixBand{Key: band, Total: summarize(MatrixRow{LabelKey: "matrix.total." + band}, byBand[band], activeBand[band], n)}
 		for key, cents := range byCategory {
 			if key.band != band {
 				continue
 			}
 			c := cats[key.cat]
-			row := summarize(MatrixRow{Key: key.cat, Label: c.Name, Color: c.Color, Icon: c.Icon}, cents, n)
+			row := summarize(MatrixRow{Key: key.cat, Label: c.Name, Color: c.Color, Icon: c.Icon}, cents, activeCategory[key], n)
 			// A category holding a single booking already is that booking, so
 			// unfolding it would only repeat the row.
 			if len(byBooking[key]) > 1 {
 				for id, child := range byBooking[key] {
 					b := bookings[id]
-					row.Children = append(row.Children, summarize(MatrixRow{Key: id, Label: b.Name}, child, n))
+					row.Children = append(row.Children, summarize(MatrixRow{Key: id, Label: b.Name}, child, activeBooking[id], n))
 				}
 				sortChildren(row.Children)
 			}
@@ -178,8 +170,9 @@ func BuildMatrix(d Data, months []string, member int64) Matrix {
 
 	income := m.Band(BandIncome).Total
 	expense := addRows(m.Band(BandFixed).Total, m.Band(BandVariable).Total, n)
-	m.Expense = summarize(MatrixRow{LabelKey: "matrix.total.expense"}, expense, n)
-	m.Surplus = summarize(MatrixRow{LabelKey: "matrix.surplus"}, diffRows(income.Cents, expense, n), n)
+	expenseActive := mergeActive(activeBand[BandFixed], activeBand[BandVariable], n)
+	m.Expense = summarize(MatrixRow{LabelKey: "matrix.total.expense"}, expense, expenseActive, n)
+	m.Surplus = summarize(MatrixRow{LabelKey: "matrix.surplus"}, diffRows(income.Cents, expense, n), mergeActive(income.Active, expenseActive, n), n)
 	m.Surplus.Gain = true
 
 	// Income is the one band where more is the good news, and the surplus rides
@@ -223,13 +216,15 @@ func BuildMatrix(d Data, months []string, member int64) Matrix {
 // started is not a month it cost nothing, it is a month there is nothing to say
 // about. Averaging over the calendar instead would report a salary that stopped
 // in August as a smaller salary paid all year.
-func summarize(row MatrixRow, cents []int64, n int) MatrixRow {
+func summarize(row MatrixRow, cents []int64, active []bool, n int) MatrixRow {
 	row.Cents = make([]int64, n)
 	copy(row.Cents, cents)
+	row.Active = make([]bool, n)
+	copy(row.Active, active)
 	ran := make([]int64, 0, n)
-	for _, v := range row.Cents {
+	for i, v := range row.Cents {
 		row.TotalCents += v
-		if v != 0 {
+		if row.Active[i] {
 			ran = append(ran, v)
 		}
 	}
@@ -238,7 +233,7 @@ func summarize(row MatrixRow, cents []int64, n int) MatrixRow {
 		row.MeanCents = row.TotalCents / int64(row.ActiveMonths)
 		row.MedianCents = median(ran)
 	}
-	row.Trend = trendOf(row.Cents)
+	row.Trend = trendOf(row.Cents, row.Active)
 	return row
 }
 
@@ -246,10 +241,10 @@ func summarize(row MatrixRow, cents []int64, n int) MatrixRow {
 // not run in has nothing to compare, and neither has the first of the range;
 // both stay silent rather than claiming a change against a zero that only means
 // "not yet".
-func trendOf(cents []int64) []MatrixTrend {
+func trendOf(cents []int64, active []bool) []MatrixTrend {
 	out := make([]MatrixTrend, len(cents))
 	for i := 1; i < len(cents); i++ {
-		if cents[i] == 0 || cents[i-1] == 0 {
+		if !active[i] || !active[i-1] {
 			continue
 		}
 		switch {
@@ -284,6 +279,21 @@ func addAt[K comparable](m map[K][]int64, key K, i, n int, v int64) {
 		m[key] = make([]int64, n)
 	}
 	m[key][i] += v
+}
+
+func markAt[K comparable](m map[K][]bool, key K, i, n int) {
+	if m[key] == nil {
+		m[key] = make([]bool, n)
+	}
+	m[key][i] = true
+}
+
+func mergeActive(a, b []bool, n int) []bool {
+	out := make([]bool, n)
+	for i := range out {
+		out[i] = (i < len(a) && a[i]) || (i < len(b) && b[i])
+	}
+	return out
 }
 
 func addRows(a, b MatrixRow, n int) []int64 {
@@ -335,22 +345,22 @@ func median(v []int64) int64 {
 func sortChildren(rows []MatrixRow) {
 	sort.Slice(rows, func(i, j int) bool {
 		a, b := rows[i], rows[j]
-		if x, y := firstMonth(a.Cents), firstMonth(b.Cents); x != y {
+		if x, y := firstMonth(a.Active), firstMonth(b.Active); x != y {
 			return x < y
 		}
 		return lessByAmount(a, b)
 	})
 }
 
-// firstMonth is the index of the first month the row carries a figure, or the
+// firstMonth is the index of the first active month, or the
 // length of the range when it carries none.
-func firstMonth(cents []int64) int {
-	for i, c := range cents {
-		if c != 0 {
+func firstMonth(active []bool) int {
+	for i, on := range active {
+		if on {
 			return i
 		}
 	}
-	return len(cents)
+	return len(active)
 }
 
 // sortRows puts the expensive lines first. The tie-breaks matter as much as the

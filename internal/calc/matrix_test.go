@@ -182,7 +182,7 @@ func TestMatrixOrdersTheBookingsOfACategoryByMonth(t *testing.T) {
 		t.Fatalf("Gehalt has %d bookings, want three", len(gehalt.Children))
 	}
 	for i, child := range gehalt.Children {
-		if got := firstMonth(child.Cents); got != i {
+		if got := firstMonth(child.Active); got != i {
 			t.Errorf("booking %d starts in month %d, want %d", i, got, i)
 		}
 	}

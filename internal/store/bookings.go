@@ -21,7 +21,7 @@ type SplitInput struct {
 
 const bookingColumns = `id, household_id, category_id, payer_member_id, direction, name, note,
 	amount_cents, frequency, interval_n, due_point, starts_on, ends_on, cost_nature,
-	budget_class, split_mode, settle, external_id, created_at, updated_at`
+	budget_class, split_mode, settle, external_id, retired, created_at, updated_at`
 
 func scanBooking(sc scanner) (Booking, error) {
 	var (
@@ -32,7 +32,7 @@ func scanBooking(sc scanner) (Booking, error) {
 		&b.ID, &b.HouseholdID, &b.CategoryID, &payer, &b.Direction, &b.Name, &b.Note,
 		&b.AmountCents, &b.Frequency, &b.Interval, &b.DuePoint, &b.StartsOn, &b.EndsOn,
 		&b.CostNature, &b.BudgetClass, &b.SplitMode, &b.Settle, &b.ExternalID,
-		&b.CreatedAt, &b.UpdatedAt,
+		&b.Retired, &b.CreatedAt, &b.UpdatedAt,
 	)
 	if err != nil {
 		return Booking{}, err
@@ -102,7 +102,11 @@ const (
 )
 
 // CreateBooking inserts a booking with its splits and tags and returns it.
+// New bookings are never retired; only a price change or restore sets that flag.
 func (s *Store) CreateBooking(ctx context.Context, b Booking, splits []SplitInput, tagIDs []int64) (Booking, error) {
+	if err := ValidateDateRange(b.StartsOn, b.EndsOn); err != nil {
+		return Booking{}, err
+	}
 	var created Booking
 	err := s.withTx(ctx, func(tx *Store) error {
 		ts := now()
@@ -143,8 +147,11 @@ func (s *Store) CreateBooking(ctx context.Context, b Booking, splits []SplitInpu
 }
 
 // SaveBooking persists all mutable fields of b together with its splits and
-// tags in a single transaction, scoped to b.HouseholdID.
+// tags in a single transaction, scoped to b.HouseholdID. Retired is read-only.
 func (s *Store) SaveBooking(ctx context.Context, b Booking, splits []SplitInput, tagIDs []int64) error {
+	if err := ValidateDateRange(b.StartsOn, b.EndsOn); err != nil {
+		return err
+	}
 	return s.withTx(ctx, func(tx *Store) error {
 		err := affected(tx.q.ExecContext(ctx,
 			`UPDATE bookings SET
@@ -179,7 +186,8 @@ func (s *Store) DeleteBooking(ctx context.Context, householdID, id int64) error 
 
 // ExtendBookings moves the end of the given recurring bookings, which is how a
 // book that runs to December is taken into the next year. It never shortens a
-// period and never touches a one-off, so a stale checkbox can do no harm;
+// period and never touches a one-off, a retired predecessor or a mid-year end,
+// so a stale checkbox can do no harm;
 // anything that does not qualify is left alone rather than reported, because a
 // review of a dozen bookings should not fail over one of them.
 func (s *Store) ExtendBookings(ctx context.Context, householdID int64, ids []int64, until string) error {
@@ -194,7 +202,8 @@ func (s *Store) ExtendBookings(ctx context.Context, householdID int64, ids []int
 		for _, id := range ids {
 			if _, err := tx.q.ExecContext(ctx,
 				`UPDATE bookings SET ends_on = ?, updated_at = ?
-				 WHERE id = ? AND household_id = ? AND frequency <> ? AND ends_on <> '' AND ends_on < ?`,
+				 WHERE id = ? AND household_id = ? AND frequency <> ? AND retired = 0
+				   AND ends_on <> '' AND ends_on < ? AND substr(ends_on, 6, 2) = '12'`,
 				until, now(), id, householdID, string(FreqOnce), until,
 			); err != nil {
 				return err
@@ -252,7 +261,20 @@ func (s *Store) ChangeAmountFrom(ctx context.Context, householdID, id int64, fro
 		if err := tx.SaveBooking(ctx, old, splitInputs(splits), tagIDs); err != nil {
 			return err
 		}
+		if err := affected(tx.q.ExecContext(ctx,
+			`UPDATE bookings SET retired = 1 WHERE id = ? AND household_id = ?`,
+			old.ID, householdID)); err != nil {
+			return err
+		}
+		// Splitting an already historical period must not create a carriable
+		// successor either; the original successor still owns the later period.
 		created, err = tx.CreateBooking(ctx, next, splitInputs(splits), tagIDs)
+		if err == nil && old.Retired {
+			err = affected(tx.q.ExecContext(ctx,
+				`UPDATE bookings SET retired = 1 WHERE id = ? AND household_id = ?`,
+				created.ID, householdID))
+			created.Retired = true
+		}
 		return err
 	})
 	if err != nil {
@@ -410,6 +432,9 @@ func (s *Store) ListOverridesForHousehold(ctx context.Context, householdID int64
 
 // CreateOverride adds an amount override to a booking of a household.
 func (s *Store) CreateOverride(ctx context.Context, householdID int64, o BookingOverride) (BookingOverride, error) {
+	if err := ValidateDateRange(o.StartsOn, o.EndsOn); err != nil {
+		return BookingOverride{}, err
+	}
 	var out BookingOverride
 	err := s.withTx(ctx, func(tx *Store) error {
 		res, err := tx.q.ExecContext(ctx,
@@ -442,6 +467,9 @@ func (s *Store) CreateOverride(ctx context.Context, householdID int64, o Booking
 
 // UpdateOverride changes an override of a household's booking.
 func (s *Store) UpdateOverride(ctx context.Context, householdID int64, o BookingOverride) error {
+	if err := ValidateDateRange(o.StartsOn, o.EndsOn); err != nil {
+		return err
+	}
 	return affected(s.q.ExecContext(ctx,
 		`UPDATE booking_overrides SET starts_on = ?, ends_on = ?, amount_cents = ?, note = ?
 		 WHERE id = ? AND booking_id IN (SELECT id FROM bookings WHERE household_id = ?)`,

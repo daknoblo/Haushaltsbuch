@@ -44,6 +44,9 @@ func (s *Server) handleBookings(w http.ResponseWriter, r *http.Request) {
 			s.serverError(w, r, err)
 			return
 		}
+		vm.Search = r.URL.Query().Get("q")
+		vm.ShowAll = r.URL.Query().Get("all") == "true"
+		nav.BookingFilters = "&s=" + vm.Sort + vm.FilterQuery()
 	}
 	s.render(w, r, BookingsPage(nav, vm))
 }
@@ -61,6 +64,8 @@ func (s *Server) handleBookingList(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
+	vm.Search = r.URL.Query().Get("q")
+	vm.ShowAll = r.URL.Query().Get("all") == "true"
 	s.render(w, r, BookingList(vm))
 }
 
@@ -343,6 +348,16 @@ func calendarYear(anchor string) []string {
 	return out
 }
 
+func elapsedYearMonths(anchor, current string) []string {
+	out := make([]string, 0, 12)
+	for _, month := range calendarYear(anchor) {
+		if month <= current {
+			out = append(out, month)
+		}
+	}
+	return out
+}
+
 // dashboardURL builds a link that keeps every dashboard control in the query,
 // so switching one of them does not reset the others.
 func dashboardURL(month, period string, member int64, grouping string) string {
@@ -400,6 +415,9 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 	grouping = calc.CleanGrouping(grouping)
 	months := rangeMonths(period, month)
 	span := len(months)
+	year := calendarYear(month)
+	elapsed := elapsedYearMonths(month, NormalizeMonth(""))
+	data = calc.Prepare(data, months, year, elapsed)
 
 	vm := DashboardVM{
 		Report:     calc.PeriodReport(data, months, member),
@@ -458,12 +476,19 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 	// period control says, because one column of a single month tells nothing
 	// the tiles above do not already say.
 	vm.MatrixYear = NormalizeMonth(month)[:4]
-	vm.Matrix = calc.BuildMatrix(data, calendarYear(month), member)
+	vm.Matrix = calc.BuildMatrix(data, year, member)
 
 	vm.FixedTop = calc.FixedCosts(data, months, member, fixedCostTop)
 	vm.Rule = calc.BuildRuleRing(vm.Report)
 	vm.Sankey = calc.BuildSankey(ctx, data, vm.Report, months, sankeyWidth, sankeyHeight)
-	vm.Settlement = calc.Settlement(data, months)
+	vm.SettlementRange = vm.RangeLabel
+	if period == periodYear {
+		vm.Settlement = calc.SettlementTotal(data, elapsed)
+		vm.SettlementRange = rangeLabel(ctx, elapsed)
+		vm.SettlementIsTotal = true
+	} else {
+		vm.Settlement = calc.Settlement(data, months)
+	}
 	return vm, nil
 }
 

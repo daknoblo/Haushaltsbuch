@@ -30,6 +30,7 @@ type Data struct {
 	Splits     map[int64][]store.BookingSplit
 	TagLinks   map[int64][]int64
 	Overrides  map[int64][]store.BookingOverride
+	evaluated  *evaluatedData
 }
 
 // MemberBalance holds the income, allocated expense share and resulting balance
@@ -177,52 +178,14 @@ func MonthlyCents(b store.Booking, overrides []store.BookingOverride, month stri
 	return round(float64(AmountFor(b, overrides, month)) * monthlyFactor(b))
 }
 
-// allocate distributes the monthly amount of a booking among members according
-// to its split mode and returns the per-member allocation plus the remainder
-// that could not be attributed to anyone.
-func allocate(amount float64, b store.Booking, splits []store.BookingSplit) (map[int64]float64, float64) {
-	res := make(map[int64]float64)
-
-	switch b.SplitMode {
-	case store.SplitPercent:
-		for _, s := range splits {
-			res[s.MemberID] += amount * ClampPercent(s.Value) / 100.0
-		}
-	case store.SplitFixed:
-		factor := monthlyFactor(b)
-		for _, s := range splits {
-			res[s.MemberID] += clampAmount(s.Value) * factor
-		}
-	default: // equal
-		// No split at all means nobody carries it: the amount stays unassigned
-		// rather than being spread over people who were never picked.
-		ids := make([]int64, 0, len(splits))
-		for _, s := range splits {
-			ids = append(ids, s.MemberID)
-		}
-		if len(ids) > 0 {
-			share := amount / float64(len(ids))
-			for _, id := range ids {
-				res[id] += share
-			}
-		}
-	}
-
-	var assigned float64
-	for _, v := range res {
-		assigned += v
-	}
-	unassigned := amount - assigned
-	if math.Abs(unassigned) < 0.5 {
-		unassigned = 0
-	}
-	return res, unassigned
-}
-
 // BuildMonthReport aggregates all figures of a household for one month. With a
 // member other than Everyone the report only contains that member's own share,
 // which is what "what does this cost me" means.
 func BuildMonthReport(d Data, month string, member int64) MonthReport {
+	return buildReport(d, bookingValues(d, month), month, member)
+}
+
+func buildReport(d Data, values []bookingValue, month string, member int64) MonthReport {
 	rep := MonthReport{
 		Month:         month,
 		Member:        member,
@@ -231,38 +194,35 @@ func BuildMonthReport(d Data, month string, member int64) MonthReport {
 	}
 
 	var (
-		income        float64
-		expense       float64
-		unassigned    float64
-		memIncome     = make(map[int64]float64)
-		memExpense    = make(map[int64]float64)
-		byCategory    = make(map[int64]float64)
-		byIncomeCat   = make(map[int64]float64)
-		byTag         = make(map[int64]float64)
-		byCostNature  = make(map[store.CostNature]float64)
-		byBudgetClass = make(map[store.BudgetClass]float64)
+		income        int64
+		expense       int64
+		unassigned    int64
+		memIncome     = make(map[int64]int64)
+		memExpense    = make(map[int64]int64)
+		byCategory    = make(map[int64]int64)
+		byIncomeCat   = make(map[int64]int64)
+		byTag         = make(map[int64]int64)
+		byCostNature  = make(map[store.CostNature]int64)
+		byBudgetClass = make(map[store.BudgetClass]int64)
 	)
 
-	for _, b := range d.Bookings {
-		if !ActiveIn(b, month) {
+	for _, value := range values {
+		b := value.Booking
+		amount, ok := value.scoped(member)
+		if !ok {
 			continue
 		}
-		amount := float64(AmountFor(b, d.Overrides[b.ID], month)) * monthlyFactor(b)
-		shares, rest := allocate(amount, b, d.Splits[b.ID])
-
+		shares, rest := value.Shares, value.Unassigned
 		if member != Everyone {
-			share, ok := shares[member]
-			if !ok {
-				continue
-			}
-			amount, rest = share, 0
-			shares = map[int64]float64{member: share}
+			rest = 0
 		}
 
 		if b.Direction == store.DirIncome {
 			income += amount
 			for id, v := range shares {
-				memIncome[id] += v
+				if member == Everyone || member == id {
+					memIncome[id] += v
+				}
 			}
 			byIncomeCat[b.CategoryID] += amount
 			continue
@@ -271,7 +231,9 @@ func BuildMonthReport(d Data, month string, member int64) MonthReport {
 		expense += amount
 		unassigned += rest
 		for id, v := range shares {
-			memExpense[id] += v
+			if member == Everyone || member == id {
+				memExpense[id] += v
+			}
 		}
 
 		byCategory[b.CategoryID] += amount
@@ -282,17 +244,17 @@ func BuildMonthReport(d Data, month string, member int64) MonthReport {
 		byBudgetClass[b.BudgetClass] += amount
 	}
 
-	rep.IncomeCents = round(income)
-	rep.ExpenseCents = round(expense)
-	rep.UnassignedCents = round(unassigned)
+	rep.IncomeCents = income
+	rep.ExpenseCents = expense
+	rep.UnassignedCents = unassigned
 	rep.BalanceCents = rep.IncomeCents - rep.ExpenseCents
 
 	for _, m := range d.Members {
 		if member != Everyone && m.ID != member {
 			continue
 		}
-		in := round(memIncome[m.ID])
-		out := round(memExpense[m.ID])
+		in := memIncome[m.ID]
+		out := memExpense[m.ID]
 		rep.Members = append(rep.Members, MemberBalance{
 			Member:       m,
 			IncomeCents:  in,
@@ -302,10 +264,10 @@ func BuildMonthReport(d Data, month string, member int64) MonthReport {
 	}
 
 	for k, v := range byCostNature {
-		rep.ByCostNature[k] = round(v)
+		rep.ByCostNature[k] = v
 	}
 	for k, v := range byBudgetClass {
-		rep.ByBudgetClass[k] = round(v)
+		rep.ByBudgetClass[k] = v
 	}
 
 	for _, c := range d.Categories {
@@ -314,13 +276,13 @@ func BuildMonthReport(d Data, month string, member int64) MonthReport {
 		if c.Classification == store.DirIncome {
 			totals, target = byIncomeCat, &rep.IncomeCategories
 		}
-		if v := round(totals[c.ID]); v != 0 {
+		if v := totals[c.ID]; v != 0 {
 			*target = append(*target,
 				LabeledTotal{Key: c.ID, Label: c.Name, Color: c.Color, Icon: c.Icon, Cents: v})
 		}
 	}
 	for _, t := range d.Tags {
-		if v := round(byTag[t.ID]); v != 0 {
+		if v := byTag[t.ID]; v != 0 {
 			rep.Tags = append(rep.Tags, LabeledTotal{Key: t.ID, Label: t.Name, Color: t.Color, Cents: v})
 		}
 	}
@@ -344,144 +306,32 @@ func Trend(d Data, months []string, member int64) []MonthReport {
 // month, so every breakdown answers for the selected period instead of only
 // its last month. A single-month range yields exactly BuildMonthReport.
 func PeriodReport(d Data, months []string, member int64) MonthReport {
-	rep := average(Trend(d, months, member))
-	rep.Member = member
+	month := ""
 	if len(months) > 0 {
-		rep.Month = months[len(months)-1]
+		month = months[len(months)-1]
 	}
-	return rep
-}
-
-// average merges month reports into the figures of a typical month. It divides
-// by every month of the range, empty ones included: a year with three months of
-// salary in it earns a twelfth of that salary per month, not a third.
-func average(reps []MonthReport) MonthReport {
-	out := MonthReport{
-		ByCostNature:  make(map[store.CostNature]int64),
-		ByBudgetClass: make(map[store.BudgetClass]int64),
-	}
-	n := int64(len(reps))
-	if n == 0 {
-		return out
-	}
-
-	byMember := make(map[int64]int, len(reps[0].Members))
-	for _, r := range reps {
-		out.IncomeCents += r.IncomeCents
-		out.ExpenseCents += r.ExpenseCents
-		out.UnassignedCents += r.UnassignedCents
-		for k, v := range r.ByCostNature {
-			out.ByCostNature[k] += v
-		}
-		for k, v := range r.ByBudgetClass {
-			out.ByBudgetClass[k] += v
-		}
-		for _, mb := range r.Members {
-			i, ok := byMember[mb.Member.ID]
-			if !ok {
-				out.Members = append(out.Members, MemberBalance{Member: mb.Member})
-				i = len(out.Members) - 1
-				byMember[mb.Member.ID] = i
-			}
-			out.Members[i].IncomeCents += mb.IncomeCents
-			out.Members[i].ExpenseCents += mb.ExpenseCents
-		}
-	}
-
-	out.IncomeCents /= n
-	out.ExpenseCents /= n
-	out.UnassignedCents /= n
-	out.BalanceCents = out.IncomeCents - out.ExpenseCents
-	for k := range out.ByCostNature {
-		out.ByCostNature[k] /= n
-	}
-	for k := range out.ByBudgetClass {
-		out.ByBudgetClass[k] /= n
-	}
-	for i := range out.Members {
-		out.Members[i].IncomeCents /= n
-		out.Members[i].ExpenseCents /= n
-		out.Members[i].BalanceCents = out.Members[i].IncomeCents - out.Members[i].ExpenseCents
-	}
-
-	out.Categories = averageTotals(reps, n, func(r MonthReport) []LabeledTotal { return r.Categories })
-	out.IncomeCategories = averageTotals(reps, n, func(r MonthReport) []LabeledTotal { return r.IncomeCategories })
-	out.Tags = averageTotals(reps, n, func(r MonthReport) []LabeledTotal { return r.Tags })
-	return out
-}
-
-// averageTotals merges one breakdown across months, keyed by the row id.
-func averageTotals(reps []MonthReport, n int64, pick func(MonthReport) []LabeledTotal) []LabeledTotal {
-	sums := make(map[int64]*LabeledTotal)
-	order := make([]int64, 0, len(pick(reps[0])))
-	for _, r := range reps {
-		for _, t := range pick(r) {
-			cur, ok := sums[t.Key]
-			if !ok {
-				merged := t
-				merged.Cents = 0
-				sums[t.Key] = &merged
-				order = append(order, t.Key)
-				cur = &merged
-			}
-			cur.Cents += t.Cents
-		}
-	}
-
-	out := make([]LabeledTotal, 0, len(order))
-	for _, k := range order {
-		t := *sums[k]
-		if t.Cents /= n; t.Cents != 0 {
-			out = append(out, t)
-		}
-	}
-	sortByCentsDesc(out)
-	return out
+	return buildReport(d, periodBookingValues(d, months, true), month, member)
 }
 
 // FixedCosts lists the fixed-cost bookings of a period as monthly averages,
 // largest first, because that is the list worth renegotiating. A limit of 0
 // keeps all of them.
 func FixedCosts(d Data, months []string, member int64, limit int) []LabeledTotal {
-	n := int64(len(months))
-	if n == 0 {
-		return nil
-	}
-
-	sums := make(map[int64]int64)
 	out := make([]LabeledTotal, 0, len(d.Bookings))
-	for _, m := range months {
-		for _, b := range d.Bookings {
-			if b.Direction != store.DirExpense || b.CostNature != store.CostFix || !ActiveIn(b, m) {
-				continue
-			}
-			amount := float64(AmountFor(b, d.Overrides[b.ID], m)) * monthlyFactor(b)
-			if member != Everyone {
-				shares, _ := allocate(amount, b, d.Splits[b.ID])
-				share, ok := shares[member]
-				if !ok {
-					continue
-				}
-				amount = share
-			}
-			if _, ok := sums[b.ID]; !ok {
-				out = append(out, LabeledTotal{Key: b.ID, Label: b.Name})
-			}
-			sums[b.ID] += round(amount)
+	for _, value := range periodBookingValues(d, months, true) {
+		b := value.Booking
+		if b.Direction != store.DirExpense || b.CostNature != store.CostFix {
+			continue
+		}
+		if cents, ok := value.scoped(member); ok && cents != 0 {
+			out = append(out, LabeledTotal{Key: b.ID, Label: b.Name, Cents: cents})
 		}
 	}
-
-	kept := out[:0]
-	for _, t := range out {
-		if t.Cents = sums[t.Key] / n; t.Cents != 0 {
-			kept = append(kept, t)
-		}
+	sortByCentsDesc(out)
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
 	}
-	sortByCentsDesc(kept)
-	if limit > 0 && len(kept) > limit {
-		kept = kept[:limit]
-	}
-	return kept
+	return out
 }
 
 // sortByCentsDesc puts the largest first. The tie-breaks are not cosmetic: the

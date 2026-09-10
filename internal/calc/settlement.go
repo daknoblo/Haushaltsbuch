@@ -7,7 +7,7 @@ import (
 )
 
 // MemberPosition is what one member fronted and what they actually owe for a
-// period, both as a monthly average so it matches the rest of the dashboard.
+// period, either as a monthly average or as a period total.
 type MemberPosition struct {
 	Member    store.Member
 	PaidCents int64
@@ -23,16 +23,19 @@ type Transfer struct {
 	Cents int64
 }
 
-// ShareLine is one expense the settlement was built from: what it costs in an
-// average month, who fronts it and how much of it each member carries. It is
+// ShareLine is one expense the settlement was built from: what it costs,
+// who fronts it and how much of it each member carries. It is
 // what makes a transfer traceable — a bill that is not divided moves no money
 // between members, and only the line shows that.
 type ShareLine struct {
-	Booking      store.Booking
-	Payer        store.Member
-	MonthlyCents int64
+	Booking store.Booking
+	Payer   store.Member
+	// Cents holds a monthly average for Settlement, a period sum for
+	// SettlementTotal.
+	Cents int64
 	// Shares holds every member's carried amount, the payer included.
 	Shares map[int64]int64
+	Splits []store.BookingSplit
 	// Carriers is how many members carry the booking, i.e. the "divided by".
 	Carriers int
 }
@@ -48,6 +51,9 @@ type SettlementReport struct {
 	Positions []MemberPosition
 	Transfers []Transfer
 	Lines     []ShareLine
+	// InvalidBookings have shares that do not cover their amount. No transfer
+	// is suggested until these are corrected.
+	InvalidBookings []store.Booking
 }
 
 // Carried is what a scope shoulders, split by whether the cost is divided.
@@ -63,7 +69,7 @@ type Carried struct {
 func (r SettlementReport) CarriedBy(member int64) Carried {
 	var out Carried
 	for _, l := range r.LinesFor(member) {
-		cents := l.MonthlyCents
+		cents := l.Cents
 		if member != Everyone {
 			cents = l.ShareOf(member)
 		}
@@ -95,6 +101,8 @@ func (r SettlementReport) LinesFor(member int64) []ShareLine {
 // for it, less the share they carry themselves.
 type LedgerLine struct {
 	Booking store.Booking
+	// TotalCents is the full booking amount, before splitting.
+	TotalCents int64
 	// PaidCents is 0 unless the member fronted this booking.
 	PaidCents int64
 	// OwedCents is the share the member carries.
@@ -108,9 +116,9 @@ type LedgerLine struct {
 func (r SettlementReport) Ledger(member int64) []LedgerLine {
 	out := make([]LedgerLine, 0, len(r.Lines))
 	for _, l := range r.Lines {
-		line := LedgerLine{Booking: l.Booking, OwedCents: l.ShareOf(member)}
+		line := LedgerLine{Booking: l.Booking, TotalCents: l.Cents, OwedCents: l.ShareOf(member)}
 		if l.Payer.ID == member {
-			line.PaidCents = l.MonthlyCents
+			line.PaidCents = l.Cents
 		}
 		if line.PaidCents == 0 && line.OwedCents == 0 {
 			continue
@@ -129,88 +137,71 @@ func (r SettlementReport) Ledger(member int64) []LedgerLine {
 // counting what was fronted for it would leave the payer owed by no one.
 func Settlement(d Data, months []string) SettlementReport {
 	n := int64(len(months))
-	if n == 0 || len(d.Members) == 0 {
+	if n == 0 {
 		return SettlementReport{}
 	}
+	return settlement(d, months, true)
+}
 
-	paid := make(map[int64]int64, len(d.Members))
-	owed := make(map[int64]int64, len(d.Members))
-	totals := make(map[int64]int64, len(d.Bookings))
-	perBooking := make(map[int64]map[int64]int64, len(d.Bookings))
-	order := make([]store.Booking, 0, len(d.Bookings))
+// SettlementTotal adds the normalized monthly amounts without averaging them.
+// The caller selects the elapsed months; this is a plan, not a payment log.
+func SettlementTotal(d Data, months []string) SettlementReport {
+	return settlement(d, months, false)
+}
 
-	for _, m := range months {
-		for _, b := range d.Bookings {
-			if b.Direction != store.DirExpense || !b.Settle || b.PayerMemberID == nil || !ActiveIn(b, m) {
-				continue
-			}
-			amount := float64(AmountFor(b, d.Overrides[b.ID], m)) * monthlyFactor(b)
-			shares, _ := allocate(amount, b, d.Splits[b.ID])
-			if len(shares) == 0 {
-				continue
-			}
-			paid[*b.PayerMemberID] += round(amount)
-			if _, seen := perBooking[b.ID]; !seen {
-				perBooking[b.ID] = make(map[int64]int64, len(d.Members))
-				order = append(order, b)
-			}
-			totals[b.ID] += round(amount)
-			for id, v := range shares {
-				owed[id] += round(v)
-				perBooking[b.ID][id] += round(v)
-			}
+func settlement(d Data, months []string, averaged bool) SettlementReport {
+	rep := SettlementReport{Positions: make([]MemberPosition, 0, len(d.Members))}
+	known := make(map[int64]store.Member, len(d.Members))
+	for _, m := range d.Members {
+		known[m.ID] = m
+	}
+	for _, value := range periodBookingValues(d, months, averaged) {
+		b := value.Booking
+		if b.Direction != store.DirExpense || !b.Settle || b.PayerMemberID == nil || len(d.Splits[b.ID]) == 0 {
+			continue
+		}
+		payer, valid := known[*b.PayerMemberID]
+		valid = valid && value.Complete
+		for id, share := range value.Shares {
+			_, exists := known[id]
+			valid = valid && exists && share >= 0
+		}
+		if !valid {
+			rep.InvalidBookings = append(rep.InvalidBookings, b)
+			continue
+		}
+		if value.Cents != 0 {
+			rep.Lines = append(rep.Lines, ShareLine{
+				Booking: b, Payer: payer, Cents: value.Cents,
+				Shares: value.Shares, Splits: d.Splits[b.ID], Carriers: len(value.Shares),
+			})
 		}
 	}
-
-	rep := SettlementReport{Positions: make([]MemberPosition, 0, len(d.Members))}
+	sort.Slice(rep.Lines, func(i, j int) bool {
+		a, b := rep.Lines[i], rep.Lines[j]
+		if a.Cents != b.Cents {
+			return a.Cents > b.Cents
+		}
+		if a.Booking.Name != b.Booking.Name {
+			return a.Booking.Name < b.Booking.Name
+		}
+		return a.Booking.ID < b.Booking.ID
+	})
 	for _, m := range d.Members {
-		p := MemberPosition{Member: m, PaidCents: paid[m.ID] / n, OwedCents: owed[m.ID] / n}
+		p := MemberPosition{Member: m}
+		for _, l := range rep.Lines {
+			if l.Payer.ID == m.ID {
+				p.PaidCents += l.Cents
+			}
+			p.OwedCents += l.ShareOf(m.ID)
+		}
 		p.NetCents = p.PaidCents - p.OwedCents
 		rep.Positions = append(rep.Positions, p)
 	}
-	rep.Transfers = transfers(rep.Positions)
-	rep.Lines = shareLines(d, order, totals, perBooking, n)
+	if len(rep.InvalidBookings) == 0 {
+		rep.Transfers = transfers(rep.Positions)
+	}
 	return rep
-}
-
-// shareLines turns the accumulated per-booking sums into monthly averages,
-// largest first, so the list reads like the settlement it explains.
-func shareLines(d Data, order []store.Booking, totals map[int64]int64, shares map[int64]map[int64]int64, n int64) []ShareLine {
-	byID := make(map[int64]store.Member, len(d.Members))
-	for _, m := range d.Members {
-		byID[m.ID] = m
-	}
-
-	out := make([]ShareLine, 0, len(order))
-	for _, b := range order {
-		line := ShareLine{
-			Booking:      b,
-			Payer:        byID[*b.PayerMemberID],
-			MonthlyCents: totals[b.ID] / n,
-			Shares:       make(map[int64]int64, len(d.Members)),
-		}
-		for _, m := range d.Members {
-			cents := shares[b.ID][m.ID] / n
-			line.Shares[m.ID] = cents
-			if cents != 0 {
-				line.Carriers++
-			}
-		}
-		if line.MonthlyCents == 0 {
-			continue
-		}
-		out = append(out, line)
-	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].MonthlyCents != out[j].MonthlyCents {
-			return out[i].MonthlyCents > out[j].MonthlyCents
-		}
-		if out[i].Booking.Name != out[j].Booking.Name {
-			return out[i].Booking.Name < out[j].Booking.Name
-		}
-		return out[i].Booking.ID < out[j].Booking.ID
-	})
-	return out
 }
 
 // transfers turns net positions into payments, always sending the largest debt
@@ -233,14 +224,9 @@ func transfers(positions []MemberPosition) []Transfer {
 	sort.SliceStable(creditors, func(i, j int) bool { return creditors[i].cents > creditors[j].cents })
 
 	var out []Transfer
-	// Rounding each member's share separately can leave a cent adrift, which
-	// would otherwise produce a transfer of a single cent.
-	const noise = 100
 	for i, j := 0, 0; i < len(debtors) && j < len(creditors); {
 		amount := min(debtors[i].cents, creditors[j].cents)
-		if amount >= noise {
-			out = append(out, Transfer{From: debtors[i].member, To: creditors[j].member, Cents: amount})
-		}
+		out = append(out, Transfer{From: debtors[i].member, To: creditors[j].member, Cents: amount})
 		debtors[i].cents -= amount
 		creditors[j].cents -= amount
 		if debtors[i].cents == 0 {

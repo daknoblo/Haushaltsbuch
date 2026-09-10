@@ -1,6 +1,11 @@
 package store
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"path/filepath"
 	"testing"
 )
 
@@ -230,5 +235,166 @@ func TestResetBookingsKeepsTheSetup(t *testing.T) {
 	}
 	if left, _ := s.ListCategories(ctx, h); len(left) != len(cats) {
 		t.Errorf("categories = %d, want the original %d", len(left), len(cats))
+	}
+}
+
+func TestSnapshotRetiredMarkerAndLegacyRestore(t *testing.T) {
+	s, ctx, h := seededStore(t)
+	cat := firstExpenseCategory(ctx, t, s, h)
+	b := newBooking(h, cat, 5000)
+	b.StartsOn, b.EndsOn = "2025-01-01", "2026-12-31"
+	b.Retired = true
+	old, err := s.CreateBooking(ctx, b, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if old.Retired {
+		t.Fatal("ordinary creation accepted a read-only retired marker")
+	}
+	next, err := s.ChangeAmountFrom(ctx, h.ID, old.ID, "2026-01-01", 6000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap, err := s.Export(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(snap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded Snapshot
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Import(ctx, decoded); err != nil {
+		t.Fatal(err)
+	}
+	for id, retired := range map[int64]bool{old.ID: true, next.ID: false} {
+		got, err := s.GetBooking(ctx, h.ID, id)
+		if err != nil || got.Retired != retired {
+			t.Fatalf("restored marker id=%d: %+v, %v", id, got, err)
+		}
+	}
+
+	// Legacy backups have no marker. Even identical names and contiguous dates
+	// do not provide enough information to reconstruct predecessor relationships.
+	legacy := bytes.ReplaceAll(raw, []byte(`"Retired":true,`), nil)
+	legacy = bytes.ReplaceAll(legacy, []byte(`"Retired":false,`), nil)
+	if bytes.Contains(legacy, []byte(`"Retired"`)) {
+		t.Fatal("legacy fixture still contains Retired")
+	}
+	var oldFormat Snapshot
+	if err := json.Unmarshal(legacy, &oldFormat); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Import(ctx, oldFormat); err != nil {
+		t.Fatalf("legacy restore: %v", err)
+	}
+	for _, id := range []int64{old.ID, next.ID} {
+		got, err := s.GetBooking(ctx, h.ID, id)
+		if err != nil || got.Retired {
+			t.Fatalf("legacy marker id=%d: %+v, %v", id, got, err)
+		}
+	}
+}
+
+func TestImportInvalidRangeRollsBack(t *testing.T) {
+	s, ctx, h := seededStore(t)
+	cat := firstExpenseCategory(ctx, t, s, h)
+	b, err := s.CreateBooking(ctx, newBooking(h, cat, 5000), nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, override := range []bool{false, true} {
+		snap, err := s.Export(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		bs := &snap.Households[0].Bookings[0]
+		if override {
+			bs.Overrides = []BookingOverride{{
+				ID: 1, BookingID: b.ID, StartsOn: "2026-12-01", EndsOn: "2026-01-31",
+			}}
+		} else {
+			bs.Booking.StartsOn, bs.Booking.EndsOn = "2026-12-01", "2026-01-31"
+		}
+		if err := s.Import(ctx, snap); !errors.Is(err, ErrBadSnapshot) {
+			t.Fatalf("override=%v: error=%v, want ErrBadSnapshot", override, err)
+		}
+		got, err := s.GetBooking(ctx, h.ID, b.ID)
+		if err != nil || got.StartsOn != b.StartsOn || got.EndsOn != b.EndsOn {
+			t.Fatalf("failed restore changed booking: %+v, %v", got, err)
+		}
+	}
+}
+
+func TestExportIsConsistentDuringConcurrentWrites(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "snapshot.db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	ctx := t.Context()
+	if err := s.EnsureSeed(ctx); err != nil {
+		t.Fatal(err)
+	}
+	households, err := s.ListHouseholds(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := households[0]
+	cat := firstExpenseCategory(ctx, t, s, h)
+	b := newBooking(h, cat, 5000)
+	b.Name = h.Name
+	b, err = s.CreateBooking(ctx, b, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = writer.Close() })
+	finished := make(chan error, 1)
+	stop := make(chan struct{})
+	go func() {
+		for revision := 1; ; revision++ {
+			select {
+			case <-stop:
+				finished <- nil
+				return
+			default:
+			}
+			name := fmt.Sprintf("revision %d", revision)
+			err := writer.withTx(ctx, func(tx *Store) error {
+				if err := tx.RenameHousehold(ctx, h.ID, name); err != nil {
+					return err
+				}
+				b.Name = name
+				return tx.SaveBooking(ctx, b, nil, nil)
+			})
+			if err != nil {
+				finished <- err
+				return
+			}
+		}
+	}()
+	defer func() {
+		close(stop)
+		if err := <-finished; err != nil {
+			t.Error(err)
+		}
+	}()
+	for range 100 {
+		snap, err := s.Export(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		hs := snap.Households[0]
+		if len(hs.Bookings) != 1 || hs.Household.Name != hs.Bookings[0].Booking.Name {
+			t.Fatalf("mixed revisions in snapshot: %+v", hs)
+		}
 	}
 }

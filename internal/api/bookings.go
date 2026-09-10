@@ -84,6 +84,7 @@ type bookingOut struct {
 	BudgetClass  string    `json:"budget_class"`
 	SplitMode    string    `json:"split_mode"`
 	Settle       bool      `json:"settle"`
+	Retired      bool      `json:"retired"`
 	PayerID      int64     `json:"payer_id,omitempty"`
 	Shares       []shareOu `json:"shares"`
 	Tags         []int64   `json:"tags"`
@@ -114,11 +115,6 @@ func (s *Server) handleListBookings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cats := categoryNames(data)
-	tags, err := s.store.ListBookingTags(r.Context(), id)
-	if err != nil {
-		s.fail(w, r, err)
-		return
-	}
 
 	out := make([]bookingOut, 0, len(data.Bookings))
 	for _, b := range data.Bookings {
@@ -127,7 +123,7 @@ func (s *Server) handleListBookings(w http.ResponseWriter, r *http.Request) {
 		if month != "" && !calc.ActiveIn(b, month) {
 			continue
 		}
-		out = append(out, toBookingOut(b, cats, data.Splits[b.ID], tags[b.ID], month))
+		out = append(out, toBookingOut(b, cats, data.Splits[b.ID], data.TagLinks[b.ID], data.Overrides[b.ID], month))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"bookings": out})
 }
@@ -275,25 +271,22 @@ func (s *Server) saveBooking(w http.ResponseWriter, r *http.Request, householdID
 		return
 	}
 
+	catID, name := b.CategoryID, ""
 	if in.CategoryID != nil || in.Category != nil {
-		catID, name := int64(0), ""
-		if in.CategoryID != nil {
-			catID = *in.CategoryID
-		}
-		if in.Category != nil {
-			name = *in.Category
-		}
-		id, err := s.resolveCategory(r, householdID, catID, name, b.Direction)
-		if err != nil {
-			s.referenceError(w, r, err)
-			return
-		}
-		b.CategoryID = id
+		catID = 0
 	}
-	if b.CategoryID == 0 {
-		writeError(w, http.StatusBadRequest, "category oder category_id fehlt")
+	if in.CategoryID != nil {
+		catID = *in.CategoryID
+	}
+	if in.Category != nil {
+		name = *in.Category
+	}
+	resolvedCategory, err := s.resolveCategory(r, householdID, catID, name, b.Direction)
+	if err != nil {
+		s.referenceError(w, r, err)
 		return
 	}
+	b.CategoryID = resolvedCategory
 
 	if in.PayerID != nil || in.Payer != nil {
 		payer, ok := s.resolvePayer(w, r, householdID, in)
@@ -312,7 +305,6 @@ func (s *Server) saveBooking(w http.ResponseWriter, r *http.Request, householdID
 		return
 	}
 
-	var err error
 	if b.ID == 0 {
 		b, err = s.store.CreateBooking(r.Context(), b, splits, tagIDs)
 	} else {
@@ -538,6 +530,9 @@ func applyDates(b *store.Booking, in bookingIn) error {
 	if !b.Frequency.Recurring() && b.StartsOn == "" {
 		return errors.New("eine einmalige Buchung braucht ein date")
 	}
+	if err := store.ValidateDateRange(b.StartsOn, b.EndsOn); err != nil {
+		return errors.New("active_until darf nicht vor active_from liegen")
+	}
 	return nil
 }
 
@@ -604,10 +599,15 @@ func (s *Server) writeBooking(w http.ResponseWriter, r *http.Request, status int
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, status, toBookingOut(fresh, names, splits, tagIDs, ""))
+	overrides, err := s.store.ListOverrides(r.Context(), householdID, fresh.ID)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, status, toBookingOut(fresh, names, splits, tagIDs, overrides, ""))
 }
 
-func toBookingOut(b store.Booking, cats map[int64]string, splits []store.BookingSplit, tagIDs []int64, month string) bookingOut {
+func toBookingOut(b store.Booking, cats map[int64]string, splits []store.BookingSplit, tagIDs []int64, overrides []store.BookingOverride, month string) bookingOut {
 	if month == "" {
 		month = time.Now().Format("2006-01")
 	}
@@ -623,12 +623,12 @@ func toBookingOut(b store.Booking, cats map[int64]string, splits []store.Booking
 		ID: b.ID, ExternalID: b.ExternalID, Household: b.HouseholdID,
 		Direction: string(b.Direction), Name: b.Name, Note: b.Note,
 		AmountCents:  b.AmountCents,
-		MonthlyCents: calc.MonthlyCents(b, nil, month),
+		MonthlyCents: calc.MonthlyCents(b, overrides, month),
 		Category:     cats[b.CategoryID], CategoryID: b.CategoryID,
 		Frequency: string(b.Frequency), Interval: b.Interval,
 		DuePoint: string(b.DuePoint), StartsOn: b.StartsOn, EndsOn: b.EndsOn,
 		CostNature: string(b.CostNature), BudgetClass: string(b.BudgetClass),
-		SplitMode: string(b.SplitMode), Settle: b.Settle,
+		SplitMode: string(b.SplitMode), Settle: b.Settle, Retired: b.Retired,
 		Shares: shares, Tags: tagIDs, UpdatedAt: b.UpdatedAt,
 	}
 	if b.PayerMemberID != nil {

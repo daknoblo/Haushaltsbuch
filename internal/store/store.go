@@ -185,35 +185,32 @@ func (s *Store) migrate(ctx context.Context) error {
 			return err
 		}
 
-		tx, err := s.db.BeginTx(ctx, nil)
-		if err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, string(content)); err != nil {
-			_ = tx.Rollback()
-			return fmt.Errorf("apply migration %s: %w", name, err)
-		}
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`,
-			name, now(),
-		); err != nil {
-			_ = tx.Rollback()
-			return err
-		}
-		if err := tx.Commit(); err != nil {
-			return err
-		}
-		if err := s.checkForeignKeys(ctx, name); err != nil {
+		if err := s.applyMigration(ctx, name, content); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
+func (s *Store) applyMigration(ctx context.Context, name string, content []byte) error {
+	return s.withTx(ctx, func(tx *Store) error {
+		if _, err := tx.q.ExecContext(ctx, string(content)); err != nil {
+			return fmt.Errorf("apply migration %s: %w", name, err)
+		}
+		if _, err := tx.q.ExecContext(ctx,
+			`INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`,
+			name, now(),
+		); err != nil {
+			return err
+		}
+		return tx.checkForeignKeys(ctx, name)
+	})
+}
+
 // checkForeignKeys reports rows a migration left pointing at nothing, which is
 // the price of running the migrations with enforcement turned off.
 func (s *Store) checkForeignKeys(ctx context.Context, migration string) error {
-	rows, err := s.db.QueryContext(ctx, `PRAGMA foreign_key_check`)
+	rows, err := s.q.QueryContext(ctx, `PRAGMA foreign_key_check`)
 	if err != nil {
 		return err
 	}

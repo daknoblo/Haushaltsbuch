@@ -91,6 +91,9 @@ func TestMigrationKeepsSplitsAndTags(t *testing.T) {
 	if b.DuePoint != DueStart {
 		t.Errorf("due point = %q, want start", b.DuePoint)
 	}
+	if b.Retired {
+		t.Error("migration inferred a retired predecessor for an existing booking")
+	}
 }
 
 func newTestStore(t *testing.T) *Store {

@@ -218,31 +218,18 @@ func BuildSankey(ctx context.Context, d Data, rep MonthReport, months []string, 
 // because one category may carry bookings of more than one class. The result
 // is the monthly average over the period, matching PeriodReport.
 func classCategoryTotals(ctx context.Context, d Data, months []string, member int64) map[store.BudgetClass][]LabeledTotal {
-	n := int64(len(months))
-	if n == 0 {
-		return nil
-	}
-
 	type key struct {
 		class store.BudgetClass
 		cat   int64
 	}
 	sums := make(map[key]int64)
-	for _, m := range months {
-		for _, bk := range d.Bookings {
-			if bk.Direction != store.DirExpense || !ActiveIn(bk, m) {
-				continue
-			}
-			amount := float64(AmountFor(bk, d.Overrides[bk.ID], m)) * monthlyFactor(bk)
-			if member != Everyone {
-				shares, _ := allocate(amount, bk, d.Splits[bk.ID])
-				share, ok := shares[member]
-				if !ok {
-					continue
-				}
-				amount = share
-			}
-			sums[key{bk.BudgetClass, bk.CategoryID}] += round(amount)
+	for _, value := range periodBookingValues(d, months, true) {
+		bk := value.Booking
+		if bk.Direction != store.DirExpense {
+			continue
+		}
+		if cents, ok := value.scoped(member); ok {
+			sums[key{bk.BudgetClass, bk.CategoryID}] += cents
 		}
 	}
 
@@ -253,7 +240,7 @@ func classCategoryTotals(ctx context.Context, d Data, months []string, member in
 
 	out := make(map[store.BudgetClass][]LabeledTotal)
 	for k, v := range sums {
-		if v /= n; v <= 0 {
+		if v <= 0 {
 			continue
 		}
 		c := names[k.cat]

@@ -1,6 +1,10 @@
 package web
 
-import "github.com/daknoblo/Haushaltsbuch/internal/store"
+import (
+	"strconv"
+
+	"github.com/daknoblo/Haushaltsbuch/internal/store"
+)
 
 templ BookingsPage(nav Nav, vm BookingsVM) {
 	@Layout(nav) {
@@ -13,9 +17,10 @@ templ BookingsPage(nav Nav, vm BookingsVM) {
 		if nav.ActiveHousehold.ID == 0 {
 			@noHousehold()
 		} else {
-			// The list reloads itself whenever the dialog reports a change, so an
-			// edit never costs a page reload.
-			<div id="booking-list" hx-get={ vm.ListURL() } hx-trigger="hb:changed from:body" hx-swap="outerHTML">
+			<div class="grid gap-4">
+				<div class="card-tight">
+					@sortBar(vm)
+				</div>
 				@BookingList(vm)
 			</div>
 			<div id="booking-dialog"></div>
@@ -42,11 +47,13 @@ templ BookingList(vm BookingsVM) {
 				</div>
 			} else {
 				<div class="card-tight">
-					@sortBar(vm)
 					<div class="card-body grid gap-1.5">
 						for _, b := range vm.Bookings {
-							@bookingRow(b)
+							<div class="min-w-0" data-booking-name={ b.Booking.Name } data-booking-active={ strconv.FormatBool(b.ActiveInMonth()) } hidden?={ !vm.Visible(b) }>
+								@bookingRow(b)
+							</div>
 						}
+						<p data-booking-no-matches role="status" hidden?={ !vm.NoMatches() } class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.noMatches") }</p>
 					</div>
 				</div>
 			}
@@ -57,6 +64,12 @@ templ BookingList(vm BookingsVM) {
 // sortBar lets the list be read the way the question of the moment needs it.
 templ sortBar(vm BookingsVM) {
 	<div class="card-head no-print">
+		<div class="relative w-full min-w-0 sm:w-72">
+			<input id="booking-search" class="input pr-10" type="search" value={ vm.Search } placeholder={ T(ctx, "bookings.searchPlaceholder") } aria-label={ T(ctx, "bookings.search") } title={ T(ctx, "bookings.search") } list="booking-suggestions" autocomplete="off"/>
+			<button type="button" class="btn-icon absolute right-1 top-1/2 -translate-y-1/2" data-booking-clear aria-label={ T(ctx, "bookings.clearSearch") }>×</button>
+			<datalist id="booking-suggestions"></datalist>
+		</div>
+		<button type="button" id="booking-active-filter" class={ "period-chip", templ.KV("period-chip-active", !vm.ShowAll) } aria-pressed={ strconv.FormatBool(!vm.ShowAll) } title={ T(ctx, "bookings.hideOldHint") }>{ T(ctx, "bookings.hideOld") }</button>
 		<span class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "bookings.sort") }</span>
 		<div class="flex flex-wrap items-center gap-1">
 			for _, o := range vm.SortOptions(ctx) {

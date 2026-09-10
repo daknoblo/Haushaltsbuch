@@ -263,7 +263,7 @@ templ matrixCells(row calc.MatrixRow) {
 	for i, c := range row.Cents {
 		<td class="matrix-cell text-right">
 			@matrixTrend(row.Trend[i], row.Gain)
-			{ MatrixCell(c) }
+			{ MatrixCell(c, row.Active[i]) }
 		</td>
 	}
 	// A line that ran in a single month has no average and no typical month; the
@@ -391,13 +391,31 @@ templ settlementCard(vm DashboardVM) {
 	<div class="card">
 		<div class="card-head">
 			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.settlement") }</h2>
-			<span class="badge ml-auto">{ vm.RangeLabel }</span>
+			<span class="badge ml-auto">{ vm.SettlementUnit(ctx) }</span>
 		</div>
 		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.settlementHint") }</p>
+		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ vm.SettlementBasis(ctx) }</p>
 		if !vm.HouseholdView() {
 			<p class="mb-3 text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "dash.settlementScope") }</p>
 		}
-		if vm.SettlementEven() {
+		if len(vm.Settlement.InvalidBookings) > 0 {
+			<div class="alert-error" role="alert">
+				<p>{ T(ctx, "dash.settlementInvalid") }</p>
+				<ul>
+					for _, b := range vm.Settlement.InvalidBookings {
+						<li>
+							if b.Name == "" {
+								{ T(ctx, "bookings.unnamed") }
+							} else {
+								{ b.Name }
+							}
+						</li>
+					}
+				</ul>
+			</div>
+		} else if vm.SettlementIsTotal && vm.SettlementRange == "" {
+			<p class="alert-info">{ T(ctx, "dash.noData") }</p>
+		} else if vm.SettlementEven() {
 			<p class="alert-info">{ T(ctx, "dash.settlementEven") }</p>
 		} else {
 			<div class="grid gap-2">
@@ -445,6 +463,7 @@ templ memberLedger(p calc.MemberPosition, lines []calc.LedgerLine) {
 					<thead>
 						<tr>
 							<th class="table-head">{ T(ctx, "dash.booking") }</th>
+							<th class="table-head whitespace-nowrap text-right">{ T(ctx, "dash.bookingTotal") }</th>
 							<th class="table-head whitespace-nowrap text-right">{ T(ctx, "dash.paid") }</th>
 							<th class="table-head whitespace-nowrap text-right">{ T(ctx, "dash.owed") }</th>
 							<th class="table-head whitespace-nowrap text-right">{ T(ctx, "overview.balance") }</th>
@@ -460,6 +479,7 @@ templ memberLedger(p calc.MemberPosition, lines []calc.LedgerLine) {
 										{ l.Booking.Name }
 									}
 								</td>
+								<td class="table-cell tnum whitespace-nowrap text-right">{ FormatEUR(l.TotalCents) }</td>
 								<td class="table-cell tnum whitespace-nowrap text-right">
 									if l.PaidCents == 0 {
 										<span class="text-slate-400 dark:text-slate-600">–</span>
@@ -481,6 +501,7 @@ templ memberLedger(p calc.MemberPosition, lines []calc.LedgerLine) {
 						}
 						<tr>
 							<td class="table-cell font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.sum") }</td>
+							<td class="table-cell tnum whitespace-nowrap text-right font-semibold">{ FormatEUR(LedgerTotal(lines)) }</td>
 							<td class="table-cell tnum whitespace-nowrap text-right font-semibold">{ FormatEUR(p.PaidCents) }</td>
 							<td class="table-cell tnum whitespace-nowrap text-right font-semibold">{ FormatEUR(p.OwedCents) }</td>
 							<td class="table-cell whitespace-nowrap text-right">
@@ -501,12 +522,13 @@ templ shareCard(vm DashboardVM) {
 	<div class="card">
 		<div class="card-head">
 			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.shares") }</h2>
-			<span class="badge ml-auto">{ vm.RangeLabel }</span>
+			<span class="badge ml-auto">{ vm.SettlementUnit(ctx) }</span>
 		</div>
 		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.sharesHint") }</p>
+		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ vm.SettlementBasis(ctx) }</p>
 		<div class="mb-4 grid gap-3 sm:mx-auto sm:max-w-xl sm:grid-cols-2">
-			@shareTotal(T(ctx, "dash.sharedTotal"), vm.Carried().SharedCents, "badge-info")
-			@shareTotal(T(ctx, "dash.soleTotal"), vm.Carried().SoleCents, "badge-muted")
+			@shareTotal(T(ctx, "dash.sharedTotal"), vm.Carried().SharedCents, "badge-info", vm.SettlementUnit(ctx))
+			@shareTotal(T(ctx, "dash.soleTotal"), vm.Carried().SoleCents, "badge-muted", vm.SettlementUnit(ctx))
 		</div>
 		if len(vm.ShareLines()) == 0 {
 			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.noData") }</p>
@@ -518,7 +540,7 @@ templ shareCard(vm DashboardVM) {
 							<th class="table-head">{ T(ctx, "dash.booking") }</th>
 							<th class="table-head">{ T(ctx, "bookings.payer") }</th>
 							<th class="table-head">{ T(ctx, "bookings.splitMode") }</th>
-							<th class="table-head text-right whitespace-nowrap">{ T(ctx, "dash.perMonth") }</th>
+							<th class="table-head text-right whitespace-nowrap">{ vm.SettlementUnit(ctx) }</th>
 							for _, p := range vm.Positions() {
 								<th class="table-head text-right whitespace-nowrap">{ p.Member.Name }</th>
 							}
@@ -545,13 +567,16 @@ templ shareCard(vm DashboardVM) {
 										{ SplitLabel(ctx, l) }
 									</span>
 								</td>
-								<td class="table-cell tnum text-right whitespace-nowrap">{ FormatEUR(l.MonthlyCents) }</td>
+								<td class="table-cell tnum text-right whitespace-nowrap">{ FormatEUR(l.Cents) }</td>
 								for _, p := range vm.Positions() {
 									<td class="table-cell tnum text-right whitespace-nowrap">
 										if l.ShareOf(p.Member.ID) == 0 {
 											<span class="text-slate-400 dark:text-slate-600">–</span>
 										} else {
 											{ FormatEUR(l.ShareOf(p.Member.ID)) }
+										}
+										if allocation := ShareAllocation(l, p.Member.ID); allocation != "" {
+											<span class="ml-1 text-xs text-slate-500 dark:text-slate-400">{ allocation }</span>
 										}
 									</td>
 								}
@@ -564,11 +589,11 @@ templ shareCard(vm DashboardVM) {
 	</div>
 }
 
-templ shareTotal(label string, cents int64, badge string) {
+templ shareTotal(label string, cents int64, badge string, unit string) {
 	<div class="rounded-lg border border-slate-200 px-4 py-3 text-center dark:border-slate-800">
 		<span class={ "badge", badge }>{ label }</span>
 		<div class="tnum mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
-			{ FormatEUR(cents) } <span class="text-sm font-normal text-slate-400 dark:text-slate-500">{ T(ctx, "bookings.perMonth") }</span>
+			{ FormatEUR(cents) } <span class="text-sm font-normal text-slate-400 dark:text-slate-500">{ unit }</span>
 		</div>
 	</div>
 }

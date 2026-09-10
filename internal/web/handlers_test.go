@@ -336,6 +336,11 @@ func TestIncomeUpdateKeepsFieldsItsDialogNeverShows(t *testing.T) {
 
 	b := newExpenseBooking(t, srv, active.ID)
 	b.Direction = store.DirIncome
+	categories, err := srv.store.ListCategories(ctx, active.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.CategoryID = defaultCategory(categories, store.DirIncome)
 	b.CostNature = store.CostVariable
 	b.BudgetClass = store.ClassSaving
 	b.Settle = true

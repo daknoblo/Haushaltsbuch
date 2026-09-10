@@ -17,6 +17,74 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     indicator = document.getElementById("save-indicator");
+    filterBookings();
+  });
+
+  // Keep the controls outside the swapped list so an autosave cannot replace
+  // a search keystroke. Reapply their current state to every fresh fragment.
+  function filterBookings() {
+    var input = document.getElementById("booking-search");
+    var toggle = document.getElementById("booking-active-filter");
+    if (!input || !toggle) return;
+    var activeOnly = toggle.getAttribute("aria-pressed") === "true";
+    var query = input.value.trim().toLowerCase();
+    var searching = Array.from(query).length >= 2;
+    var count = 0;
+    var suggestions = new Set();
+    document.querySelectorAll("[data-booking-name]").forEach(function (row) {
+      var name = row.getAttribute("data-booking-name");
+      var active = !activeOnly || row.getAttribute("data-booking-active") === "true";
+      var matches = !searching || name.toLowerCase().includes(query);
+      row.hidden = !active || !matches;
+      if (!row.hidden) count++;
+      if (active && searching && matches && name) suggestions.add(name);
+    });
+    var empty = document.querySelector("[data-booking-no-matches]");
+    if (empty) empty.hidden = count !== 0;
+    var list = document.getElementById("booking-suggestions");
+    list.replaceChildren();
+    Array.from(suggestions).sort().slice(0, 20).forEach(function (name) {
+      var option = document.createElement("option");
+      option.value = name;
+      list.appendChild(option);
+    });
+    toggle.classList.toggle("period-chip-active", activeOnly);
+    document.querySelector("[data-booking-clear]").disabled = input.value === "";
+
+    function withFilters(href) {
+      var url = new URL(href, location.origin);
+      if (input.value) url.searchParams.set("q", input.value);
+      else url.searchParams.delete("q");
+      if (activeOnly) url.searchParams.delete("all");
+      else url.searchParams.set("all", "true");
+      return url.pathname + url.search;
+    }
+    history.replaceState(history.state, "", withFilters(location.href));
+    document.querySelectorAll('a[href^="/bookings?"]').forEach(function (link) {
+      link.setAttribute("href", withFilters(link.href));
+    });
+  }
+
+  document.addEventListener("input", function (e) {
+    if (e.target.id === "booking-search") filterBookings();
+  });
+
+  document.addEventListener("click", function (e) {
+    var toggle = e.target.closest("#booking-active-filter");
+    if (toggle) {
+      toggle.setAttribute("aria-pressed", toggle.getAttribute("aria-pressed") === "true" ? "false" : "true");
+      filterBookings();
+    }
+    if (e.target.closest("[data-booking-clear]")) {
+      var input = document.getElementById("booking-search");
+      input.value = "";
+      filterBookings();
+      input.focus();
+    }
+  });
+
+  document.addEventListener("htmx:afterSwap", function (e) {
+    if (e.target && e.target.id === "booking-list") filterBookings();
   });
 
   function currentDialog() {
@@ -28,6 +96,7 @@
   // save requests, because a bare Escape also produces a keyup and would
   // otherwise count as an edit.
   var dialogTouched = false;
+  var saveErrors = new Map();
 
   // A click on the backdrop reports the dialog itself as its target, because
   // everything visible sits in a child element.
@@ -99,6 +168,7 @@
     if (!dlg) return;
     if (!dlg.open) dlg.showModal();
     dialogTouched = false;
+    saveErrors.clear();
     // A modal focuses its first field anyway, so a suggested name is selected
     // rather than cleared: typing replaces it, clicking into the field wipes it.
     var name = dlg.querySelector("input[data-clear-on-focus]");
@@ -151,6 +221,7 @@
   // the DOM and its fields would keep posting.
   document.addEventListener("close", function (e) {
     if (!e.target || e.target.tagName !== "DIALOG") return;
+    saveErrors.clear();
     var discard = dialogTouched ? "" : e.target.getAttribute("data-discard-url");
     var host = document.getElementById("booking-dialog");
     if (host) host.innerHTML = "";
@@ -165,9 +236,27 @@
 
   document.body.addEventListener("htmx:afterRequest", function (e) {
     var d = e.detail;
-    if (!d || !d.successful) return;
+    if (!d) return;
+    var dlg = currentDialog();
+    if (dlg && d.elt && dlg.contains(d.elt)) {
+      var error = dlg.querySelector("[data-save-errors]");
+      if (error) {
+        var path = d.requestConfig && d.requestConfig.path;
+        if (d.successful) {
+          saveErrors.delete(path);
+        } else {
+          var message = d.xhr && d.xhr.responseText.trim();
+          saveErrors.set(path, message || error.getAttribute("data-fallback"));
+        }
+        error.textContent = Array.from(new Set(saveErrors.values())).join("\n");
+        error.hidden = saveErrors.size === 0;
+        var saved = dlg.querySelector("[data-saved-hint]");
+        if (saved) saved.hidden = saveErrors.size !== 0;
+      }
+    }
+    if (!d.successful) return;
     var verb = d.requestConfig && d.requestConfig.verb;
-    if (verb && verb.toLowerCase() !== "get") {
+    if (verb && verb.toLowerCase() !== "get" && saveErrors.size === 0) {
       flashSaved();
     }
     // Clear "add new entry" forms after a successful submit. Handled here

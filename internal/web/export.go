@@ -197,8 +197,20 @@ func (s *Server) handleExportStatistics(w http.ResponseWriter, r *http.Request) 
 			FormatEUR(rep.BalanceCents), false)
 	}
 
-	if len(vm.Settlement.Transfers) > 0 {
+	if vm.ShowSettlement() {
 		pdfHeading(m, T(ctx, "dash.settlement"))
+		m.AddAutoRow(text.NewCol(12, vm.SettlementBasis(ctx), props.Text{Size: 9, Color: pdfGrey}))
+		m.AddRow(3)
+		if len(vm.Settlement.InvalidBookings) > 0 {
+			m.AddAutoRow(text.NewCol(12, T(ctx, "dash.settlementInvalid"), props.Text{Size: 9}))
+			for _, b := range vm.Settlement.InvalidBookings {
+				name := b.Name
+				if name == "" {
+					name = T(ctx, "bookings.unnamed")
+				}
+				m.AddAutoRow(text.NewCol(12, name, props.Text{Size: 9}))
+			}
+		}
 		for _, tr := range vm.Settlement.Transfers {
 			pdfKV(m, Tf(ctx, "dash.owes", tr.From.Name, tr.To.Name), FormatEUR(tr.Cents))
 		}
@@ -273,8 +285,8 @@ func pdfMatrixRow(m core.Maroto, label string, cells []string, style fontstyle.T
 // matrixCells is a row's figures in the order the table shows them.
 func pdfCells(row calc.MatrixRow) []string {
 	out := make([]string, 0, len(row.Cents)+3)
-	for _, c := range row.Cents {
-		out = append(out, MatrixCell(c))
+	for i, c := range row.Cents {
+		out = append(out, MatrixCell(c, row.Active[i]))
 	}
 	return append(out,
 		FormatEURShort(row.TotalCents),

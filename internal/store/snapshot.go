@@ -39,6 +39,19 @@ type BookingSnapshot struct {
 
 // Export reads the whole database into a snapshot.
 func (s *Store) Export(ctx context.Context) (Snapshot, error) {
+	var snap Snapshot
+	err := s.withTx(ctx, func(tx *Store) error {
+		var err error
+		snap, err = tx.exportSnapshot(ctx)
+		return err
+	})
+	if err != nil {
+		return Snapshot{}, err
+	}
+	return snap, nil
+}
+
+func (s *Store) exportSnapshot(ctx context.Context) (Snapshot, error) {
 	snap := Snapshot{Version: SnapshotVersion, CreatedAt: now()}
 
 	active, err := s.ActiveHouseholdID(ctx)
@@ -174,19 +187,22 @@ func (s *Store) importHousehold(ctx context.Context, hs HouseholdSnapshot) error
 
 func (s *Store) importBooking(ctx context.Context, householdID int64, bs BookingSnapshot) error {
 	b := sanitizeBooking(bs.Booking)
+	if err := ValidateDateRange(b.StartsOn, b.EndsOn); err != nil {
+		return fmt.Errorf("%w: booking %d: %w", ErrBadSnapshot, b.ID, err)
+	}
 	if _, err := s.q.ExecContext(ctx,
 		`INSERT INTO bookings
 			(id, household_id, category_id, payer_member_id, direction, name, note,
 			 amount_cents, frequency, interval_n, due_point, starts_on, ends_on,
-			 cost_nature, budget_class, split_mode, settle, external_id, created_at, updated_at)
-		 VALUES (?, ?, `+categoryRef+`, `+memberRef+`, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			 cost_nature, budget_class, split_mode, settle, external_id, retired, created_at, updated_at)
+		 VALUES (?, ?, `+categoryRef+`, `+memberRef+`, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		b.ID, householdID,
 		b.CategoryID, householdID,
 		nullInt(b.PayerMemberID), householdID,
 		string(b.Direction), b.Name, b.Note, b.AmountCents,
 		string(b.Frequency), b.Interval, string(b.DuePoint), b.StartsOn, b.EndsOn,
 		string(b.CostNature), string(b.BudgetClass), string(b.SplitMode), b.Settle,
-		b.ExternalID, orNow(b.CreatedAt), orNow(b.UpdatedAt),
+		b.ExternalID, b.Retired, orNow(b.CreatedAt), orNow(b.UpdatedAt),
 	); err != nil {
 		return err
 	}
@@ -208,6 +224,9 @@ func (s *Store) importBooking(ctx context.Context, householdID int64, bs Booking
 		}
 	}
 	for _, o := range bs.Overrides {
+		if err := ValidateDateRange(o.StartsOn, o.EndsOn); err != nil {
+			return fmt.Errorf("%w: override %d: %w", ErrBadSnapshot, o.ID, err)
+		}
 		if _, err := s.q.ExecContext(ctx,
 			`INSERT INTO booking_overrides (id, booking_id, starts_on, ends_on, amount_cents, note)
 			 VALUES (?, ?, ?, ?, ?, ?)`,

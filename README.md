@@ -40,19 +40,34 @@ _Not captured yet._
   - **who fronts the bill** and a flexible **split**: equal, percentage or fixed
     amounts – e.g. rent 50/50, life insurance 100 % on one person,
   - **differing amounts for a period**, so an introductory price ("10 € for the
-    first six months, 49.99 € afterwards") needs no second booking.
+    first six months, 49.99 € afterwards") needs no second booking,
+  - **permanent price changes** that close the predecessor and exclude it from
+    annual carry-over, preventing the old and new price from being added
+    together,
+  - an active-month filter enabled by default, plus instant name search from
+    two characters with completion suggestions and a clear button. Turn off
+    **Hide old bookings** to include past and future bookings. Filters affect
+    the list only, not the monthly balance.
 - **Overview** per month: income, expenses and balance – in total and per
   person, broken down by category, cost nature and 50/30/20.
 - **Dashboard** with a selectable period (month, two months, quarter, half year,
-  year) and arrows that step by the length of that period. Every figure
-  describes a *typical month* of the range, so the cards stay comparable no
-  matter how long it is:
+  year) and arrows that step by the length of that period. The budget cards
+  describe a *typical month* of the range, so they stay comparable no matter
+  how long it is:
   - a **bar chart** of income against expenses, with the period picker centred
     above it,
   - a **view switch** between the whole household and a single person, which
     recomputes every card – your own view shows your half of the rent plus
     whatever only you carry,
-  - a **settlement** that says who has to transfer how much to whom,
+  - a **settlement** with the full booking amount, fronted amount and own
+    share on each member's ledger. In year view, settlement and its cost
+    breakdown sum January through the current month (all twelve months for
+    past years; no months for future years). Other periods retain monthly
+    averages. These are normalized **planned amounts**, not actual payments;
+    previously made settlement transfers are not recorded or deducted.
+    Shares are rounded without losing cents, including transfers below one
+    euro. Incomplete or excessive splits are explicitly listed and block
+    transfer suggestions until corrected,
   - **fixed costs** with their share of income and the largest items,
   - **savings rate** — deliberate savings plus surplus against net income — and
     the 50/30/20 split against its targets,
@@ -65,7 +80,33 @@ _Not captured yet._
   arrow buttons; bookings sort themselves by amount inside their category.
 - **Automatic saving**: every input is persisted as soon as a field changes –
   there is no save button anywhere, and nothing you are typing in is ever
-  replaced under your cursor.
+  replaced under your cursor. Failed saves are shown in the dialog and do not
+  discard the input; correcting the invalid field clears the error after a
+  successful save.
+
+### Calculation rules
+
+All reports, member views, charts and settlement use the same cent-rounded
+monthly booking values. Indivisible cents are assigned deterministically by
+booking or member ID, so the parts add up to the total. Incomplete or excessive
+splits keep an explicit unassigned remainder rather than being silently
+rescaled. Percent splits show the configured percentages; fixed splits are
+labelled as fixed amounts, not as equal divisions.
+
+Period averages divide by every month in the selected period. Their remaining
+cents are distributed at booking level before categories and member figures
+are summed. The year matrix's **mean and median** instead describe the months a
+row was active: a genuine zero month counts, while months outside the active
+range do not. An active zero displays as `0 €`; inactive cells stay blank.
+The dashboard reuses a single request-local evaluation rather than repeatedly
+calculating the same monthly allocations.
+
+Backups read all tables in one transaction and preserve retired predecessors.
+Older backups without that marker remain readable. Existing price changes
+created before the marker was introduced cannot be identified reliably from
+names or amounts; review those old entries before carrying them forward.
+Migration foreign-key checks run before commit, so a failed check rolls back
+the schema, data and migration version together.
 
 ---
 

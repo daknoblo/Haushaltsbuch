@@ -250,16 +250,17 @@ func (s *Server) handleBookingUpdate(w http.ResponseWriter, r *http.Request) {
 		b.SplitMode = store.SplitEqual
 	}
 
-	if b.Frequency.Recurring() {
-		b.StartsOn = monthToDate(cleanMonth(r.FormValue("active_from")))
-		b.EndsOn = monthEnd(cleanMonth(r.FormValue("active_until")))
-	} else {
-		b.StartsOn = cleanDate(r.FormValue("occurred_on"))
-		b.EndsOn = ""
+	if err := bookingDatesFromForm(r, &b); err != nil {
+		s.clientError(w, r, http.StatusBadRequest, "error.invalidDateRange")
+		return
 	}
 
 	if catID, err := s.categoryFromName(ctx, active, b, r.FormValue("category")); err != nil {
-		s.serverError(w, r, err)
+		if errors.Is(err, store.ErrInvalid) {
+			s.clientError(w, r, http.StatusBadRequest, "error.categoryDirection")
+		} else {
+			s.serverError(w, r, err)
+		}
 		return
 	} else if catID != 0 {
 		b.CategoryID = catID
@@ -328,17 +329,19 @@ func (s *Server) handleBookingChange(w http.ResponseWriter, r *http.Request) {
 // like it. Returns 0 when nothing matches.
 func (s *Server) categoryFromName(ctx context.Context, householdID int64, b store.Booking, typed string) (int64, error) {
 	typed = strings.ToLower(strings.TrimSpace(typed))
-	if typed == "" {
-		return 0, nil
-	}
 	cats, err := s.store.ListCategories(ctx, householdID)
 	if err != nil {
 		return 0, err
 	}
 
 	var prefix, contains []int64
+	currentValid := false
 	for _, c := range cats {
 		if c.Classification != b.Direction {
+			continue
+		}
+		currentValid = currentValid || c.ID == b.CategoryID
+		if typed == "" {
 			continue
 		}
 		name := strings.ToLower(c.Name)
@@ -357,7 +360,74 @@ func (s *Server) categoryFromName(ctx context.Context, householdID int64, b stor
 	if len(prefix) == 0 && len(contains) == 1 {
 		return contains[0], nil
 	}
+	if !currentValid {
+		return 0, store.ErrInvalid
+	}
 	return 0, nil
+}
+
+// dateOrKeep preserves a partially typed ISO value instead of turning it into
+// an open bound. An explicitly empty field still clears the bound.
+func dateOrKeep(raw, current, layout string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	if len(raw) < len(layout) {
+		for i := range len(raw) {
+			if (layout[i] == '-' && raw[i] != '-') ||
+				(layout[i] != '-' && (raw[i] < '0' || raw[i] > '9')) {
+				return current, store.ErrInvalid
+			}
+		}
+		return current, nil
+	}
+	if _, err := time.Parse(layout, raw); err != nil {
+		return current, store.ErrInvalid
+	}
+	return raw, nil
+}
+
+func bookingDatesFromForm(r *http.Request, b *store.Booking) error {
+	if b.Frequency.Recurring() {
+		for _, field := range []struct {
+			name string
+			date *string
+			end  bool
+		}{
+			{"active_from", &b.StartsOn, false},
+			{"active_until", &b.EndsOn, true},
+		} {
+			if !r.Form.Has(field.name) {
+				continue
+			}
+			current := *field.date
+			if len(current) >= 7 {
+				current = current[:7]
+			}
+			month, err := dateOrKeep(r.FormValue(field.name), current, "2006-01")
+			if err != nil {
+				return err
+			}
+			if month == current && strings.TrimSpace(r.FormValue(field.name)) != "" {
+				continue
+			}
+			*field.date = monthToDate(month)
+			if field.end {
+				*field.date = monthEnd(month)
+			}
+		}
+	} else {
+		var err error
+		if r.Form.Has("occurred_on") {
+			b.StartsOn, err = dateOrKeep(r.FormValue("occurred_on"), b.StartsOn, "2006-01-02")
+			if err != nil {
+				return err
+			}
+		}
+		b.EndsOn = ""
+	}
+	return store.ValidateDateRange(b.StartsOn, b.EndsOn)
 }
 
 // calendarYearBounds is the range a new recurring booking runs over: the whole
@@ -495,9 +565,13 @@ func overrideFromForm(r *http.Request) (store.BookingOverride, error) {
 	if errors.Is(err, ErrAmountRange) {
 		return store.BookingOverride{}, err
 	}
+	startsOn, endsOn := strings.TrimSpace(r.FormValue("starts_on")), strings.TrimSpace(r.FormValue("ends_on"))
+	if err := store.ValidateDateRange(startsOn, endsOn); err != nil {
+		return store.BookingOverride{}, err
+	}
 	return store.BookingOverride{
-		StartsOn:    cleanDate(r.FormValue("starts_on")),
-		EndsOn:      cleanDate(r.FormValue("ends_on")),
+		StartsOn:    startsOn,
+		EndsOn:      endsOn,
 		AmountCents: cents,
 		Note:        cleanName(r.FormValue("note")),
 	}, nil
@@ -513,7 +587,11 @@ func (s *Server) handleOverrideCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	o, err := overrideFromForm(r)
 	if err != nil {
-		s.clientError(w, r, http.StatusBadRequest, "error.amountRange")
+		if errors.Is(err, store.ErrInvalid) {
+			s.clientError(w, r, http.StatusBadRequest, "error.invalidDateRange")
+		} else {
+			s.clientError(w, r, http.StatusBadRequest, "error.amountRange")
+		}
 		return
 	}
 	o.BookingID = parseID(r.PathValue("id"))
@@ -534,7 +612,11 @@ func (s *Server) handleOverrideUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	o, err := overrideFromForm(r)
 	if err != nil {
-		s.clientError(w, r, http.StatusBadRequest, "error.amountRange")
+		if errors.Is(err, store.ErrInvalid) {
+			s.clientError(w, r, http.StatusBadRequest, "error.invalidDateRange")
+		} else {
+			s.clientError(w, r, http.StatusBadRequest, "error.amountRange")
+		}
 		return
 	}
 	o.ID = parseID(r.PathValue("id"))

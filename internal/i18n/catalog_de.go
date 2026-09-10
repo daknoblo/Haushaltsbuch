@@ -83,7 +83,7 @@ var german = Catalog{
 	"bookings.splitSection":        "Bezahlt & aufgeteilt",
 	"bookings.splitHint":           "Erst wählen, wer die Rechnung bezahlt, dann wer sie mitträgt.",
 	"bookings.whoPays":             "Wer trägt die Ausgabe?",
-	"bookings.whoPaysHint":         "Nur angehakte Personen tragen mit: beide angehakt = jeder die Hälfte, keine = die Ausgabe bleibt unzugeordnet.",
+	"bookings.whoPaysHint":         "Nur angehakte Personen tragen mit. Gleichmäßig teilt zu gleichen Teilen; sonst gelten die eingetragenen Prozente oder Beträge. Ohne Auswahl bleibt die Ausgabe unzugeordnet.",
 	"bookings.whoGets":             "Wem gehört die Einnahme?",
 	"bookings.nobodyCarries":       "Nicht zugeordnet: niemand trägt diese Ausgabe. Mindestens eine Person mit einem Anteil größer null auswählen.",
 	"bookings.nobodyGets":          "Nicht zugeordnet: niemand bekommt diese Einnahme. Mindestens eine Person mit einem Anteil größer null auswählen.",
@@ -138,6 +138,12 @@ var german = Catalog{
 	"bookings.sortUpdated":         "Zuletzt geändert",
 	"bookings.allExpenses":         "Alle Ausgaben",
 	"bookings.left":                "Übrig",
+	"bookings.search":              "Buchungen suchen (ab 2 Zeichen)",
+	"bookings.searchPlaceholder":   "Buchungen suchen",
+	"bookings.clearSearch":         "Suche löschen",
+	"bookings.hideOld":             "Blende alte Buchungen aus",
+	"bookings.hideOldHint":         "Nur Buchungen anzeigen, die im ausgewählten Monat gelten.",
+	"bookings.noMatches":           "Keine passenden Buchungen.",
 
 	// Dashboard
 	"dash.title":        "Auswertung",
@@ -163,7 +169,7 @@ var german = Catalog{
 	"dash.paid":            "Vorgestreckt",
 	"dash.owed":            "Getragen",
 	"dash.shares":          "Wer trägt was?",
-	"dash.sharesHint":      "Grundlage des Ausgleichs: geteilte Ausgaben zählen anteilig, allein getragene bleiben beim Zahler.",
+	"dash.sharesHint":      "Grundlage des Ausgleichs: nur auszugleichende Ausgaben mit Zahler und gültigen Anteilen. Allein getragene Kosten zählen bei der tragenden Person.",
 	"dash.sharedTotal":     "Geteilte Kosten",
 	"dash.soleTotal":       "Eigene Kosten",
 	"dash.splitAlone":      "allein",
@@ -221,6 +227,13 @@ var german = Catalog{
 	"dash.flowDeficit":      "Der Plan gibt mehr aus als er einnimmt. Die Differenz fließt als überschrittenes Budget mit ein.",
 	"dash.byTag":            "Nach Tag",
 	"dash.noTagData":        "Keine getaggten Buchungen im Zeitraum.",
+
+	"dash.bookingTotal":          "Gesamtbetrag",
+	"dash.periodTotal":           "Summe im Zeitraum",
+	"dash.settlementTotalHint":   "Summe der geplanten Monatsbeträge: %s. Keine erfassten Ist-Zahlungen; bereits erfolgte Ausgleichszahlungen sind nicht abgezogen.",
+	"dash.settlementAverageHint": "Monatsdurchschnitt der Planung: %s.",
+	"dash.settlementFuture":      "Dieses Jahr liegt in der Zukunft; es gibt noch keine bisherigen Monatsbeträge.",
+	"dash.settlementInvalid":     "Die Anteile folgender Buchungen passen nicht zum Betrag. Sie sind hier nicht eingerechnet; bis zur Korrektur werden keine Überweisungen vorgeschlagen:",
 
 	// Sankey nodes that have no counterpart elsewhere in the UI
 	"sankey.withdrawal": "Budget überschritten",
@@ -298,6 +311,9 @@ var german = Catalog{
 
 	// Errors shown to the user
 	"error.internal":           "Interner Serverfehler",
+	"error.saveFailed":         "Änderung nicht gespeichert. Bitte Eingaben und Verbindung prüfen.",
+	"error.invalidDateRange":   "Bitte gültige Datumsangaben verwenden. Das Ende darf nicht vor dem Beginn liegen.",
+	"error.categoryDirection":  "Die Kategorie passt nicht zur Buchungsrichtung.",
 	"error.noHousehold":        "Kein aktiver Haushalt",
 	"error.nameMissing":        "Name fehlt",
 	"error.backupTooLarge":     "Die Datei ist zu groß.",

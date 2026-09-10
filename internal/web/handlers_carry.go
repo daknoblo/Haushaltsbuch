@@ -67,15 +67,15 @@ func carryYear(now time.Time) int {
 // and it stops at the end of a December earlier than the one being planned for.
 //
 // The turn of the year is what separates a book that simply runs out from a
-// booking that was closed off on purpose — the March half of a price change
-// ends mid-year, and carrying it would raise it from the dead alongside its own
-// successor, counting the cost twice.
+// booking that was closed off on purpose. Price-change predecessors are also
+// explicitly retired, because a January change ends its old price in December
+// and carrying that predecessor would count the cost twice.
 //
 // Only the month is read, never the day: books written before the end date was
 // stored as the last of the month carry a first of December instead, and they
 // mean the same thing.
 func carriable(b store.Booking, year int) bool {
-	if !b.Frequency.Recurring() || len(b.EndsOn) < 7 || b.EndsOn[5:7] != "12" {
+	if b.Retired || !b.Frequency.Recurring() || len(b.EndsOn) < 7 || b.EndsOn[5:7] != "12" {
 		return false
 	}
 	end, err := strconv.Atoi(b.EndsOn[:4])

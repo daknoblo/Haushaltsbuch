@@ -41,10 +41,14 @@ func TestChangeAmountSplitsTheBookingInTwo(t *testing.T) {
 	if closed.AmountCents != 5000 {
 		t.Errorf("the old amount became %d, want it kept at 5000", closed.AmountCents)
 	}
+	if !closed.Retired || next.Retired {
+		t.Errorf("retired flags: predecessor=%v successor=%v", closed.Retired, next.Retired)
+	}
 
 	if next.StartsOn != "2026-04-01" {
 		t.Errorf("the successor starts %q, want 2026-04-01", next.StartsOn)
 	}
+
 	if next.EndsOn != "2026-12-31" {
 		t.Errorf("the successor ends %q, want the original 2026-12-31", next.EndsOn)
 	}
@@ -61,6 +65,65 @@ func TestChangeAmountSplitsTheBookingInTwo(t *testing.T) {
 	splits, _ := s.ListSplits(ctx, h, next.ID)
 	if len(splits) != 2 {
 		t.Errorf("the successor carries %d shares, want the original 2", len(splits))
+	}
+}
+
+func TestJanuaryPredecessorCannotBeCarriedOrUnretiredBySave(t *testing.T) {
+	s, ctx, h := seededStore(t)
+	cat := firstExpenseCategory(ctx, t, s, h)
+	b := newBooking(h, cat, 5000)
+	b.StartsOn, b.EndsOn = "2025-01-01", "2026-12-31"
+	old, err := s.CreateBooking(ctx, b, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next, err := s.ChangeAmountFrom(ctx, h.ID, old.ID, "2026-01-01", 6000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, err = s.GetBooking(ctx, h.ID, old.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old.Retired = false
+	if err := s.SaveBooking(ctx, old, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ExtendBookings(ctx, h.ID, []int64{old.ID, next.ID}, "2027-12-31"); err != nil {
+		t.Fatal(err)
+	}
+	old, err = s.GetBooking(ctx, h.ID, old.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !old.Retired || old.EndsOn != "2025-12-31" {
+		t.Errorf("historical booking revived: %+v", old)
+	}
+	next, err = s.GetBooking(ctx, h.ID, next.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.Retired || next.EndsOn != "2027-12-31" {
+		t.Errorf("successor not carried: %+v", next)
+	}
+
+	// Subdividing history cannot introduce a new annual carry candidate.
+	historical, err := s.ChangeAmountFrom(ctx, h.ID, old.ID, "2025-06-01", 4500)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !historical.Retired {
+		t.Error("a subdivision of a retired booking lost its retired marker")
+	}
+	if err := s.ExtendBookings(ctx, h.ID, []int64{historical.ID}, "2027-12-31"); err != nil {
+		t.Fatal(err)
+	}
+	historical, err = s.GetBooking(ctx, h.ID, historical.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if historical.EndsOn != "2025-12-31" {
+		t.Error("historical subdivision was extended")
 	}
 }
 
@@ -94,6 +157,34 @@ func TestChangeAmountLeavesTheExternalIDBehind(t *testing.T) {
 	}
 	if kept, _ := s.GetBookingByExternalID(ctx, h, "strom"); kept.ID != old.ID {
 		t.Error("the external id no longer points at the booking it was given to")
+	}
+}
+
+func TestChangeAmountFailureDoesNotRetireOrShortenPredecessor(t *testing.T) {
+	s, ctx, h := seededStore(t)
+	cat := firstExpenseCategory(ctx, t, s, h)
+	b := newBooking(h, cat, 5000)
+	b.StartsOn, b.EndsOn = "2025-01-01", "2026-12-31"
+	old, err := s.CreateBooking(ctx, b, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.q.ExecContext(ctx, `
+		CREATE TRIGGER reject_test_successor BEFORE INSERT ON bookings
+		WHEN NEW.starts_on = '2026-01-01'
+		BEGIN SELECT RAISE(ABORT, 'test successor failure'); END
+	`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ChangeAmountFrom(ctx, h.ID, old.ID, "2026-01-01", 6000); err == nil {
+		t.Fatal("successor creation unexpectedly succeeded")
+	}
+	got, err := s.GetBooking(ctx, h.ID, old.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Retired || got.EndsOn != old.EndsOn {
+		t.Fatalf("failed price change modified predecessor: %+v", got)
 	}
 }
 

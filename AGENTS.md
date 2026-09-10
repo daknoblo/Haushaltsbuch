@@ -38,6 +38,9 @@ document wins over this file unless a deviation is listed below.
   computed.
 - **BookingSplit** – a member's share. `split_mode` decides how `value` is read:
   ignored for `equal`, a percentage for `percent`, cents for `fixed`.
+- **Retired booking** – a price-change predecessor remains in historical
+  reports but is excluded from annual carry-over, including at SQL level.
+  `retired` is read-only for normal booking writes and is preserved by backups.
 - **BookingOverride** – replaces a booking's amount for a date range, so an
   introductory price is expressible without a second booking. The last matching
   override wins.
@@ -54,6 +57,13 @@ is what "what does this cost me" means.
 
 Money is stored as `int64` cents everywhere. Amounts are parsed and rendered in
 German notation by `internal/web/format.go`.
+
+All reporting paths use the same rounded monthly booking values and member
+shares. Remaining cents are assigned by stable IDs; period averages distribute
+their remainder at booking level before aggregation. `calc.Prepare` creates a
+read-only, request-local evaluation for dashboard reuse, never database rows.
+The year matrix tracks active months separately from amounts: genuine zeros
+count towards its mean and median, inactive months do not.
 
 Every write is scoped to the active household in SQL — the household id is part
 of the store method signature, and section and category references are resolved
@@ -118,7 +128,8 @@ annotation becomes the body of the GitHub release, so write it properly.
   that fires the children's `ON DELETE CASCADE` — migration 0004 would have wiped
   every split and tag. The pragma is a no-op inside a transaction, so it brackets
   the whole loop in `store.migrate`; `PRAGMA foreign_key_check` runs after each
-  migration to take enforcement's place.
+  migration, inside its transaction and before commit, to take enforcement's
+  place without making a failed migration permanent.
 - **Tailwind only scans the templates and `viewmodel.go`.** Tailwind matches bare
   words anywhere in a scanned file, so ordinary prose in a Go comment would emit
   a utility and break the "CSS is up to date" check on an unrelated edit.

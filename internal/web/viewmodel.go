@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/calc"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
@@ -73,6 +74,7 @@ type Nav struct {
 	Month           string
 	ShowMonthNav    bool
 	Version         string
+	BookingFilters  string
 }
 
 // IsActive reports whether the given nav item is the active page.
@@ -101,7 +103,7 @@ func (n Nav) MonthURL(m string) string {
 	if p == "" {
 		p = "/"
 	}
-	return p + "?m=" + m
+	return p + "?m=" + m + n.BookingFilters
 }
 
 // AssetURL returns the URL of a static asset with the build version appended.
@@ -471,6 +473,25 @@ type BookingsVM struct {
 	Bookings []BookingRow
 	Report   calc.MonthReport
 	Form     BookingFormVM
+	Search   string
+	ShowAll  bool
+}
+
+// Visible combines the selected month and the two-character name search.
+func (v BookingsVM) Visible(row BookingRow) bool {
+	query := strings.TrimSpace(v.Search)
+	return (v.ShowAll || row.ActiveInMonth()) &&
+		(utf8.RuneCountInString(query) < 2 || strings.Contains(strings.ToLower(row.Booking.Name), strings.ToLower(query)))
+}
+
+// NoMatches distinguishes a filtered empty result from an empty household.
+func (v BookingsVM) NoMatches() bool {
+	for _, row := range v.Bookings {
+		if v.Visible(row) {
+			return false
+		}
+	}
+	return true
 }
 
 // Empty reports whether the household has nothing recorded yet.
@@ -524,7 +545,7 @@ func (v BookingsVM) SortOptions(ctx context.Context) []PeriodOption {
 			Key:    o.key,
 			Label:  T(ctx, o.label),
 			Active: o.key == cleanSort(v.Sort),
-			URL:    "/bookings?m=" + v.Month + "&s=" + o.key,
+			URL:    "/bookings?m=" + v.Month + "&s=" + o.key + v.FilterQuery(),
 		})
 	}
 	return out
@@ -533,7 +554,12 @@ func (v BookingsVM) SortOptions(ctx context.Context) []PeriodOption {
 // ListURL is what the list re-fetches itself from, sort included so an
 // auto-save does not throw the chosen order away.
 func (v BookingsVM) ListURL() string {
-	return "/bookings/list?m=" + v.Month + "&s=" + cleanSort(v.Sort)
+	return "/bookings/list?m=" + v.Month + "&s=" + cleanSort(v.Sort) + v.FilterQuery()
+}
+
+// FilterQuery preserves list filters when sorting or changing months.
+func (v BookingsVM) FilterQuery() string {
+	return "&q=" + url.QueryEscape(v.Search) + "&all=" + strconv.FormatBool(v.ShowAll)
 }
 
 // BookingFormVM carries the pickers the booking dialog needs.
@@ -709,10 +735,9 @@ func MatrixSpan(m calc.Matrix) string {
 	return strconv.Itoa(len(m.Months) + 3)
 }
 
-// MatrixCell leaves a zero blank. A year of mostly empty cells is unreadable
-// when every one of them says 0,00 €.
-func MatrixCell(cents int64) string {
-	if cents == 0 {
+// MatrixCell leaves inactive months blank while showing genuine zero amounts.
+func MatrixCell(cents int64, active bool) string {
+	if !active {
 		return ""
 	}
 	return FormatEURShort(cents)
@@ -757,26 +782,47 @@ type DashboardVM struct {
 	Report calc.MonthReport
 	// HouseholdReport is always the whole household, so a person view can put
 	// its own share next to what the household spends in total.
-	HouseholdReport calc.MonthReport
-	Trend           []calc.MonthReport
-	Chart           calc.TrendChart
-	Stack           calc.StackChart
-	Rule            calc.RuleRing
-	Matrix          calc.Matrix
-	MatrixYear      string
-	Sankey          calc.Sankey
-	FixedTop        []calc.LabeledTotal
-	Periods         []PeriodOption
-	Groupings       []PeriodOption
-	PeriodKey       string
-	PeriodLabel     string
-	Grouping        string
-	RangeLabel      string
-	PrevURL         string
-	NextURL         string
-	Views           []ViewOption
-	ViewMember      int64
-	Settlement      calc.SettlementReport
+	HouseholdReport   calc.MonthReport
+	Trend             []calc.MonthReport
+	Chart             calc.TrendChart
+	Stack             calc.StackChart
+	Rule              calc.RuleRing
+	Matrix            calc.Matrix
+	MatrixYear        string
+	Sankey            calc.Sankey
+	FixedTop          []calc.LabeledTotal
+	Periods           []PeriodOption
+	Groupings         []PeriodOption
+	PeriodKey         string
+	PeriodLabel       string
+	Grouping          string
+	RangeLabel        string
+	PrevURL           string
+	NextURL           string
+	Views             []ViewOption
+	ViewMember        int64
+	Settlement        calc.SettlementReport
+	SettlementRange   string
+	SettlementIsTotal bool
+}
+
+// SettlementUnit distinguishes accumulated amounts from monthly averages.
+func (v DashboardVM) SettlementUnit(ctx context.Context) string {
+	if v.SettlementIsTotal {
+		return T(ctx, "dash.periodTotal")
+	}
+	return T(ctx, "dash.perMonth")
+}
+
+// SettlementBasis names the actual span and explains the planning basis.
+func (v DashboardVM) SettlementBasis(ctx context.Context) string {
+	if v.SettlementIsTotal {
+		if v.SettlementRange == "" {
+			return T(ctx, "dash.settlementFuture")
+		}
+		return Tf(ctx, "dash.settlementTotalHint", v.SettlementRange)
+	}
+	return Tf(ctx, "dash.settlementAverageHint", v.SettlementRange)
 }
 
 // Positions is every member's paid/owed position of the period.
@@ -797,13 +843,21 @@ func (v DashboardVM) ShareLines() []calc.ShareLine {
 	return v.Settlement.LinesFor(v.ViewMember)
 }
 
-// Carried splits what the selected view shoulders into the divided part and
-// the part it carries alone; the two add up to the expenses shown above.
+// Carried splits the settlement's expenses into divided and sole costs.
 func (v DashboardVM) Carried() calc.Carried { return v.Settlement.CarriedBy(v.ViewMember) }
 
 // Ledger lists what one member fronted and carries, booking by booking.
 func (v DashboardVM) Ledger(member int64) []calc.LedgerLine {
 	return v.Settlement.Ledger(member)
+}
+
+// LedgerTotal sums full booking amounts, not just the member's own shares.
+func LedgerTotal(lines []calc.LedgerLine) int64 {
+	var total int64
+	for _, line := range lines {
+		total += line.TotalCents
+	}
+	return total
 }
 
 // HouseholdView reports whether the dashboard shows the whole household.
@@ -828,10 +882,26 @@ func (v DashboardVM) YearExportURL(month string) string {
 // SplitLabel names how a booking is divided, which is what tells a shared bill
 // apart from one a single member carries alone.
 func SplitLabel(ctx context.Context, l calc.ShareLine) string {
+	if l.Booking.SplitMode == store.SplitPercent || l.Booking.SplitMode == store.SplitFixed {
+		return SplitModeLabel(ctx, l.Booking.SplitMode)
+	}
 	if l.Shared() {
 		return "÷ " + strconv.Itoa(l.Carriers)
 	}
 	return T(ctx, "dash.splitAlone")
+}
+
+// ShareAllocation adds the exact configured percentage beside its amount.
+func ShareAllocation(l calc.ShareLine, member int64) string {
+	if l.Booking.SplitMode != store.SplitPercent {
+		return ""
+	}
+	for _, split := range l.Splits {
+		if split.MemberID == member {
+			return strings.ReplaceAll(strconv.FormatFloat(split.Value, 'f', -1, 64), ".", ",") + " %"
+		}
+	}
+	return ""
 }
 
 // SettingsVM is the view model of the settings page.

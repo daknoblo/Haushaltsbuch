@@ -210,6 +210,9 @@ type Booking struct {
 	// Settle keeps the booking out of the settlement when false, for costs that
 	// are shared on paper but never squared between the members.
 	Settle bool
+	// Retired marks a price-change predecessor. It remains in historical reports,
+	// but ordinary saves cannot clear it and the annual carry never extends it.
+	Retired bool
 	// ExternalID is the caller's own name for a booking created through the API.
 	// Empty for anything entered by hand; unique per household otherwise.
 	ExternalID string
