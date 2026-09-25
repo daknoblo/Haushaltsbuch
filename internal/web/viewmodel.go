@@ -837,6 +837,7 @@ type DashboardVM struct {
 	Views             []ViewOption
 	ViewMember        int64
 	Settlement        calc.SettlementReport
+	Costs             calc.CostReport
 	SettlementRange   string
 	SettlementIsTotal bool
 }
@@ -866,8 +867,8 @@ func (v DashboardVM) Positions() []calc.MemberPosition { return v.Settlement.Pos
 // Transfers are the payments that square the period.
 func (v DashboardVM) Transfers() []calc.Transfer { return v.Settlement.Transfers }
 
-// ShowSettlement hides the settlement while there is nobody to settle with.
-func (v DashboardVM) ShowSettlement() bool { return len(v.Settlement.Positions) > 1 }
+// ShowSettlement also makes personal costs accessible in a one-person household.
+func (v DashboardVM) ShowSettlement() bool { return len(v.Settlement.Positions) > 0 }
 
 // SettlementEven reports whether nothing has to change hands.
 func (v DashboardVM) SettlementEven() bool { return len(v.Settlement.Transfers) == 0 }
@@ -875,11 +876,48 @@ func (v DashboardVM) SettlementEven() bool { return len(v.Settlement.Transfers) 
 // ShareLines are the expenses the selected view carries: all of them for the
 // household, only the ones the member has a share in for a person.
 func (v DashboardVM) ShareLines() []calc.ShareLine {
-	return v.Settlement.LinesFor(v.ViewMember)
+	return v.Costs.LinesFor(v.ViewMember)
 }
 
-// Carried splits the settlement's expenses into divided and sole costs.
-func (v DashboardVM) Carried() calc.Carried { return v.Settlement.CarriedBy(v.ViewMember) }
+// Carried includes allocated costs whether reimbursable or not.
+func (v DashboardVM) Carried() calc.Carried { return v.Costs.CarriedBy(v.ViewMember) }
+
+// HasSharedCosts controls the initial shared-only table and empty state.
+func (v DashboardVM) HasSharedCosts() bool {
+	for _, line := range v.ShareLines() {
+		if line.Shared() {
+			return true
+		}
+	}
+	return false
+}
+
+// CostMembers follows the selected scope, unlike the household-wide settlement.
+func (v DashboardVM) CostMembers() []store.Member {
+	var members []store.Member
+	for _, p := range v.Positions() {
+		if v.HouseholdView() || p.Member.ID == v.ViewMember {
+			members = append(members, p.Member)
+		}
+	}
+	return members
+}
+
+// VisibleCosts totals the visible bookings, with each member's exact shares.
+func (v DashboardVM) VisibleCosts(member int64, own bool) int64 {
+	var total int64
+	for _, line := range v.ShareLines() {
+		if !own && !line.Shared() {
+			continue
+		}
+		if member == calc.Everyone {
+			total += line.Cents
+		} else {
+			total += line.ShareOf(member)
+		}
+	}
+	return total
+}
 
 // Ledger lists what one member fronted and carries, booking by booking.
 func (v DashboardVM) Ledger(member int64) []calc.LedgerLine {

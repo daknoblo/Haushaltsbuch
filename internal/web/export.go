@@ -221,9 +221,35 @@ func (s *Server) handleExportStatistics(w http.ResponseWriter, r *http.Request) 
 		for _, tr := range vm.Settlement.Transfers {
 			pdfKV(m, Tf(ctx, "dash.owes", tr.From.Name, tr.To.Name), FormatEUR(tr.Cents))
 		}
+		pdfCostOverview(ctx, m, vm)
 	}
 
 	s.writePDF(w, r, m, T(ctx, "pdf.fileStatistics")+"-"+month+".pdf")
+}
+
+func pdfCostOverview(ctx context.Context, m core.Maroto, vm DashboardVM) {
+	pdfHeading(m, T(ctx, "dash.shares"))
+	if len(vm.Costs.InvalidBookings) > 0 {
+		m.AddAutoRow(text.NewCol(12, T(ctx, "dash.costsInvalid"), props.Text{Size: 9}))
+		for _, b := range vm.Costs.InvalidBookings {
+			name := b.Name
+			if name == "" {
+				name = T(ctx, "bookings.unnamed")
+			}
+			m.AddAutoRow(text.NewCol(12, name, props.Text{Size: 9}))
+		}
+	}
+	total := func(label string, cents, fixed int64) {
+		pdfKV(m, label, FormatEUR(cents))
+		m.AddAutoRow(text.NewCol(12, Tf(ctx, "dash.fixedPortion", FormatEUR(fixed)), props.Text{Size: 9, Color: pdfGrey}))
+	}
+	carried := vm.Carried()
+	total(T(ctx, "dash.sharedTotal"), carried.SharedCents, carried.FixedSharedCents)
+	total(T(ctx, "dash.soleTotal"), carried.SoleCents, carried.FixedSoleCents)
+	for _, member := range vm.CostMembers() {
+		costs := vm.Costs.CarriedBy(member.ID)
+		total(Tf(ctx, "dash.personCosts", member.Name), costs.TotalCents(), costs.FixedCents())
+	}
 }
 
 func (s *Server) handleExportExpenses(w http.ResponseWriter, r *http.Request) {

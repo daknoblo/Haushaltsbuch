@@ -469,13 +469,47 @@ func TestDashboardRendersForEveryPeriod(t *testing.T) {
 	}
 }
 
-// The year block below the chart is fixed to the calendar year, so opening on
-// anything else would put two different spans on one page.
-func TestDashboardOpensOnTheYear(t *testing.T) {
+func TestDashboardOpensOnTheCurrentMonth(t *testing.T) {
 	_, h, _ := newTestServer(t)
 	body := get(t, h, "/dashboard").Body.String()
-	if !strings.Contains(body, `selected>Jahr</option>`) {
-		t.Error("the year is not the period the dashboard opens on")
+	if !strings.Contains(body, `selected>`+MonthLabel(t.Context(), NormalizeMonth(""))+`</option>`) {
+		t.Error("the current month is not the period the dashboard opens on")
+	}
+	if strings.Contains(body, `selected>Jahr</option>`) {
+		t.Error("the year must no longer be selected by default")
+	}
+}
+
+func TestDashboardKeepsExplicitPeriodsAndSupportsInPlaceNavigation(t *testing.T) {
+	_, h, _ := newTestServer(t)
+	for _, tc := range []struct{ query, label string }{
+		{"m=2025-02", "Februar 2025"},
+		{"m=2025-02&p=bogus", "Februar 2025"},
+		{"m=2025-02&p=12m", "Jahr"},
+		{"m=2025-02&p=3m", "Quartal"},
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/dashboard?"+tc.query, nil)
+		req.Header.Set("HX-Request", "true")
+		req.Header.Set("HX-Target", "dashboard-content")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s: status %d", tc.query, w.Code)
+		}
+		body := w.Body.String()
+		for _, marker := range []string{
+			`selected>` + tc.label + `</option>`,
+			`id="dashboard-content" hx-history-elt hx-history="false"`,
+			`hx-select="#dashboard-content"`, `hx-target="#dashboard-content"`,
+			`hx-swap="outerHTML show:none"`, `hx-push-url="true"`,
+			`hx-sync="#dashboard-content:replace"`,
+			`data-dashboard-period hx-get="/dashboard" hx-trigger="change"`,
+			`data-dashboard-error hidden`,
+		} {
+			if !strings.Contains(body, marker) {
+				t.Errorf("%s: missing %q", tc.query, marker)
+			}
+		}
 	}
 }
 

@@ -18,7 +18,30 @@
   document.addEventListener("DOMContentLoaded", function () {
     indicator = document.getElementById("save-indicator");
     filterBookings();
+    filterCosts();
   });
+
+  function filterCosts() {
+    var root = document.querySelector("[data-cost-overview]");
+    if (!root) return;
+    var own = root.querySelector("[data-own-costs]").checked;
+    var count = 0;
+    root.querySelectorAll("[data-cost-row]").forEach(function (row) {
+      row.hidden = !own && row.getAttribute("data-own-cost") === "true";
+      if (!row.hidden) count++;
+    });
+    root.querySelectorAll("[data-cost-total]").forEach(function (row) {
+      row.hidden = row.getAttribute("data-cost-total") !== String(own);
+    });
+    root.querySelector("[data-cost-empty]").hidden = count !== 0;
+    root.querySelector("[data-cost-table]").hidden = count === 0;
+  }
+
+  document.addEventListener("change", function (e) {
+    if (e.target.matches("[data-own-costs]")) filterCosts();
+  });
+
+  window.addEventListener("pageshow", filterCosts);
 
   // Keep the controls outside the swapped list so an autosave cannot replace
   // a search keystroke. Reapply their current state to every fresh fragment.
@@ -365,13 +388,67 @@
   document.addEventListener("input", refreshSplitState, true);
   document.addEventListener("change", refreshSplitState, true);
 
-  // A period picker carries the whole target URL in each option, so following
-  // it needs no knowledge of the page. The handler lives here because the
-  // content security policy forbids the inline one a select would otherwise use.
-  document.addEventListener("change", function (e) {
-    var el = e.target;
-    if (el && el.tagName === "SELECT" && el.hasAttribute("data-nav") && el.value) {
-      window.location.assign(el.value);
+  document.addEventListener("htmx:configRequest", function (e) {
+    if (e.detail.elt.matches("[data-dashboard-period]")) {
+      e.detail.path = e.detail.elt.value;
     }
   });
+
+  // Replacing a long report must not collapse its open ledgers or jump to the
+  // top. Capture at swap time so scrolling while the request runs is respected.
+  var dashboardSwaps = new WeakMap();
+  document.addEventListener("htmx:beforeSwap", function (e) {
+    var d = e.detail;
+    if (d.target.id !== "dashboard-content" || !d.shouldSwap || d.isError) return;
+    var own = d.target.querySelector("[data-own-costs]");
+    dashboardSwaps.set(d.xhr, {
+      x: window.scrollX,
+      y: window.scrollY,
+      own: own && own.checked,
+      categories: Array.from(d.target.querySelectorAll("[data-matrix-category]:checked"), function (el) {
+        return el.getAttribute("data-matrix-category");
+      }),
+      ledgers: Array.from(d.target.querySelectorAll("[data-ledger-member][open]"), function (el) {
+        return el.getAttribute("data-ledger-member");
+      })
+    });
+  });
+
+  document.addEventListener("htmx:afterSwap", function (e) {
+    var state = dashboardSwaps.get(e.detail.xhr);
+    if (!state) return;
+    var root = document.getElementById("dashboard-content");
+    var own = root.querySelector("[data-own-costs]");
+    if (own) own.checked = state.own;
+    root.querySelectorAll("[data-matrix-category]").forEach(function (el) {
+      el.checked = state.categories.includes(el.getAttribute("data-matrix-category"));
+    });
+    root.querySelectorAll("[data-ledger-member]").forEach(function (el) {
+      el.open = state.ledgers.includes(el.getAttribute("data-ledger-member"));
+    });
+    filterCosts();
+    window.scrollTo(state.x, state.y);
+  });
+
+  document.addEventListener("htmx:afterSettle", function (e) {
+    var state = dashboardSwaps.get(e.detail.xhr);
+    if (!state) return;
+    window.scrollTo(state.x, state.y);
+    dashboardSwaps.delete(e.detail.xhr);
+  });
+
+  function dashboardLoadError(e) {
+    var d = e.detail;
+    if (!d.target || d.target.id !== "dashboard-content") return;
+    var root = document.getElementById("dashboard-content");
+    root.querySelector("[data-dashboard-error]").hidden = false;
+    var picker = root.querySelector("[data-dashboard-period]");
+    picker.value = picker.querySelector("option[selected]").value;
+  }
+
+  document.body.addEventListener("htmx:responseError", dashboardLoadError);
+  document.body.addEventListener("htmx:sendError", dashboardLoadError);
+  document.body.addEventListener("htmx:timeout", dashboardLoadError);
+
+  document.addEventListener("htmx:historyRestore", filterCosts);
 })();

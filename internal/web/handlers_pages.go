@@ -300,9 +300,7 @@ func lessName(a, b string) bool {
 // periodMonths is how many months each period key spans.
 var periodMonths = map[string]int{"1m": 1, "2m": 2, periodQuarter: 3, "6m": 6, periodYear: 12}
 
-// periodYear covers the calendar year rather than a window around the anchor,
-// and is what the dashboard opens on: the year block below it is fixed to the
-// calendar year anyway, so anything else would put two spans on one page.
+// periodYear covers the calendar year rather than a window around the anchor.
 const periodYear = "12m"
 
 const periodQuarter = "3m"
@@ -316,12 +314,12 @@ var periodOrder = []struct{ key, label string }{
 	{periodYear, "dash.rangeYear"},
 }
 
-// cleanPeriod falls back to the calendar year for anything unknown.
+// cleanPeriod defaults to the selected month for missing or unknown periods.
 func cleanPeriod(key string) string {
 	if _, ok := periodMonths[key]; ok {
 		return key
 	}
-	return periodYear
+	return "1m"
 }
 
 // rangeMonths returns the months a period covers, centered on the anchor month
@@ -491,10 +489,12 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 	vm.SettlementRange = vm.RangeLabel
 	if period == periodYear {
 		vm.Settlement = calc.SettlementTotal(data, elapsed)
+		vm.Costs = calc.CostsTotal(data, elapsed)
 		vm.SettlementRange = rangeLabel(ctx, elapsed)
 		vm.SettlementIsTotal = true
 	} else {
 		vm.Settlement = calc.Settlement(data, months)
+		vm.Costs = calc.Costs(data, months)
 	}
 	return vm, nil
 }

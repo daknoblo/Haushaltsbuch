@@ -54,7 +54,14 @@ _Not captured yet._
 - **Overview** per month: income, expenses and balance – in total and per
   person, broken down by category, cost nature and 50/30/20.
 - **Dashboard** with a selectable period (month, two months, quarter, half year,
-  year) and arrows that step by the length of that period. The budget cards
+  year) and arrows that step by the length of that period. It opens on the
+  current month by default; explicit period links remain supported. The sticky
+  period and person controls refresh the report in place without reloading the
+  page, preserving the scroll position, expanded categories, open settlement
+  ledgers and own-cost visibility. If the new report is shorter, scrolling is
+  limited to its end.
+  Failed requests leave the previous report visible and show an error.
+  The budget cards
   describe a *typical month* of the range, so they stay comparable no matter
   how long it is:
   - a **bar chart** of income against expenses, with the period picker centred
@@ -71,6 +78,17 @@ _Not captured yet._
     Shares are rounded without losing cents, including transfers below one
     euro. Incomplete or excessive splits are explicitly listed and block
     transfer suggestions until corrected,
+  - an integrated **cost overview** within settlement, with shared and own cost
+    tiles and a total per person, each showing its fixed-cost portion. All
+    correctly allocated expenses count, including personal expenses, savings,
+    manual settlement exclusions and bookings without a payer. Missing or
+    invalid allocations are listed explicitly and excluded from these totals.
+    **Show own costs** is off by default and adds sole-carried bookings to the
+    list (for the selected person or the whole household). The list footer
+    follows the visible rows; tiles always show all costs. Reimbursement
+    ledgers and transfers remain separate and unchanged. Cost figures use the
+    settlement period, not the income-coverage filter of the budget metrics.
+    The statistics PDF includes the complete cost summary and fixed portions,
   - **automatic settlement exclusion** when the payer carries the entire cost
     alone. The switch turns off with an explanation, including for existing
     bookings. Adding another carrier or changing the payer restores the

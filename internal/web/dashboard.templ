@@ -9,40 +9,41 @@ import (
 
 templ DashboardPage(nav Nav, vm DashboardVM) {
 	@Layout(nav) {
-		@pageHeading(T(ctx, "dash.title"), T(ctx, "dash.subtitle")) {
-			<div class="ml-auto flex flex-wrap items-center gap-2 no-print">
-				<a class="btn-ghost" href={ templ.SafeURL("/export/overview.pdf?m=" + nav.Month) }>{ T(ctx, "pdf.overview") }</a>
-				<a class="btn-ghost" href={ templ.SafeURL("/export/expenses.pdf?m=" + nav.Month) }>{ T(ctx, "pdf.expenseList") }</a>
-				<a class="btn-ghost" href={ templ.SafeURL(vm.YearExportURL(nav.Month)) }>{ T(ctx, "pdf.year") }</a>
-				<a class="btn-primary" href={ templ.SafeURL(vm.StatisticsExportURL(nav.Month)) }>{ T(ctx, "action.exportPDF") }</a>
-			</div>
-		}
-		if nav.ActiveHousehold.ID == 0 {
-			@noHousehold()
-		} else {
-			<div class="grid gap-4">
-				@viewSwitch(vm)
-				@chartCard(vm)
-				<p class="alert-info" data-calculation-basis>{ vm.CalculationBasis(ctx) }</p>
-				@headlineTiles(vm)
-				@matrixCard(vm)
-				@stackCard(vm)
-				if vm.ShowSettlement() {
-					@settlementCard(vm)
-					@shareCard(vm)
-				}
-				if vm.HasRecordedIncome() {
-					<div class="grid gap-4 lg:grid-cols-2">
-						@fixedCostCard(vm)
-						@savingsCard(vm)
-					</div>
-					@ruleCard(vm)
-					@sankeyCard(vm)
-					@categoryCard(vm)
-					@tagCard(vm)
-				}
-			</div>
-		}
+		<div id="dashboard-content" hx-history-elt hx-history="false">
+			@pageHeading(T(ctx, "dash.title"), T(ctx, "dash.subtitle")) {
+				<div class="ml-auto flex flex-wrap items-center gap-2 no-print">
+					<a class="btn-ghost" href={ templ.SafeURL("/export/overview.pdf?m=" + nav.Month) }>{ T(ctx, "pdf.overview") }</a>
+					<a class="btn-ghost" href={ templ.SafeURL("/export/expenses.pdf?m=" + nav.Month) }>{ T(ctx, "pdf.expenseList") }</a>
+					<a class="btn-ghost" href={ templ.SafeURL(vm.YearExportURL(nav.Month)) }>{ T(ctx, "pdf.year") }</a>
+					<a class="btn-primary" href={ templ.SafeURL(vm.StatisticsExportURL(nav.Month)) }>{ T(ctx, "action.exportPDF") }</a>
+				</div>
+			}
+			if nav.ActiveHousehold.ID == 0 {
+				@noHousehold()
+			} else {
+				<div class="grid gap-4">
+					@viewSwitch(vm)
+					@chartCard(vm)
+					<p class="alert-info" data-calculation-basis>{ vm.CalculationBasis(ctx) }</p>
+					@headlineTiles(vm)
+					@matrixCard(vm)
+					@stackCard(vm)
+					if vm.ShowSettlement() {
+						@settlementCard(vm)
+					}
+					if vm.HasRecordedIncome() {
+						<div class="grid gap-4 lg:grid-cols-2">
+							@fixedCostCard(vm)
+							@savingsCard(vm)
+						</div>
+						@ruleCard(vm)
+						@sankeyCard(vm)
+						@categoryCard(vm)
+						@tagCard(vm)
+					}
+				</div>
+			}
+		</div>
 	}
 }
 
@@ -51,7 +52,15 @@ templ DashboardPage(nav Nav, vm DashboardVM) {
 // long enough that a reader deep in the flow diagram would otherwise have to
 // scroll back up to ask the same question about a different month.
 templ viewSwitch(vm DashboardVM) {
-	<div class="view-bar no-print">
+	<div
+		class="view-bar no-print"
+		hx-boost="true"
+		hx-target="#dashboard-content"
+		hx-select="#dashboard-content"
+		hx-swap="outerHTML show:none"
+		hx-push-url="true"
+		hx-sync="#dashboard-content:replace"
+	>
 		<div class="flex flex-wrap items-center gap-2 px-4 py-2.5">
 			<span class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "dash.view") }</span>
 			for _, v := range vm.Views {
@@ -72,16 +81,17 @@ templ viewSwitch(vm DashboardVM) {
 				}
 			}
 			<div class="ml-auto flex items-center gap-1">
-				<a class="btn-icon" href={ templ.SafeURL(vm.PrevURL) } aria-label={ T(ctx, "dash.rangePrev") }>‹</a>
+				<a id="dashboard-prev" class="btn-icon" href={ templ.SafeURL(vm.PrevURL) } aria-label={ T(ctx, "dash.rangePrev") }>‹</a>
 				<label class="section-picker">
-					<select data-nav="1" aria-label={ T(ctx, "dash.range") }>
+					<select id="dashboard-period" data-dashboard-period hx-get="/dashboard" hx-trigger="change" aria-label={ T(ctx, "dash.range") }>
 						for _, p := range vm.Periods {
 							<option value={ p.URL } selected?={ p.Active }>{ p.Label }</option>
 						}
 					</select>
 				</label>
-				<a class="btn-icon" href={ templ.SafeURL(vm.NextURL) } aria-label={ T(ctx, "dash.rangeNext") }>›</a>
+				<a id="dashboard-next" class="btn-icon" href={ templ.SafeURL(vm.NextURL) } aria-label={ T(ctx, "dash.rangeNext") }>›</a>
 			</div>
+			<p class="alert-error mx-4 mb-3" role="alert" data-dashboard-error hidden>{ T(ctx, "dash.loadError") }</p>
 		</div>
 	</div>
 }
@@ -209,7 +219,7 @@ templ matrixBand(vm DashboardVM, band calc.MatrixBand) {
 				<th class="matrix-cell matrix-sticky text-left">
 					if len(row.Children) > 0 {
 						<label class="matrix-toggle">
-							<input type="checkbox" class="sr-only"/>
+							<input type="checkbox" class="sr-only" data-matrix-category={ band.Key + ":" + strconv.FormatInt(row.Key, 10) }/>
 							<span class="matrix-caret" aria-hidden="true">›</span>
 							@matrixDot(row)
 							@matrixLabel(row)
@@ -237,7 +247,9 @@ templ matrixBand(vm DashboardVM, band calc.MatrixBand) {
 	}
 	<tbody>
 		<tr class="matrix-line matrix-total">
-			<th class="matrix-cell matrix-sticky text-left">@matrixLabel(band.Total)</th>
+			<th class="matrix-cell matrix-sticky text-left">
+				@matrixLabel(band.Total)
+			</th>
 			@matrixCells(band.Total)
 		</tr>
 		if band.Key != calc.BandIncome {
@@ -263,7 +275,9 @@ templ matrixShare(row calc.MatrixRow) {
 
 templ matrixLine(vm DashboardVM, row calc.MatrixRow, extra string) {
 	<tr class={ "matrix-line matrix-total", extra }>
-		<th class="matrix-cell matrix-sticky text-left">@matrixLabel(row)</th>
+		<th class="matrix-cell matrix-sticky text-left">
+			@matrixLabel(row)
+		</th>
 		@matrixCells(row)
 	</tr>
 }
@@ -393,15 +407,36 @@ templ headlineTiles(vm DashboardVM) {
 	</div>
 }
 
-// settlementCard answers "who owes whom", which only the payer of a booking
-// makes computable. The payment comes first; every member's own ledger is one
-// click away, so the figure can be followed line by line.
+// Cost visibility is independent of the reimbursement ledgers and transfers.
 templ settlementCard(vm DashboardVM) {
-	<div class="card">
+	<div class="card" data-settlement>
 		<div class="card-head">
 			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.settlement") }</h2>
 			<span class="badge ml-auto">{ vm.SettlementUnit(ctx) }</span>
 		</div>
+		<div class="my-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-cost-tiles>
+			@shareTotal(T(ctx, "dash.sharedTotal"), vm.Carried().SharedCents, vm.Carried().FixedSharedCents, "badge-info", vm.SettlementUnit(ctx))
+			@shareTotal(T(ctx, "dash.soleTotal"), vm.Carried().SoleCents, vm.Carried().FixedSoleCents, "badge-muted", vm.SettlementUnit(ctx))
+			for _, member := range vm.CostMembers() {
+				@shareTotal(Tf(ctx, "dash.personCosts", member.Name), vm.Costs.CarriedBy(member.ID).TotalCents(), vm.Costs.CarriedBy(member.ID).FixedCents(), "badge-info", vm.SettlementUnit(ctx))
+			}
+		</div>
+		if len(vm.Costs.InvalidBookings) > 0 {
+			<div class="alert-error" role="alert" data-cost-invalid>
+				<p>{ T(ctx, "dash.costsInvalid") }</p>
+				<ul>
+					for _, b := range vm.Costs.InvalidBookings {
+						<li>
+							if b.Name == "" {
+								{ T(ctx, "bookings.unnamed") }
+							} else {
+								{ b.Name }
+							}
+						</li>
+					}
+				</ul>
+			</div>
+		}
 		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.settlementHint") }</p>
 		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ vm.SettlementBasis(ctx) }</p>
 		if !vm.HouseholdView() {
@@ -446,13 +481,14 @@ templ settlementCard(vm DashboardVM) {
 				@memberLedger(p, vm.Ledger(p.Member.ID))
 			}
 		</div>
+		@costOverview(vm)
 	</div>
 }
 
 // memberLedger is one person's side of the settlement: what they fronted, what
 // they carry and what that leaves them with.
 templ memberLedger(p calc.MemberPosition, lines []calc.LedgerLine) {
-	<details class="settle">
+	<details class="settle" data-ledger-member={ strconv.FormatInt(p.Member.ID, 10) }>
 		<summary class="settle-summary">
 			<span class="settle-caret" aria-hidden="true">›</span>
 			@memberDot(p.Member.Color)
@@ -524,86 +560,101 @@ templ memberLedger(p calc.MemberPosition, lines []calc.LedgerLine) {
 	</details>
 }
 
-// shareCard is what makes the settlement checkable: it shows per booking who
-// fronts it and whether it is divided at all, because a bill a single member
-// carries alone moves no money between members.
-templ shareCard(vm DashboardVM) {
-	<div class="card">
-		<div class="card-head">
-			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.shares") }</h2>
-			<span class="badge ml-auto">{ vm.SettlementUnit(ctx) }</span>
+templ costOverview(vm DashboardVM) {
+	<div class="mt-6 border-t border-slate-200 pt-4 dark:border-slate-800" data-cost-overview>
+		<div class="mb-3 flex flex-wrap items-center gap-3">
+			<h3 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.shares") }</h3>
+			<label class="ml-auto flex min-h-11 cursor-pointer items-center gap-2 text-sm text-slate-600 dark:text-slate-300 no-print">
+				<input type="checkbox" class="h-4 w-4 accent-indigo-500" data-own-costs aria-controls="cost-overview-table"/>
+				{ T(ctx, "dash.showOwnCosts") }
+			</label>
 		</div>
 		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.sharesHint") }</p>
-		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ vm.SettlementBasis(ctx) }</p>
-		<div class="mb-4 grid gap-3 sm:mx-auto sm:max-w-xl sm:grid-cols-2">
-			@shareTotal(T(ctx, "dash.sharedTotal"), vm.Carried().SharedCents, "badge-info", vm.SettlementUnit(ctx))
-			@shareTotal(T(ctx, "dash.soleTotal"), vm.Carried().SoleCents, "badge-muted", vm.SettlementUnit(ctx))
-		</div>
-		if len(vm.ShareLines()) == 0 {
-			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.noData") }</p>
-		} else {
-			<div class="overflow-x-auto">
-				<table class="w-full">
-					<thead>
-						<tr>
-							<th class="table-head">{ T(ctx, "dash.booking") }</th>
-							<th class="table-head">{ T(ctx, "bookings.payer") }</th>
-							<th class="table-head">{ T(ctx, "bookings.splitMode") }</th>
-							<th class="table-head text-right whitespace-nowrap">{ vm.SettlementUnit(ctx) }</th>
-							for _, p := range vm.Positions() {
-								<th class="table-head text-right whitespace-nowrap">{ p.Member.Name }</th>
-							}
-						</tr>
-					</thead>
-					<tbody>
-						for _, l := range vm.ShareLines() {
-							<tr>
-								<td class="table-cell font-medium text-slate-900 dark:text-slate-100">
-									if l.Booking.Name == "" {
-										<span class="italic text-slate-400 dark:text-slate-500">{ T(ctx, "bookings.unnamed") }</span>
-									} else {
-										{ l.Booking.Name }
-									}
-								</td>
-								<td class="table-cell">
+		<p class="text-sm text-slate-500 dark:text-slate-400" data-cost-empty role="status" hidden?={ vm.HasSharedCosts() }>{ T(ctx, "dash.noVisibleCosts") }</p>
+		<div class="overflow-x-auto" data-cost-table hidden?={ !vm.HasSharedCosts() }>
+			<table class="w-full" id="cost-overview-table">
+				<thead>
+					<tr>
+						<th class="table-head">{ T(ctx, "dash.booking") }</th>
+						<th class="table-head">{ T(ctx, "bookings.payer") }</th>
+						<th class="table-head">{ T(ctx, "bookings.splitMode") }</th>
+						<th class="table-head">{ T(ctx, "bookings.costNature") }</th>
+						<th class="table-head text-right whitespace-nowrap">{ T(ctx, "dash.bookingTotal") }</th>
+						for _, member := range vm.CostMembers() {
+							<th class="table-head text-right whitespace-nowrap">{ member.Name }</th>
+						}
+					</tr>
+				</thead>
+				<tbody>
+					for _, l := range vm.ShareLines() {
+						<tr data-cost-row data-own-cost={ strconv.FormatBool(!l.Shared()) } hidden?={ !l.Shared() }>
+							<td class="table-cell font-medium text-slate-900 dark:text-slate-100">
+								if l.Booking.Name == "" {
+									<span class="italic text-slate-400 dark:text-slate-500">{ T(ctx, "bookings.unnamed") }</span>
+								} else {
+									{ l.Booking.Name }
+								}
+								if l.WithoutSettlement {
+									<span class="badge badge-muted ml-2">{ T(ctx, "bookings.noSettle") }</span>
+								}
+							</td>
+							<td class="table-cell">
+								if l.Payer.ID != 0 {
 									<span class="flex items-center gap-2">
 										@memberDot(l.Payer.Color)
 										{ l.Payer.Name }
 									</span>
-								</td>
-								<td class="table-cell">
-									<span class={ "badge", templ.KV("badge-info", l.Shared()), templ.KV("badge-muted", !l.Shared()) }>
-										{ SplitLabel(ctx, l) }
-									</span>
-								</td>
-								<td class="table-cell tnum text-right whitespace-nowrap">{ FormatEUR(l.Cents) }</td>
-								for _, p := range vm.Positions() {
-									<td class="table-cell tnum text-right whitespace-nowrap">
-										if l.ShareOf(p.Member.ID) == 0 {
-											<span class="text-slate-400 dark:text-slate-600">–</span>
-										} else {
-											{ FormatEUR(l.ShareOf(p.Member.ID)) }
-										}
-										if allocation := ShareAllocation(l, p.Member.ID); allocation != "" {
-											<span class="ml-1 text-xs text-slate-500 dark:text-slate-400">{ allocation }</span>
-										}
-									</td>
+								} else {
+									<span class="text-slate-400 dark:text-slate-500">–</span>
 								}
-							</tr>
-						}
-					</tbody>
-				</table>
-			</div>
-		}
+							</td>
+							<td class="table-cell">
+								<span class={ "badge", templ.KV("badge-info", l.Shared()), templ.KV("badge-muted", !l.Shared()) }>
+									{ SplitLabel(ctx, l) }
+								</span>
+							</td>
+							<td class="table-cell">
+								{ CostNatureLabel(ctx, l.Booking.CostNature) }
+							</td>
+							<td class="table-cell tnum text-right whitespace-nowrap">{ FormatEUR(l.Cents) }</td>
+							for _, member := range vm.CostMembers() {
+								<td class="table-cell tnum text-right whitespace-nowrap">
+									if l.ShareOf(member.ID) == 0 {
+										<span class="text-slate-400 dark:text-slate-600">–</span>
+									} else {
+										{ FormatEUR(l.ShareOf(member.ID)) }
+									}
+									if allocation := ShareAllocation(l, member.ID); allocation != "" {
+										<span class="ml-1 text-xs text-slate-500 dark:text-slate-400">{ allocation }</span>
+									}
+								</td>
+							}
+						</tr>
+					}
+				</tbody>
+				<tfoot>
+					for _, own := range []bool{false, true} {
+						<tr data-cost-total={ strconv.FormatBool(own) } hidden?={ own }>
+							<td class="table-cell font-semibold text-slate-900 dark:text-slate-100" colspan="4">{ T(ctx, "dash.visibleCosts") }</td>
+							<td class="table-cell tnum whitespace-nowrap text-right font-semibold">{ FormatEUR(vm.VisibleCosts(calc.Everyone, own)) }</td>
+							for _, member := range vm.CostMembers() {
+								<td class="table-cell tnum whitespace-nowrap text-right font-semibold">{ FormatEUR(vm.VisibleCosts(member.ID, own)) }</td>
+							}
+						</tr>
+					}
+				</tfoot>
+			</table>
+		</div>
 	</div>
 }
 
-templ shareTotal(label string, cents int64, badge string, unit string) {
+templ shareTotal(label string, cents int64, fixed int64, badge string, unit string) {
 	<div class="rounded-lg border border-slate-200 px-4 py-3 text-center dark:border-slate-800">
 		<span class={ "badge", badge }>{ label }</span>
 		<div class="tnum mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
 			{ FormatEUR(cents) } <span class="text-sm font-normal text-slate-400 dark:text-slate-500">{ unit }</span>
 		</div>
+		<div class="mt-1 text-xs text-slate-500 dark:text-slate-400">{ Tf(ctx, "dash.fixedPortion", FormatEUR(fixed)) }</div>
 	</div>
 }
 
@@ -735,7 +786,6 @@ templ ruleBucket(vm DashboardVM, class store.BudgetClass, dot, edge string) {
 		</div>
 	</div>
 }
-
 
 templ sankeyCard(vm DashboardVM) {
 	<div class="card">

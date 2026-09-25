@@ -23,10 +23,7 @@ type Transfer struct {
 	Cents int64
 }
 
-// ShareLine is one expense the settlement was built from: what it costs,
-// who fronts it and how much of it each member carries. It is
-// what makes a transfer traceable — a bill that is not divided moves no money
-// between members, and only the line shows that.
+// ShareLine is one allocated expense: its full cost, payer and member shares.
 type ShareLine struct {
 	Booking store.Booking
 	Payer   store.Member
@@ -38,6 +35,8 @@ type ShareLine struct {
 	Splits []store.BookingSplit
 	// Carriers is how many members carry the booking, i.e. the "divided by".
 	Carriers int
+	// WithoutSettlement marks informational costs, never reimbursement claims.
+	WithoutSettlement bool
 }
 
 // Shared reports whether more than one member carries the booking.
@@ -59,25 +58,43 @@ type SettlementReport struct {
 // Carried is what a scope shoulders, split by whether the cost is divided.
 // The two add up to that scope's expenses.
 type Carried struct {
-	SharedCents int64
-	SoleCents   int64
+	SharedCents      int64
+	SoleCents        int64
+	FixedSharedCents int64
+	FixedSoleCents   int64
 }
+
+// TotalCents includes shared and personal expenses.
+func (c Carried) TotalCents() int64 { return c.SharedCents + c.SoleCents }
+
+// FixedCents is the fixed portion of the carried expenses.
+func (c Carried) FixedCents() int64 { return c.FixedSharedCents + c.FixedSoleCents }
 
 // CarriedBy sums what a member carries, or the whole household for Everyone.
 // In a member scope a divided booking counts with that member's share only,
 // which is what "half the rent plus what I carry alone" means.
 func (r SettlementReport) CarriedBy(member int64) Carried {
+	return carriedBy(r.Lines, member)
+}
+
+func carriedBy(lines []ShareLine, member int64) Carried {
 	var out Carried
-	for _, l := range r.LinesFor(member) {
+	for _, l := range lines {
 		cents := l.Cents
 		if member != Everyone {
 			cents = l.ShareOf(member)
 		}
 		if l.Shared() {
 			out.SharedCents += cents
+			if l.Booking.CostNature == store.CostFix {
+				out.FixedSharedCents += cents
+			}
 			continue
 		}
 		out.SoleCents += cents
+		if l.Booking.CostNature == store.CostFix {
+			out.FixedSoleCents += cents
+		}
 	}
 	return out
 }
@@ -85,12 +102,16 @@ func (r SettlementReport) CarriedBy(member int64) Carried {
 // LinesFor returns the expenses a member carries a part of, all of them for
 // Everyone.
 func (r SettlementReport) LinesFor(member int64) []ShareLine {
+	return shareLinesFor(r.Lines, member)
+}
+
+func shareLinesFor(lines []ShareLine, member int64) []ShareLine {
 	if member == Everyone {
-		return r.Lines
+		return lines
 	}
-	out := make([]ShareLine, 0, len(r.Lines))
-	for _, l := range r.Lines {
-		if l.ShareOf(member) != 0 {
+	out := make([]ShareLine, 0, len(lines))
+	for _, l := range lines {
+		if cents, carries := l.Shares[member]; carries && (cents != 0 || l.Cents == 0) {
 			out = append(out, l)
 		}
 	}
@@ -161,11 +182,7 @@ func settlement(d Data, months []string, averaged bool) SettlementReport {
 			continue
 		}
 		payer, valid := known[*b.PayerMemberID]
-		valid = valid && value.Complete
-		for id, share := range value.Shares {
-			_, exists := known[id]
-			valid = valid && exists && share >= 0
-		}
+		valid = valid && validShares(value, known)
 		if !valid {
 			rep.InvalidBookings = append(rep.InvalidBookings, b)
 			continue
@@ -180,16 +197,7 @@ func settlement(d Data, months []string, averaged bool) SettlementReport {
 			})
 		}
 	}
-	sort.Slice(rep.Lines, func(i, j int) bool {
-		a, b := rep.Lines[i], rep.Lines[j]
-		if a.Cents != b.Cents {
-			return a.Cents > b.Cents
-		}
-		if a.Booking.Name != b.Booking.Name {
-			return a.Booking.Name < b.Booking.Name
-		}
-		return a.Booking.ID < b.Booking.ID
-	})
+	sortShareLines(rep.Lines)
 	for _, m := range d.Members {
 		p := MemberPosition{Member: m}
 		for _, l := range rep.Lines {
@@ -205,6 +213,31 @@ func settlement(d Data, months []string, averaged bool) SettlementReport {
 		rep.Transfers = transfers(rep.Positions)
 	}
 	return rep
+}
+
+func validShares(value bookingValue, known map[int64]store.Member) bool {
+	if !value.Complete {
+		return false
+	}
+	for id, share := range value.Shares {
+		if _, exists := known[id]; !exists || share < 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func sortShareLines(lines []ShareLine) {
+	sort.Slice(lines, func(i, j int) bool {
+		a, b := lines[i], lines[j]
+		if a.Cents != b.Cents {
+			return a.Cents > b.Cents
+		}
+		if a.Booking.Name != b.Booking.Name {
+			return a.Booking.Name < b.Booking.Name
+		}
+		return a.Booking.ID < b.Booking.ID
+	})
 }
 
 // transfers turns net positions into payments, always sending the largest debt

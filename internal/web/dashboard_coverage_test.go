@@ -76,6 +76,9 @@ func TestDashboardAveragesOnlyMonthsWithIncome(t *testing.T) {
 	if !reflect.DeepEqual(vm.Settlement, wantSettlement) {
 		t.Error("income coverage must not remove payable costs from settlement")
 	}
+	if !reflect.DeepEqual(vm.Costs, calc.CostsTotal(data, elapsedYearMonths("2026-09", NormalizeMonth("")))) {
+		t.Error("income coverage must not hide carried costs")
+	}
 	body := get(t, handler, fmt.Sprintf("/dashboard?m=2026-09&p=12m&view=%d", members[0].ID)).Body.String()
 	if !strings.Contains(body, "8 von 12 Monaten") || !strings.Contains(body, "4.000,00 €") ||
 		strings.Contains(body, `class="chart-value"`) && strings.Contains(body, ">-9.999 €</text>") {
