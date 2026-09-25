@@ -85,9 +85,9 @@ _Not captured yet._
     invalid allocations are listed explicitly and excluded from these totals.
     **Show own costs** is off by default and adds sole-carried bookings to the
     list (for the selected person or the whole household). Allocation badges
-    are colored green for alone, blue for equal shares,
-    violet for percentages and amber for fixed amounts, with text labels
-    retained in both themes. The list footer
+    use solid, high-contrast green for alone, blue for equal shares,
+    violet for percentages and amber for fixed amounts, with bold text labels
+    and explicit light/dark palettes. Other status badges stay unchanged. The list footer
     follows the visible rows; tiles always show all costs. Reimbursement
     ledgers and transfers remain separate and unchanged. Cost figures use the
     settlement period, not the income-coverage filter of the budget metrics.

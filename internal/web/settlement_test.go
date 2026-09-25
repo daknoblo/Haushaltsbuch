@@ -63,7 +63,7 @@ func TestCostOverviewSplitColors(t *testing.T) {
 				if err := costOverview(vm).Render(t.Context(), &out); err != nil {
 					t.Fatal(err)
 				}
-				want := `class="badge ` + tc.badge + `">` + SplitLabel(t.Context(), line) + `</span>`
+				want := `class="badge cost-split ` + tc.badge + `">` + SplitLabel(t.Context(), line) + `</span>`
 				if !strings.Contains(out.String(), want) {
 					t.Errorf("missing labeled split badge %q (excluded=%v)", want, excluded)
 				}

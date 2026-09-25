@@ -142,6 +142,22 @@
     @apply bg-violet-500/15 text-violet-700 ring-1 ring-inset ring-violet-500/30 dark:text-violet-300;
   }
 
+  .cost-split {
+    @apply font-semibold;
+  }
+  .cost-split.badge-ok {
+    @apply bg-emerald-700 text-white ring-emerald-800 dark:bg-emerald-400 dark:text-slate-950 dark:ring-emerald-300;
+  }
+  .cost-split.badge-sky {
+    @apply bg-blue-700 text-white ring-blue-800 dark:bg-blue-600 dark:text-white dark:ring-blue-400;
+  }
+  .cost-split.badge-violet {
+    @apply bg-violet-700 text-white ring-violet-800 dark:bg-violet-400 dark:text-slate-950 dark:ring-violet-300;
+  }
+  .cost-split.badge-warn {
+    @apply bg-amber-300 text-slate-950 ring-amber-500 dark:bg-amber-300 dark:text-slate-950 dark:ring-amber-200;
+  }
+
   /* Income or expense, readable before a single word is. */
   .dir-mark {
     @apply grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold leading-none;
