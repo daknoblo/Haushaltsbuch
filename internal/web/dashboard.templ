@@ -31,16 +31,14 @@ templ DashboardPage(nav Nav, vm DashboardVM) {
 					if vm.ShowSettlement() {
 						@settlementCard(vm)
 					}
-					if vm.HasRecordedIncome() {
-						<div class="grid gap-4 lg:grid-cols-2">
-							@fixedCostCard(vm)
-							@savingsCard(vm)
-						</div>
-						@ruleCard(vm)
-						@sankeyCard(vm)
-						@categoryCard(vm)
-						@tagCard(vm)
-					}
+					<div class="grid gap-4 lg:grid-cols-2">
+						@fixedCostCard(vm)
+						@savingsCard(vm)
+					</div>
+					@ruleCard(vm)
+					@sankeyCard(vm)
+					@categoryCard(vm)
+					@tagCard(vm)
 				</div>
 			}
 		</div>
@@ -609,7 +607,7 @@ templ costOverview(vm DashboardVM) {
 								}
 							</td>
 							<td class="table-cell">
-								<span class={ "badge", templ.KV("badge-info", l.Shared()), templ.KV("badge-muted", !l.Shared()) }>
+								<span class={ "badge", SplitBadge(l) }>
 									{ SplitLabel(ctx, l) }
 								</span>
 							</td>
@@ -665,10 +663,11 @@ templ fixedCostCard(vm DashboardVM) {
 			<span class="badge badge-info ml-auto">{ IncomeRate(vm.Report.IncomeCents, vm.Report.FixedCostRate()) }</span>
 		</div>
 		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.fixedHint") }</p>
+		@expensePlanningHint(vm)
 		<div class="mb-4 flex items-baseline gap-3">
-			<span class="tnum text-2xl font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(vm.Report.FixedCents()) }</span>
+			<span class="tnum text-2xl font-semibold text-slate-900 dark:text-slate-100">{ FormatEUR(vm.ExpenseReport.FixedCents()) }</span>
 			<span class="text-sm text-slate-500 dark:text-slate-400">
-				{ T(ctx, "dash.variableCosts") }: { FormatEUR(vm.Report.VariableCents()) }
+				{ T(ctx, "dash.variableCosts") }: { FormatEUR(vm.ExpenseReport.VariableCents()) }
 			</span>
 		</div>
 		if len(vm.FixedTop) == 0 {
@@ -688,15 +687,20 @@ templ savingsCard(vm DashboardVM) {
 			<span class="badge badge-ok ml-auto">{ IncomeRate(vm.Report.IncomeCents, vm.Report.SavingsRate()) }</span>
 		</div>
 		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.savingsHint") }</p>
+		@expensePlanningHint(vm)
 		<div class="grid grid-cols-2 gap-3">
 			<div>
 				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "dash.deliberate") }</div>
-				<div class="tnum mt-1 text-lg font-semibold text-sky-600 dark:text-sky-400">{ FormatEUR(vm.Report.SavingCents()) }</div>
+				<div class="tnum mt-1 text-lg font-semibold text-sky-600 dark:text-sky-400">{ FormatEUR(vm.ExpenseReport.SavingCents()) }</div>
 			</div>
 			<div>
 				<div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{ T(ctx, "dash.surplus") }</div>
 				<div class="tnum mt-1 text-lg font-semibold">
-					@signedMoney(vm.Report.BalanceCents)
+					if vm.HasRecordedIncome() {
+						@signedMoney(vm.Report.BalanceCents)
+					} else {
+						<span class="text-slate-400 dark:text-slate-500">—</span>
+					}
 				</div>
 			</div>
 		</div>
@@ -715,7 +719,9 @@ templ ruleCard(vm DashboardVM) {
 			}
 		</div>
 		<p class="mb-4 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.ruleHint") }</p>
-		if vm.Rule.Empty() {
+		if !vm.HasRecordedIncome() {
+			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.incomeMetricsMissing") }</p>
+		} else if vm.Rule.Empty() {
 			<p class="text-sm text-slate-400 dark:text-slate-500">{ T(ctx, "dash.ruleNoIncome") }</p>
 		} else {
 			<div class="rule-layout">
@@ -794,7 +800,9 @@ templ sankeyCard(vm DashboardVM) {
 			<span class="badge ml-auto">{ Tf(ctx, "dash.recordedMonths", len(vm.RecordedMonths)) }</span>
 		</div>
 		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.flowHint") }</p>
-		if vm.Sankey.Empty() {
+		if !vm.HasRecordedIncome() {
+			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.incomeMetricsMissing") }</p>
+		} else if vm.Sankey.Empty() {
 			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.noData") }</p>
 		} else {
 			if vm.Sankey.Deficit {
@@ -849,13 +857,16 @@ templ categoryCard(vm DashboardVM) {
 	<div class="card">
 		<div class="card-head">
 			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.topCategories") }</h2>
-			<span class="badge ml-auto">{ Tf(ctx, "dash.recordedMonths", len(vm.RecordedMonths)) }</span>
+			if vm.HasRecordedIncome() {
+				<span class="badge ml-auto">{ Tf(ctx, "dash.recordedMonths", len(vm.RecordedMonths)) }</span>
+			}
 		</div>
-		if len(vm.Report.Categories) == 0 {
+		@expensePlanningHint(vm)
+		if len(vm.ExpenseReport.Categories) == 0 {
 			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.noCategories") }</p>
 		} else {
-			for _, c := range vm.Report.Categories {
-				@categoryBar(c, MaxLabeled(vm.Report.Categories), vm.Report.ExpenseCents)
+			for _, c := range vm.ExpenseReport.Categories {
+				@categoryBar(c, MaxLabeled(vm.ExpenseReport.Categories), vm.ExpenseReport.ExpenseCents)
 			}
 		}
 	</div>
@@ -884,12 +895,19 @@ templ tagCard(vm DashboardVM) {
 		<div class="card-head">
 			<h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "dash.byTag") }</h2>
 		</div>
-		if len(vm.Report.Tags) == 0 {
+		@expensePlanningHint(vm)
+		if len(vm.ExpenseReport.Tags) == 0 {
 			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "dash.noTagData") }</p>
 		} else {
-			for _, t := range vm.Report.Tags {
-				@categoryBar(t, MaxLabeled(vm.Report.Tags), vm.Report.ExpenseCents)
+			for _, t := range vm.ExpenseReport.Tags {
+				@categoryBar(t, MaxLabeled(vm.ExpenseReport.Tags), vm.ExpenseReport.ExpenseCents)
 			}
 		}
 	</div>
+}
+
+templ expensePlanningHint(vm DashboardVM) {
+	if !vm.HasRecordedIncome() {
+		<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ Tf(ctx, "dash.expensePlanningBasis", vm.RangeLabel) }</p>
+	}
 }

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -12,6 +13,72 @@ import (
 	"github.com/daknoblo/Haushaltsbuch/internal/calc"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
+
+func TestMissingIncomeKeepsDashboardSectionsAndExpensePlanning(t *testing.T) {
+	srv, handler, hh, _, members := incomeCoverageFixture(t)
+	saving := newExpenseBooking(t, srv, hh.ID)
+	saving.Name, saving.AmountCents, saving.BudgetClass = "Planned savings", 12345, store.ClassSaving
+	saving.StartsOn, saving.EndsOn = "2026-09-01", "2026-12-31"
+	tag, err := srv.store.CreateTag(t.Context(), hh.ID, "Future plan", "#14b8a6")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.store.SaveBooking(t.Context(), saving, []store.SplitInput{{MemberID: members[0].ID}}, []int64{tag.ID}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := srv.loadHouseholdData(t.Context(), hh.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, member := range []int64{calc.Everyone, members[0].ID, members[1].ID} {
+		for _, period := range []string{"1m", "3m", periodYear} {
+			vm, err := srv.buildDashboardVM(t.Context(), hh.ID, "2026-10", period, member, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			months := rangeMonths(period, "2026-10")
+			recorded := calc.MonthsWithIncome(data, months, member)
+			basis := recorded
+			if len(recorded) == 0 {
+				basis = months
+			}
+			if !reflect.DeepEqual(vm.ExpenseReport, calc.PeriodReport(data, basis, member)) {
+				t.Errorf("member=%d period=%s: expense basis is incorrect", member, period)
+			}
+			if !reflect.DeepEqual(vm.Report, calc.PeriodReport(data, recorded, member)) {
+				t.Error("expense planning must not change income-based metrics")
+			}
+			if !reflect.DeepEqual(vm.FixedTop, calc.FixedCosts(data, basis, member, fixedCostTop)) {
+				t.Error("fixed-cost ranking uses a different period")
+			}
+			if !vm.HasRecordedIncome() {
+				var out bytes.Buffer
+				if err := savingsCard(vm).Render(t.Context(), &out); err != nil {
+					t.Fatal(err)
+				}
+				if !strings.Contains(out.String(), FormatEUR(vm.ExpenseReport.SavingCents())) ||
+					!strings.Contains(out.String(), "—") ||
+					!strings.Contains(out.String(), T(t.Context(), "dash.savingsRate")) {
+					t.Error("savings card lost planned amounts or unavailable metrics")
+				}
+				if !vm.Rule.Empty() || !vm.Sankey.Empty() {
+					t.Error("missing income must not produce fictitious income-based diagrams")
+				}
+			}
+		}
+	}
+	body := get(t, handler, "/dashboard?m=2026-10&p=1m").Body.String()
+	for _, key := range []string{"dash.fixedCosts", "dash.savingsRate", "dash.rule503020", "dash.flow", "dash.topCategories", "dash.byTag"} {
+		if !strings.Contains(body, T(t.Context(), key)) {
+			t.Errorf("missing section %s without income", key)
+		}
+	}
+	for _, value := range []string{"Future plan", "123,45 €", "9.999,00 €", T(t.Context(), "dash.incomeMetricsMissing")} {
+		if !strings.Contains(body, value) {
+			t.Errorf("missing planning data or explanation %q", value)
+		}
+	}
+}
 
 func incomeCoverageFixture(t *testing.T) (*Server, http.Handler, store.Household, store.Booking, []store.Member) {
 	t.Helper()

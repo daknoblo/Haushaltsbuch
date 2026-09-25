@@ -815,6 +815,8 @@ type ViewOption struct {
 type DashboardVM struct {
 	RecordedMonths []string
 	Report         calc.MonthReport
+	// ExpenseReport falls back to planning only when no income months exist.
+	ExpenseReport calc.MonthReport
 	// HouseholdReport is always the whole household, so a person view can put
 	// its own share next to what the household spends in total.
 	HouseholdReport   calc.MonthReport
@@ -950,6 +952,22 @@ func (v DashboardVM) ViewName() string {
 // YearExportURL prints the same year and the same person the page is showing.
 func (v DashboardVM) YearExportURL(month string) string {
 	return "/export/year.pdf?m=" + month + "&view=" + strconv.FormatInt(v.ViewMember, 10)
+}
+
+// SplitBadge distinguishes allocation methods without using warning colors for
+// ordinary shared costs.
+func SplitBadge(l calc.ShareLine) string {
+	switch l.Booking.SplitMode {
+	case store.SplitPercent:
+		return "badge-violet"
+	case store.SplitFixed:
+		return "badge-warn"
+	default:
+		if l.Shared() {
+			return "badge-sky"
+		}
+		return "badge-ok"
+	}
 }
 
 // SplitLabel names how a booking is divided, which is what tells a shared bill

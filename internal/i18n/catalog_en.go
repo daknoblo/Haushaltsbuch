@@ -246,12 +246,14 @@ var english = Catalog{
 	"dash.settlementFuture":      "This year is in the future; there are no elapsed monthly amounts yet.",
 	"dash.settlementInvalid":     "The shares of these bookings do not match their amounts. They are excluded here; no transfers will be suggested until they are corrected:",
 
-	"dash.calculationBasis":   "Calculation basis: %d of %d months with recorded income (%s). Metrics and ratios use only these months.",
-	"dash.incomeDataMissing":  "No income recorded for this view yet. Metrics are unavailable; entered expenses remain visible as planning.",
-	"dash.incomeCoverageHint": "Months without an income entry are incomplete: no surplus or contribution to the metrics. An explicitly recorded income of EUR 0 counts.",
-	"dash.incomeMissing":      "Income not yet recorded",
-	"dash.plannedExpenses":    "Planned expenses",
-	"dash.recordedMonths":     "%d months with income",
+	"dash.calculationBasis":     "Calculation basis: %d of %d months with recorded income (%s). Metrics and ratios use only these months.",
+	"dash.incomeDataMissing":    "No income recorded for this view yet. Metrics are unavailable; entered expenses remain visible as planning.",
+	"dash.incomeMetricsMissing": "Income is missing: this analysis cannot yet be calculated for the selected view.",
+	"dash.expensePlanningBasis": "Monthly planning: %s. Income is missing; the savings rate, income ratios and surplus cannot yet be calculated.",
+	"dash.incomeCoverageHint":   "Months without an income entry are incomplete: no surplus or contribution to the metrics. An explicitly recorded income of EUR 0 counts.",
+	"dash.incomeMissing":        "Income not yet recorded",
+	"dash.plannedExpenses":      "Planned expenses",
+	"dash.recordedMonths":       "%d months with income",
 
 	// Sankey nodes that have no counterpart elsewhere in the UI
 	"sankey.withdrawal": "Over budget",

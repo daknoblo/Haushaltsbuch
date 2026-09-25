@@ -33,6 +33,45 @@ func TestElapsedYearMonths(t *testing.T) {
 	}
 }
 
+func TestCostOverviewSplitColors(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		mode     store.SplitMode
+		carriers int
+		badge    string
+	}{
+		{"alone", store.SplitEqual, 1, "badge-ok"},
+		{"equal pair", store.SplitEqual, 2, "badge-sky"},
+		{"equal group", store.SplitEqual, 3, "badge-sky"},
+		{"percent", store.SplitPercent, 2, "badge-violet"},
+		{"sole percent", store.SplitPercent, 1, "badge-violet"},
+		{"fixed", store.SplitFixed, 2, "badge-warn"},
+		{"sole fixed", store.SplitFixed, 1, "badge-warn"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			line := calc.ShareLine{
+				Booking:  store.Booking{ID: 1, Name: tc.name, SplitMode: tc.mode},
+				Carriers: tc.carriers, Cents: 10000,
+			}
+			if got := SplitBadge(line); got != tc.badge {
+				t.Fatalf("badge = %q, want %q", got, tc.badge)
+			}
+			for _, excluded := range []bool{false, true} {
+				line.WithoutSettlement = excluded
+				vm := DashboardVM{Costs: calc.CostReport{Lines: []calc.ShareLine{line}}}
+				var out bytes.Buffer
+				if err := costOverview(vm).Render(t.Context(), &out); err != nil {
+					t.Fatal(err)
+				}
+				want := `class="badge ` + tc.badge + `">` + SplitLabel(t.Context(), line) + `</span>`
+				if !strings.Contains(out.String(), want) {
+					t.Errorf("missing labeled split badge %q (excluded=%v)", want, excluded)
+				}
+			}
+		})
+	}
+}
+
 func TestDashboardSettlementUsesElapsedYearTotals(t *testing.T) {
 	srv, _, hh, data := plausibilityFixture(t)
 	anchor := NormalizeMonth("")

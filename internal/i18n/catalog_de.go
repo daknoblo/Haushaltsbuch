@@ -243,12 +243,14 @@ var german = Catalog{
 	"dash.settlementFuture":      "Dieses Jahr liegt in der Zukunft; es gibt noch keine bisherigen Monatsbeträge.",
 	"dash.settlementInvalid":     "Die Anteile folgender Buchungen passen nicht zum Betrag. Sie sind hier nicht eingerechnet; bis zur Korrektur werden keine Überweisungen vorgeschlagen:",
 
-	"dash.calculationBasis":   "Berechnungsbasis: %d von %d Monaten mit erfassten Einnahmen (%s). Kennzahlen und Quoten verwenden nur diese Monate.",
-	"dash.incomeDataMissing":  "Noch keine Einnahmen für diese Ansicht erfasst. Kennzahlen sind nicht verfügbar; hinterlegte Ausgaben bleiben als Planung sichtbar.",
-	"dash.incomeCoverageHint": "Monate ohne Einnahmebuchung sind unvollständig: kein Überschuss und keine Berücksichtigung in den Kennzahlen. Eine ausdrücklich erfasste Einnahme von 0 € zählt.",
-	"dash.incomeMissing":      "Einnahmen noch nicht erfasst",
-	"dash.plannedExpenses":    "Geplante Ausgaben",
-	"dash.recordedMonths":     "%d Monate mit Einnahmen",
+	"dash.calculationBasis":     "Berechnungsbasis: %d von %d Monaten mit erfassten Einnahmen (%s). Kennzahlen und Quoten verwenden nur diese Monate.",
+	"dash.incomeDataMissing":    "Noch keine Einnahmen für diese Ansicht erfasst. Kennzahlen sind nicht verfügbar; hinterlegte Ausgaben bleiben als Planung sichtbar.",
+	"dash.incomeMetricsMissing": "Einnahmen fehlen: Diese Auswertung ist für die gewählte Ansicht noch nicht berechenbar.",
+	"dash.expensePlanningBasis": "Planung pro Monat: %s. Einnahmen fehlen; Sparquote, Einkommensanteile und Überschuss sind noch nicht berechenbar.",
+	"dash.incomeCoverageHint":   "Monate ohne Einnahmebuchung sind unvollständig: kein Überschuss und keine Berücksichtigung in den Kennzahlen. Eine ausdrücklich erfasste Einnahme von 0 € zählt.",
+	"dash.incomeMissing":        "Einnahmen noch nicht erfasst",
+	"dash.plannedExpenses":      "Geplante Ausgaben",
+	"dash.recordedMonths":       "%d Monate mit Einnahmen",
 
 	// Sankey nodes that have no counterpart elsewhere in the UI
 	"sankey.withdrawal": "Budget überschritten",

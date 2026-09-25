@@ -84,7 +84,10 @@ _Not captured yet._
     manual settlement exclusions and bookings without a payer. Missing or
     invalid allocations are listed explicitly and excluded from these totals.
     **Show own costs** is off by default and adds sole-carried bookings to the
-    list (for the selected person or the whole household). The list footer
+    list (for the selected person or the whole household). Allocation badges
+    are colored green for alone, blue for equal shares,
+    violet for percentages and amber for fixed amounts, with text labels
+    retained in both themes. The list footer
     follows the visible rows; tiles always show all costs. Reimbursement
     ledgers and transfers remain separate and unchanged. Cost figures use the
     settlement period, not the income-coverage filter of the budget metrics.
@@ -124,6 +127,12 @@ Dashboard metrics use only months with an income entry for the selected scope.
 An explicitly recorded zero counts; a missing income entry is not treated as
 zero. Income, costs, ratios and breakdowns use the same included months, listed
 beside the metrics. Without any income entries, metrics display as unavailable.
+All dashboard sections remain visible. In that case, fixed costs, deliberate
+savings, categories and tags show the selected period's monthly expense plan,
+explicitly labelled as planning; income ratios and surplus remain unavailable.
+The 50/30/20 and flow sections explain that income is missing instead of drawing
+a fictitious deficit. Once income entries exist, these breakdowns continue to
+use only the recorded-income months, just like the other metrics.
 Percentages with zero income are undefined and display as a dash.
 The full expense plan remains visible in charts and the year matrix, but no
 surplus is drawn for incomplete months or across gaps. Settlement still uses

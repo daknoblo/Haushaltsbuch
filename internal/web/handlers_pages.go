@@ -483,7 +483,13 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 	vm.MatrixYear = NormalizeMonth(month)[:4]
 	vm.Matrix = calc.BuildMatrix(data, year, member)
 
-	vm.FixedTop = calc.FixedCosts(data, recorded, member, fixedCostTop)
+	expenseMonths := recorded
+	vm.ExpenseReport = vm.Report
+	if len(recorded) == 0 {
+		expenseMonths = months
+		vm.ExpenseReport = calc.PeriodReport(data, months, member)
+	}
+	vm.FixedTop = calc.FixedCosts(data, expenseMonths, member, fixedCostTop)
 	vm.Rule = calc.BuildRuleRing(vm.Report)
 	vm.Sankey = calc.BuildSankey(ctx, data, vm.Report, recorded, sankeyWidth, sankeyHeight)
 	vm.SettlementRange = vm.RangeLabel
