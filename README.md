@@ -129,9 +129,12 @@ _Not captured yet._
 2. In **Import & reconciliation**, create an account for each statement source.
    The selected member is the person fronting its payments. Use distinct account
    labels; this is account identification, not a bank connection.
+   Until an account exists, the upload selector explains the missing setup and
+   links to the account form. Newly created accounts are immediately selectable.
 3. Select the account and a discovered chat deployment, upload a text PDF and
-   explicitly consent to sending its extracted text to Azure. The text includes
-   personal financial information. The original PDF is never sent or persisted;
+   start the analysis. Starting analysis sends the extracted text to Azure
+   without an additional confirmation checkbox. The text includes personal
+   financial information. The original PDF is never sent or persisted;
    neither document text nor model responses are written to logs.
 4. Compare the suggestions with the original statement. Correct dates, positive
    EUR amounts, income/expense direction, categories and allocations. A unique
@@ -294,9 +297,9 @@ resource for discovery and **Cognitive Services OpenAI User** for inference
 (or equivalent least-privilege custom roles). The identity must belong to the
 intended tenant and have access to the chosen deployment.
 
-This integration follows forecast-tool's explicit client-secret identity,
-ARM deployment discovery and bearer-token inference model, not waim's stored
-API-key model. It targets Azure public cloud, pins identity/discovery/inference
+This integration uses an explicit client-secret identity, ARM deployment
+discovery and bearer-token inference. It targets Azure public cloud and pins
+identity/discovery/inference
 hosts, refuses redirects, caches tokens through the Azure SDK and refreshes the
 deployment list every five minutes. It does not fall back to developer CLI
 credentials. No Azure resource or role assignment is created automatically.

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/johnfercher/maroto/v2/pkg/props"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/bankimport"
+	"github.com/daknoblo/Haushaltsbuch/internal/i18n"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
 
@@ -62,16 +64,13 @@ func TestPDFImportReviewAndHybridHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	upload := func(consent bool) *httptest.ResponseRecorder {
+	upload := func(selectedAccount string) *httptest.ResponseRecorder {
 		var body bytes.Buffer
 		writer := multipart.NewWriter(&body)
-		for key, value := range map[string]string{"household": hhID, "account": account, "deployment": "synthetic-router"} {
+		for key, value := range map[string]string{"household": hhID, "account": selectedAccount, "deployment": "synthetic-router"} {
 			if err := writer.WriteField(key, value); err != nil {
 				t.Fatal(err)
 			}
-		}
-		if consent {
-			_ = writer.WriteField("consent", "yes")
 		}
 		part, err := writer.CreateFormFile("statement", "synthetic.pdf")
 		if err != nil {
@@ -86,13 +85,13 @@ func TestPDFImportReviewAndHybridHTTP(t *testing.T) {
 		handler.ServeHTTP(w, r)
 		return w
 	}
-	if w := upload(false); w.Code != http.StatusBadRequest || mock.calls != 0 {
-		t.Fatalf("consent: %d calls %d", w.Code, mock.calls)
+	if w := upload(""); w.Code != http.StatusNotFound || mock.calls != 0 {
+		t.Fatalf("missing account: %d calls %d", w.Code, mock.calls)
 	}
-	if w := upload(true); w.Code != http.StatusSeeOther {
-		t.Fatalf("upload: %d %s", w.Code, w.Body)
+	if w := upload(account); w.Code != http.StatusSeeOther {
+		t.Fatalf("upload without consent checkbox: %d %s", w.Code, w.Body)
 	}
-	if w := upload(true); w.Code != http.StatusConflict || mock.calls != 1 {
+	if w := upload(account); w.Code != http.StatusConflict || mock.calls != 1 {
 		t.Fatalf("duplicate file: %d calls %d", w.Code, mock.calls)
 	}
 	ledger, _ = srv.store.BankLedger(ctx, hh.ID)
@@ -141,6 +140,76 @@ func TestPDFImportReviewAndHybridHTTP(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"expense_cents":1234`) ||
 		!strings.Contains(w.Body.String(), `"source":"actual"`) {
 		t.Fatalf("API basis: %d %s", w.Code, w.Body)
+	}
+}
+
+func TestImportAccountSetupAndUploadHints(t *testing.T) {
+	srv, handler, hh := newTestServer(t)
+	srv.SetBankImporter(&testBankImporter{})
+	accountSelect := regexp.MustCompile(`(?s)<select\b[^>]*name="account"[^>]*>.*?</select>`)
+	analyzeButton := regexp.MustCompile(`(?s)<button\b[^>]*type="submit"[^>]*>[^<]*</button>`)
+	render := func(lang i18n.Lang) (string, string, string) {
+		t.Helper()
+		r := httptest.NewRequest(http.MethodGet, "/imports", nil)
+		r.Header.Set("Accept-Language", string(lang))
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		if w.Code != http.StatusOK {
+			t.Fatalf("imports: %d %s", w.Code, w.Body)
+		}
+		body := w.Body.String()
+		selectHTML := accountSelect.FindString(body)
+		if selectHTML == "" {
+			t.Fatal("missing account selector")
+		}
+		button := ""
+		for _, match := range analyzeButton.FindAllString(body, -1) {
+			if strings.Contains(match, i18n.T(lang, "import.analyze")) {
+				button = match
+			}
+		}
+		if button == "" {
+			t.Fatal("missing analyze button")
+		}
+		if strings.Contains(strings.ToLower(body), "forecast-tool") || strings.Contains(body, `name="consent"`) {
+			t.Fatal("removed project reference or consent checkbox still rendered")
+		}
+		if !strings.Contains(body, i18n.T(lang, "import.reviewHint")) {
+			t.Fatal("the review warning must remain")
+		}
+		return body, selectHTML, button
+	}
+	for _, lang := range []i18n.Lang{i18n.German, i18n.English} {
+		body, selectHTML, button := render(lang)
+		if !strings.Contains(selectHTML, " disabled") || !strings.Contains(selectHTML, i18n.T(lang, "import.noAccounts")) ||
+			!strings.Contains(button, " disabled") || !strings.Contains(body, `href="#bank-account-name"`) ||
+			!strings.Contains(body, `id="bank-account-name"`) {
+			t.Fatalf("missing actionable empty account state for %s", lang)
+		}
+	}
+	members, err := srv.store.ListMembers(t.Context(), hh.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := post(t, handler, "/imports/accounts", url.Values{
+		"household": {strconv.FormatInt(hh.ID, 10)}, "name": {"Synthetic account"},
+		"member": {strconv.FormatInt(members[0].ID, 10)},
+	})
+	if w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/imports" {
+		t.Fatalf("account creation must refresh the import page: %d %s", w.Code, w.Body)
+	}
+	ledger, err := srv.store.BankLedger(t.Context(), hh.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, lang := range []i18n.Lang{i18n.German, i18n.English} {
+		_, selectHTML, button := render(lang)
+		if strings.Contains(selectHTML, " disabled") || strings.Contains(button, " disabled") ||
+			!strings.Contains(selectHTML, "Synthetic account") ||
+			!strings.Contains(selectHTML, `value="`+strconv.FormatInt(ledger.Accounts[0].ID, 10)+`"`) ||
+			strings.Contains(selectHTML, i18n.T(lang, "import.noAccounts")) {
+			t.Fatalf("created account is not selectable for %s", lang)
+		}
 	}
 }
 

@@ -21,9 +21,10 @@ Daraus folgt für den Betrieb:
   (`AZURE_CLIENT_SECRET` ist ein weiteres Geheimnis) für Anmeldung, Ermittlung
   der Deployments und Modellaufrufe. Geheimnisse gehören in die
   Laufzeitkonfiguration, nicht ins Repository oder in Backups.
-- Erst nach ausdrücklicher Bestätigung wird der lokal extrahierte Auszugstext
+- Beim manuell gestarteten Analysieren wird der lokal extrahierte Auszugstext
   einschließlich personenbezogener Finanzdaten an das gewählte Azure-Deployment
-  gesendet. PDFs werden nicht dauerhaft gespeichert; Text und Antworten nicht
+  gesendet; eine zusätzliche Bestätigungs-Checkbox gibt es nicht. PDFs werden
+  nicht dauerhaft gespeichert; Text und Antworten nicht
   protokolliert. Azure-Verarbeitung, Kosten und Aufbewahrung richten sich nach
   der verwendeten Ressource. Wer die ungeschützten Seiten erreicht, kann auch
   diese Funktion nutzen und Kosten verursachen.

@@ -105,7 +105,8 @@ Optional PDF import uses `AZURE_RESOURCE_ID`, `AZURE_TENANT_ID`,
 configuration fails startup. `internal/bankimport` extracts PDF text locally,
 discovers chat deployments via ARM and authenticates using an explicit
 client-secret identity. It never uses ambient developer credentials.
-Text is sent only after explicit upload consent. Never log document text,
+Text is sent only when the user starts analysis; there is no separate consent
+checkbox. Never log document text,
 model output or credentials. AI output is an untrusted proposal and never
 writes plans or accepted payments directly. Keep request, response, page and
 text limits, destination validation and redirect refusal intact.

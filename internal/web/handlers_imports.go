@@ -228,10 +228,6 @@ func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if r.FormValue("consent") != "yes" {
-		s.clientError(w, r, http.StatusBadRequest, "import.consentRequired")
-		return
-	}
 	accountID := parseID(r.FormValue("account"))
 	ledger, err := s.store.BankLedger(ctx, hh)
 	if err != nil {
