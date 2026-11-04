@@ -67,6 +67,18 @@ func (s *Store) UpdateMember(ctx context.Context, householdID, id int64, name, c
 
 // DeleteMember removes a member of a household.
 func (s *Store) DeleteMember(ctx context.Context, householdID, id int64) error {
-	return affected(s.q.ExecContext(ctx,
-		`DELETE FROM members WHERE id = ? AND household_id = ?`, id, householdID))
+	return s.withTx(ctx, func(tx *Store) error {
+		var count int
+		if err := tx.q.QueryRowContext(ctx, `SELECT
+			(SELECT COUNT(*) FROM bank_accounts WHERE member_id = ? AND household_id = ?) +
+			(SELECT COUNT(*) FROM bank_splits sp JOIN bank_transactions t ON t.id = sp.transaction_id
+			 WHERE sp.member_id = ? AND t.household_id = ?)`, id, householdID, id, householdID).Scan(&count); err != nil {
+			return err
+		}
+		if count > 0 {
+			return ErrBankMemberInUse
+		}
+		return affected(tx.q.ExecContext(ctx,
+			`DELETE FROM members WHERE id = ? AND household_id = ?`, id, householdID))
+	})
 }

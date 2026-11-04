@@ -20,19 +20,22 @@ import (
 
 // Server holds the dependencies shared by all handlers.
 type Server struct {
-	store   *store.Store
-	logger  *slog.Logger
-	limiter *rateLimiter
-	api     *api.Server
+	store      *store.Store
+	logger     *slog.Logger
+	limiter    *rateLimiter
+	api        *api.Server
+	bankAI     BankImporter
+	importGate chan struct{}
 }
 
 // New creates a Server. An empty apiToken leaves the machine-facing API off.
 func New(st *store.Store, logger *slog.Logger, apiToken string) *Server {
 	return &Server{
-		store:   st,
-		logger:  logger,
-		limiter: newRateLimiter(),
-		api:     api.New(st, logger, apiToken),
+		store:      st,
+		logger:     logger,
+		limiter:    newRateLimiter(),
+		api:        api.New(st, logger, apiToken),
+		importGate: make(chan struct{}, 1),
 	}
 }
 
@@ -53,6 +56,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /bookings", s.handleBookings)
 	mux.HandleFunc("GET /dashboard", s.handleDashboard)
 	mux.HandleFunc("GET /settings", s.handleSettings)
+	mux.HandleFunc("GET /imports", s.handleImports)
+	mux.HandleFunc("POST /imports/accounts", s.handleBankAccount)
+	mux.HandleFunc("POST /imports/accounts/{id}/delete", s.handleBankAccountDelete)
+	mux.HandleFunc("POST /imports/batches/{id}/delete", s.handleBankImportDiscard)
+	mux.HandleFunc("POST /imports/upload", s.handleBankUpload)
+	mux.HandleFunc("POST /imports/transactions/{id}", s.handleBankReview)
+	mux.HandleFunc("POST /imports/month", s.handleBankMonth)
+	mux.HandleFunc("POST /imports/transactions/{id}/plan", s.handleBankPlan)
 
 	// The whole book out of the app and back in, and the way to start over.
 	mux.HandleFunc("GET /settings/backup.json", s.handleBackupDownload)
@@ -112,7 +123,7 @@ func (s *Server) Handler() http.Handler {
 	// Order follows the repository standard: recover, log, cap the body, set
 	// security headers, reject cross-origin writes, then throttle. Language
 	// resolution sits near the top so that rejections are translated too.
-	page := s.recoverer(s.logRequests(withLang(limitBody(securityHeaders(s.sameOrigin(s.rateLimit(compressResponses(mux))))))))
+	page := s.recoverer(s.logRequests(withLang(withReportBasis(limitBody(securityHeaders(s.sameOrigin(s.rateLimit(compressResponses(mux)))))))))
 
 	// The API carries a bearer token instead of a cookie, so the same-origin
 	// guard would only reject callers it was never meant to protect against.

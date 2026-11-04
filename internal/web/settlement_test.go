@@ -190,7 +190,7 @@ func TestPersonalCostsAvailableWithoutIncomeOrOtherMembers(t *testing.T) {
 func TestSettlementRendersFullAmountAndInvalidWarning(t *testing.T) {
 	srv, h, _, data := plausibilityFixture(t)
 	body := get(t, h, "/dashboard?m=2026-05&p=1m").Body.String()
-	if !strings.Contains(body, "Gesamtbetrag") || !strings.Contains(body, "Monatsdurchschnitt der Planung") {
+	if !strings.Contains(body, "Gesamtbetrag") || !strings.Contains(body, "Monatsdurchschnitt der gewählten Datenbasis") {
 		t.Error("missing full amount column or period basis")
 	}
 	for _, b := range data.Bookings {

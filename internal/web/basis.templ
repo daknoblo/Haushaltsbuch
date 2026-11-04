@@ -1,0 +1,9 @@
+package web
+
+templ basisSwitch(nav Nav) {
+	<div class="mb-4 flex flex-wrap gap-2 no-print">
+		for _, basis := range []string{"hybrid", "plan", "actual"} {
+			<a href={ templ.SafeURL(nav.BasisURL(basis)) } class={ "btn-ghost", templ.KV("font-bold", string(nav.Basis) == basis) } aria-current={ string(nav.Basis) == basis }>{ BasisLabel(ctx, basis) }</a>
+		}
+	</div>
+}

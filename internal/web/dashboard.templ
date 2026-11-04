@@ -12,8 +12,8 @@ templ DashboardPage(nav Nav, vm DashboardVM) {
 		<div id="dashboard-content" hx-history-elt hx-history="false">
 			@pageHeading(T(ctx, "dash.title"), T(ctx, "dash.subtitle")) {
 				<div class="ml-auto flex flex-wrap items-center gap-2 no-print">
-					<a class="btn-ghost" href={ templ.SafeURL("/export/overview.pdf?m=" + nav.Month) }>{ T(ctx, "pdf.overview") }</a>
-					<a class="btn-ghost" href={ templ.SafeURL("/export/expenses.pdf?m=" + nav.Month) }>{ T(ctx, "pdf.expenseList") }</a>
+					<a class="btn-ghost" href={ templ.SafeURL("/export/overview.pdf?m=" + nav.Month + "&basis=" + string(nav.Basis)) }>{ T(ctx, "pdf.overview") }</a>
+					<a class="btn-ghost" href={ templ.SafeURL("/export/expenses.pdf?m=" + nav.Month) }>{ T(ctx, "pdf.planList") }</a>
 					<a class="btn-ghost" href={ templ.SafeURL(vm.YearExportURL(nav.Month)) }>{ T(ctx, "pdf.year") }</a>
 					<a class="btn-primary" href={ templ.SafeURL(vm.StatisticsExportURL(nav.Month)) }>{ T(ctx, "action.exportPDF") }</a>
 				</div>
@@ -22,6 +22,8 @@ templ DashboardPage(nav Nav, vm DashboardVM) {
 				@noHousehold()
 			} else {
 				<div class="grid gap-4">
+					@basisSwitch(nav)
+					<p class="alert-info" data-report-sources>{ vm.SourceSummary(ctx) }</p>
 					@viewSwitch(vm)
 					@chartCard(vm)
 					<p class="alert-info" data-calculation-basis>{ vm.CalculationBasis(ctx) }</p>
@@ -181,8 +183,13 @@ templ matrixCard(vm DashboardVM) {
 					<thead>
 						<tr>
 							<th class="matrix-head matrix-sticky text-left">{ T(ctx, "matrix.row") }</th>
-							for _, m := range vm.Matrix.Months {
-								<th class="matrix-head text-right">{ MonthShort(ctx, m) }</th>
+							for i, m := range vm.Matrix.Months {
+								<th class="matrix-head text-right">
+									{ MonthShort(ctx, m) }
+									if i < len(vm.MatrixSources) {
+										<span class="block text-xs font-normal" title={ SourceLabel(ctx, vm.MatrixSources[i]) }>{ ShortSource(ctx, vm.MatrixSources[i]) }</span>
+									}
+								</th>
 							}
 							<th class="matrix-head text-right">{ T(ctx, "matrix.total") }</th>
 							<th class="matrix-head matrix-aside">{ T(ctx, "matrix.mean") }</th>

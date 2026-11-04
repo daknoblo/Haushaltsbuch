@@ -139,6 +139,7 @@ func (s *Server) handleExportOverview(w http.ResponseWriter, r *http.Request) {
 
 	m := newPDF()
 	pdfHeader(ctx, m, T(ctx, "pdf.overview"), hh.Name, MonthLabel(ctx, month))
+	m.AddAutoRow(text.NewCol(12, SourceLabel(ctx, rep.Source)+" · "+T(ctx, "basis.explanation"), props.Text{Size: 9, Color: pdfGrey}))
 
 	pdfKV(m, T(ctx, "overview.income"), FormatEUR(rep.IncomeCents))
 	pdfKV(m, T(ctx, "overview.expenses"), FormatEUR(rep.ExpenseCents))
@@ -184,6 +185,7 @@ func (s *Server) handleExportStatistics(w http.ResponseWriter, r *http.Request) 
 
 	m := newPDF()
 	pdfHeader(ctx, m, T(ctx, "pdf.statistics"), hh.Name, vm.RangeLabel)
+	m.AddAutoRow(text.NewCol(12, vm.SourceSummary(ctx), props.Text{Size: 9, Color: pdfGrey}))
 	if vm.ViewName() != "" {
 		m.AddAutoRow(text.NewCol(12, vm.ViewName(), props.Text{Size: 10}))
 	}
@@ -275,7 +277,7 @@ func (s *Server) handleExportExpenses(w http.ResponseWriter, r *http.Request) {
 	}
 
 	m := newPDF()
-	pdfHeader(ctx, m, T(ctx, "pdf.expenseList"), hh.Name, MonthLabel(ctx, month))
+	pdfHeader(ctx, m, T(ctx, "pdf.planList"), hh.Name, MonthLabel(ctx, month))
 
 	var grand int64
 	for _, g := range groupByCategory(vm.Bookings) {
@@ -356,6 +358,7 @@ func (s *Server) handleExportYear(w http.ResponseWriter, r *http.Request) {
 	}
 	m := newWidePDF(matrixLabelCols + len(vm.Matrix.Months) + 3)
 	pdfHeader(ctx, m, T(ctx, "matrix.title"), hh.Name, subtitle)
+	m.AddAutoRow(text.NewCol(matrixLabelCols+len(vm.Matrix.Months)+3, vm.SourceSummary(ctx), props.Text{Size: 7, Color: pdfGrey}))
 
 	head := make([]string, 0, len(vm.Matrix.Months)+3)
 	for _, mo := range vm.Matrix.Months {

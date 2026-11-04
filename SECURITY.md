@@ -13,11 +13,25 @@ Daraus folgt für den Betrieb:
 - Die Seiten gehören **nicht ins offene Internet**. Wer sie von außen erreichbar
   machen will, setzt eine Zugangskontrolle davor (Cloudflare Access, ein
   VPN, Basic Auth im Proxy).
-- `HB_API_TOKEN` ist das einzige Geheimnis, das die Anwendung kennt. Es sichert
+- `HB_API_TOKEN` sichert
   die Routen unter `/api/v1/`. Ist es nicht gesetzt, antwortet die API `503` —
   das ist der richtige Vorgabewert für eine Anwendung ohne Anmeldung.
-- Die Anwendung baut **keine ausgehenden Verbindungen** auf. Keine Bankanbindung,
-  kein Telemetriedienst, keine externe Schriftart.
+- Ohne konfigurierte KI baut die Anwendung **keine ausgehenden Verbindungen**
+  auf. Der optionale PDF-Import nutzt eine explizite Azure-App-Identität
+  (`AZURE_CLIENT_SECRET` ist ein weiteres Geheimnis) für Anmeldung, Ermittlung
+  der Deployments und Modellaufrufe. Geheimnisse gehören in die
+  Laufzeitkonfiguration, nicht ins Repository oder in Backups.
+- Erst nach ausdrücklicher Bestätigung wird der lokal extrahierte Auszugstext
+  einschließlich personenbezogener Finanzdaten an das gewählte Azure-Deployment
+  gesendet. PDFs werden nicht dauerhaft gespeichert; Text und Antworten nicht
+  protokolliert. Azure-Verarbeitung, Kosten und Aufbewahrung richten sich nach
+  der verwendeten Ressource. Wer die ungeschützten Seiten erreicht, kann auch
+  diese Funktion nutzen und Kosten verursachen.
+- Modellantworten sind untrusted Eingaben: Beträge, Daten, Währung und
+  Referenzen werden validiert; ohne manuelle Freigabe zählen sie nicht als
+  Ist-Zahlungen. Die Prüfung ersetzt keinen Vergleich mit dem Originalauszug.
+  Es gibt weiterhin keine direkte Bankanbindung, Telemetrie oder externen
+  Schriftarten.
 
 ## Eine Lücke melden
 

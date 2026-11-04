@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/api"
+	"github.com/daknoblo/Haushaltsbuch/internal/bankimport"
 )
 
 // DBFileName is the SQLite file created inside the data directory.
@@ -30,6 +31,7 @@ type Config struct {
 	// APIToken enables the machine-facing API (HB_API_TOKEN). Empty keeps it
 	// off, which is the right default for an app that has no login.
 	APIToken string
+	AI       bankimport.Identity
 }
 
 // DBPath returns the full path of the SQLite database.
@@ -46,6 +48,12 @@ func Load() Config {
 		LogLevel: parseLevel(getenv("HB_LOG_LEVEL", "info")),
 		TZ:       strings.TrimSpace(os.Getenv("TZ")),
 		APIToken: strings.TrimSpace(os.Getenv(api.TokenEnv)),
+		AI: bankimport.Identity{
+			ResourceID:   strings.TrimSpace(os.Getenv("AZURE_RESOURCE_ID")),
+			TenantID:     strings.TrimSpace(os.Getenv("AZURE_TENANT_ID")),
+			ClientID:     strings.TrimSpace(os.Getenv("AZURE_CLIENT_ID")),
+			ClientSecret: os.Getenv("AZURE_CLIENT_SECRET"),
+		},
 	}
 }
 
@@ -64,7 +72,7 @@ func (c Config) Validate() error {
 	if strings.TrimSpace(c.DataDir) == "" {
 		return errors.New("HB_DATA_DIR must not be empty")
 	}
-	return nil
+	return c.AI.Validate()
 }
 
 func parseLevel(s string) slog.Level {

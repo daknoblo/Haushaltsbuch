@@ -144,6 +144,16 @@ func BuildMatrix(d Data, months []string, member int64) Matrix {
 		}
 	}
 
+	for i, month := range months {
+		if d.actualMonth(month) && d.ClosedMonths[month] {
+			for _, band := range []string{BandIncome, BandFixed, BandVariable} {
+				markAt(activeBand, band, i, n)
+			}
+			for key := range byCategory {
+				markAt(activeCategory, key, i, n)
+			}
+		}
+	}
 	m := Matrix{Months: months}
 	for _, band := range []string{BandIncome, BandFixed, BandVariable} {
 		mb := MatrixBand{Key: band, Total: summarize(MatrixRow{LabelKey: "matrix.total." + band}, byBand[band], activeBand[band], n)}

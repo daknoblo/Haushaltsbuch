@@ -6,8 +6,8 @@ Haushaltsbuch is a self-hosted household budget book. It records recurring and
 one-off bookings, normalizes them to a monthly figure, splits them between the
 people of a household and derives a monthly overview, a trend chart, a
 fixed-cost and savings dashboard, a settlement between the members, a Sankey
-flow diagram and PDF exports. It is a planning tool: figures are entered by
-hand, there is no bank connection and no import.
+flow diagram and PDF exports. It is a planning tool: figures are maintained as plans, with optional reviewed PDF statement imports
+for actual payments. There is no direct bank connection.
 
 ## Shared conventions
 
@@ -44,10 +44,18 @@ document wins over this file unless a deviation is listed below.
 - **BookingOverride** – replaces a booking's amount for a date range, so an
   introductory price is expressible without a second booking. The last matching
   override wins.
+- **BankAccount / BankImport / BankTransaction** – statement provenance and
+  reviewed actual payments, kept separate from plans. Accepted allocations are
+  integer-cent snapshots. Transfers between own accounts never count as income
+  or expenses. Exact files are deduplicated per account; identical payments
+  require explicit confirmation rather than silently dropping repeated rows.
+- **Reconciled month** – an explicit household-wide completeness assertion.
+  Pending rows block closure; current/future months stay open. Closed months
+  must be reopened before importing or reviewing additional payments.
 
-Recurrence is **evaluated on the fly, never materialized into rows**. A planning
-tool has no actuals to reconcile against, so generated occurrences would buy
-nothing and cost a scheduler. `internal/calc` spreads a recurring amount evenly
+Recurrence is **evaluated on the fly, never materialized into rows**. Imported
+actual payments are independent statement rows, not generated occurrences.
+`internal/calc` spreads a recurring amount evenly
 across the months it covers, so a yearly premium contributes a twelfth every
 month; a one-off counts only in the month it falls into.
 
@@ -71,6 +79,16 @@ Expense plans remain visible over the full period, while surplus charts and
 matrix cells omit months without income entries. Settlement is independent of
 income coverage.
 
+Reports support `plan`, `actual` and `hybrid`. Browser reports default to hybrid;
+the API report keeps its plan default for compatibility. Hybrid replaces plans
+with actuals only in closed past months; open historical months are labelled
+plan estimates. Current/future months remain plans, with actuals shown separately.
+Closed actual months have known zero income even without an income row.
+`calc.WithBankLedger` builds a read-only report view with negative synthetic
+IDs for actuals; no synthetic booking is persisted. Source labels must survive
+member filters, period navigation and PDF exports. The booking list remains
+plan-only.
+
 Every write is scoped to the active household in SQL — the household id is part
 of the store method signature, and section and category references are resolved
 through a sub-select so a forged id cannot cross household boundaries.
@@ -80,8 +98,17 @@ through a sub-select so a forged id cannot cross household boundaries.
 Beyond the mandatory base set (`HB_HTTP_ADDR`, `HB_DATA_DIR`, `HB_LOG_LEVEL`,
 `TZ`) there is one variable: `HB_API_TOKEN`. It is the bearer token of the HTTP
 API under `/api/v1/`, and leaving it unset keeps every API route answering
-`503` — which is the right default for an app that has no login. It is the only
-secret the application knows; there are still no outbound connections.
+`503` — which is the right default for an app that has no login.
+
+Optional PDF import uses `AZURE_RESOURCE_ID`, `AZURE_TENANT_ID`,
+`AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`. All unset disables AI; partial
+configuration fails startup. `internal/bankimport` extracts PDF text locally,
+discovers chat deployments via ARM and authenticates using an explicit
+client-secret identity. It never uses ambient developer credentials.
+Text is sent only after explicit upload consent. Never log document text,
+model output or credentials. AI output is an untrusted proposal and never
+writes plans or accepted payments directly. Keep request, response, page and
+text limits, destination validation and redirect refusal intact.
 
 The API is mounted outside the same-origin guard on purpose: it authenticates
 with a token rather than a cookie, so a forged cross-site request carries
@@ -101,8 +128,8 @@ code has nothing else to go on.
   that; this project stays a household budget book.
 - **No authentication.** Operated on a private network behind a reverse proxy.
   The API token guards the machine-facing routes only; the pages stay open.
-- **No actuals tracking yet.** The app compares planned figures, not individual
-  transactions.
+- **No automatic bank synchronization or autonomous posting.** Actual payments
+  come from explicitly reviewed text PDFs; OCR and CSV import remain out of scope.
 
 ## Releases
 
@@ -129,6 +156,8 @@ annotation becomes the body of the GitHub release, so write it properly.
   `204` plus `HX-Trigger: hb:changed`; the input DOM is never replaced, which is
   what keeps a keystroke from being swallowed mid-request. The list listens for
   that event and re-fetches itself.
+  Statement review is deliberately different: accepting actual payments,
+  creating future plans and asserting month completeness require explicit actions.
 - **Migrations run with `PRAGMA foreign_keys = OFF`.** Rebuilding a table means
   dropping it, and `DROP TABLE` with enforcement on runs an implicit `DELETE`
   that fires the children's `ON DELETE CASCADE` — migration 0004 would have wiped

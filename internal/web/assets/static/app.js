@@ -21,6 +21,21 @@
     filterCosts();
   });
 
+  document.addEventListener("submit", function (event) {
+    if (!event.target.matches("[data-bank-upload]")) return;
+    event.target.dataset.bankSubmitting = "true";
+    event.target.querySelector('button[type="submit"]').disabled = true;
+    event.target.querySelector("[data-bank-progress]").hidden = false;
+  });
+
+  window.addEventListener("pageshow", function () {
+    document.querySelectorAll('[data-bank-submitting="true"]').forEach(function (form) {
+      delete form.dataset.bankSubmitting;
+      form.querySelector('button[type="submit"]').disabled = false;
+      form.querySelector("[data-bank-progress]").hidden = true;
+    });
+  });
+
   function filterCosts() {
     var root = document.querySelector("[data-cost-overview]");
     if (!root) return;

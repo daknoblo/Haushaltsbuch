@@ -115,6 +115,9 @@ func limitBody(next http.Handler) http.Handler {
 			if r.URL.Path == restorePath {
 				limit = maxSnapshotBytes
 			}
+			if r.URL.Path == "/imports/upload" {
+				limit = 11 << 20
+			}
 			r.Body = http.MaxBytesReader(w, r.Body, limit)
 		}
 		next.ServeHTTP(w, r)

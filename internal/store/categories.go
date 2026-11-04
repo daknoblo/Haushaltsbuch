@@ -88,8 +88,9 @@ func (s *Store) DeleteCategory(ctx context.Context, householdID, id int64) error
 	return s.withTx(ctx, func(tx *Store) error {
 		var used int
 		if err := tx.q.QueryRowContext(ctx,
-			`SELECT COUNT(1) FROM bookings WHERE category_id = ? AND household_id = ?`,
-			id, householdID,
+			`SELECT (SELECT COUNT(*) FROM bookings WHERE category_id = ? AND household_id = ?) +
+			 (SELECT COUNT(*) FROM bank_transactions WHERE category_id = ? AND household_id = ?)`,
+			id, householdID, id, householdID,
 		).Scan(&used); err != nil {
 			return err
 		}
@@ -105,8 +106,10 @@ func (s *Store) DeleteCategory(ctx context.Context, householdID, id int64) error
 // household, keyed by category id.
 func (s *Store) CountCategoryUsage(ctx context.Context, householdID int64) (map[int64]int, error) {
 	rows, err := s.q.QueryContext(ctx,
-		`SELECT category_id, COUNT(1) FROM bookings
-		 WHERE household_id = ? GROUP BY category_id`, householdID)
+		`SELECT category_id, COUNT(*) FROM (
+			SELECT category_id FROM bookings WHERE household_id = ?
+			UNION ALL SELECT category_id FROM bank_transactions WHERE household_id = ? AND category_id IS NOT NULL
+		 ) GROUP BY category_id`, householdID, householdID)
 	if err != nil {
 		return nil, err
 	}

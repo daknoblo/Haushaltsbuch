@@ -19,6 +19,7 @@ import (
 	// does not ship system time zone data.
 	_ "time/tzdata"
 
+	"github.com/daknoblo/Haushaltsbuch/internal/bankimport"
 	"github.com/daknoblo/Haushaltsbuch/internal/config"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 	"github.com/daknoblo/Haushaltsbuch/internal/version"
@@ -90,13 +91,20 @@ func run(cfg config.Config, logger *slog.Logger) error {
 	}
 
 	srv := web.New(st, logger, cfg.APIToken)
+	importer, err := bankimport.NewAzure(cfg.AI)
+	if err != nil {
+		return err
+	}
+	if importer != nil {
+		srv.SetBankImporter(importer)
+	}
 	httpSrv := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           srv.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		// Generous enough for the largest PDF export.
-		WriteTimeout:   60 * time.Second,
+		WriteTimeout:   210 * time.Second,
 		IdleTimeout:    120 * time.Second,
 		MaxHeaderBytes: 1 << 16,
 		ErrorLog:       slog.NewLogLogger(logger.Handler(), slog.LevelError),

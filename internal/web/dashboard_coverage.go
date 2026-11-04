@@ -9,7 +9,7 @@ import (
 // StatisticsExportURL keeps the PDF on the same scope and period as its tiles.
 func (v DashboardVM) StatisticsExportURL(month string) string {
 	return "/export/statistics.pdf?m=" + month + "&p=" + cleanPeriod(v.PeriodKey) +
-		"&view=" + strconv.FormatInt(v.ViewMember, 10)
+		"&view=" + strconv.FormatInt(v.ViewMember, 10) + "&basis=" + string(v.Basis)
 }
 
 // HasRecordedIncome distinguishes an unavailable result from a true zero.

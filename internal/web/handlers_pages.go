@@ -26,6 +26,22 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		vm.Report = rep
+		ledger, err := s.store.BankLedger(r.Context(), nav.ActiveHousehold.ID)
+		if err != nil {
+			s.serverError(w, r, err)
+			return
+		}
+		if len(ledger.Accounts) > 0 {
+			data, err := s.loadHouseholdData(r.Context(), nav.ActiveHousehold.ID)
+			if err != nil {
+				s.serverError(w, r, err)
+				return
+			}
+			vm.Compare = true
+			vm.Plan = calc.BuildMonthReport(data, nav.Month, calc.Everyone)
+			actual := calc.WithBankLedger(data, ledger, calc.BasisActual, NormalizeMonth(""))
+			vm.Actual = calc.BuildMonthReport(actual, nav.Month, calc.Everyone)
+		}
 	}
 	s.render(w, r, OverviewPage(nav, vm))
 }
@@ -409,7 +425,7 @@ const (
 )
 
 func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month, period string, member int64, grouping string) (DashboardVM, error) {
-	data, err := s.loadHouseholdData(ctx, householdID)
+	data, err := s.loadReportData(ctx, householdID)
 	if err != nil {
 		return DashboardVM{}, err
 	}
@@ -424,6 +440,7 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 	data = calc.Prepare(data, months, year, elapsed, recorded)
 
 	vm := DashboardVM{
+		Basis:          reportBasis(ctx),
 		Report:         calc.PeriodReport(data, recorded, member),
 		RecordedMonths: recorded,
 		Trend:          calc.Trend(data, months, member),
@@ -482,6 +499,9 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 	// the tiles above do not already say.
 	vm.MatrixYear = NormalizeMonth(month)[:4]
 	vm.Matrix = calc.BuildMatrix(data, year, member)
+	for _, m := range year {
+		vm.MatrixSources = append(vm.MatrixSources, data.Source(m))
+	}
 
 	expenseMonths := recorded
 	vm.ExpenseReport = vm.Report
@@ -501,6 +521,18 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 	} else {
 		vm.Settlement = calc.Settlement(data, months)
 		vm.Costs = calc.Costs(data, months)
+	}
+	suffix := "&basis=" + string(vm.Basis)
+	vm.PrevURL += suffix
+	vm.NextURL += suffix
+	for i := range vm.Periods {
+		vm.Periods[i].URL += suffix
+	}
+	for i := range vm.Groupings {
+		vm.Groupings[i].URL += suffix
+	}
+	for i := range vm.Views {
+		vm.Views[i].URL += suffix
 	}
 	return vm, nil
 }

@@ -23,14 +23,17 @@ const Everyone int64 = 0
 // the aggregation functions from growing an unreadable parameter list and makes
 // it obvious that every report is built from a single consistent snapshot.
 type Data struct {
-	Members    []store.Member
-	Categories []store.Category
-	Tags       []store.Tag
-	Bookings   []store.Booking
-	Splits     map[int64][]store.BookingSplit
-	TagLinks   map[int64][]int64
-	Overrides  map[int64][]store.BookingOverride
-	evaluated  *evaluatedData
+	Basis        Basis
+	CurrentMonth string
+	ClosedMonths map[string]bool
+	Members      []store.Member
+	Categories   []store.Category
+	Tags         []store.Tag
+	Bookings     []store.Booking
+	Splits       map[int64][]store.BookingSplit
+	TagLinks     map[int64][]int64
+	Overrides    map[int64][]store.BookingOverride
+	evaluated    *evaluatedData
 }
 
 // MemberBalance holds the income, allocated expense share and resulting balance
@@ -54,7 +57,8 @@ type LabeledTotal struct {
 
 // MonthReport is the aggregated result for one month of one household.
 type MonthReport struct {
-	Month string
+	Month  string
+	Source string
 	// IncomeRecorded also holds true for an explicitly entered zero income.
 	IncomeRecorded bool
 	// Member is the scope the figures were built for, Everyone for the whole
@@ -184,7 +188,10 @@ func MonthlyCents(b store.Booking, overrides []store.BookingOverride, month stri
 // member other than Everyone the report only contains that member's own share,
 // which is what "what does this cost me" means.
 func BuildMonthReport(d Data, month string, member int64) MonthReport {
-	return buildReport(d, bookingValues(d, month), month, member)
+	rep := buildReport(d, bookingValues(d, month), month, member)
+	rep.Source = d.Source(month)
+	rep.IncomeRecorded = rep.IncomeRecorded || (d.actualMonth(month) && d.ClosedMonths[month])
+	return rep
 }
 
 func buildReport(d Data, values []bookingValue, month string, member int64) MonthReport {

@@ -82,7 +82,11 @@ func (s *Server) buildNav(r *http.Request, active, path string, showMonth bool) 
 	if err != nil {
 		return Nav{}, err
 	}
+	query := r.URL.Query()
+	query.Del("basis")
 	return Nav{
+		Basis:           reportBasis(ctx),
+		ReportQuery:     query.Encode(),
 		Active:          active,
 		Path:            path,
 		Households:      households,
@@ -125,7 +129,7 @@ func (s *Server) loadHouseholdData(ctx context.Context, householdID int64) (calc
 // buildMonthReport aggregates one month for the whole household, which is the
 // only scope the overview shows.
 func (s *Server) buildMonthReport(ctx context.Context, householdID int64, month string) (calc.MonthReport, error) {
-	data, err := s.loadHouseholdData(ctx, householdID)
+	data, err := s.loadReportData(ctx, householdID)
 	if err != nil {
 		return calc.MonthReport{}, err
 	}

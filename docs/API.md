@@ -208,9 +208,12 @@ created in it: a yearly premium counts every month, a one-off only in its own.
 | `household` | Which household, default the active one |
 | `month` | `YYYY-MM`, default the current month |
 | `member` | Only this person's share; omit for the whole household |
+| `basis` | `plan` (default), `actual`, or `hybrid`; invalid values return `400` |
 
 ```json
 {
+  "basis": "plan",
+  "source": "plan",
   "month": "2026-08",
   "member": 0,
   "income_cents": 300000,
@@ -228,6 +231,22 @@ created in it: a yearly premium counts every month, a one-off only in its own.
 `member` is `0` for the household view. Recurring amounts are normalised to a
 monthly equivalent, so a yearly premium contributes a twelfth every month.
 `savings_rate` is a percentage of net income.
+
+`basis` and `source` are strings. The default remains `plan` for compatibility.
+`actual` counts accepted statement payments on their booking dates, never
+internal transfers. `hybrid` uses actuals only for explicitly closed past
+months; all other months use plans, without adding the two.
+`source` is one of:
+
+- `plan`: planned, monthly-normalized values;
+- `plan_estimate`: an open past month in hybrid mode;
+- `actual`: a complete, explicitly closed actual month;
+- `actual_partial`: accepted actuals so far in an open month, possibly empty.
+
+An empty `actual_partial` report is not evidence that no transactions occurred.
+Import, payment review, account setup and month closure are browser workflows;
+the API's booking CRUD endpoints still operate on plans only. All bases honor
+the same household and member scopes.
 
 ---
 

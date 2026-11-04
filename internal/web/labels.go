@@ -261,6 +261,8 @@ func PageTitle(ctx context.Context, active string) string {
 		return T(ctx, "nav.dashboard")
 	case "settings":
 		return T(ctx, "nav.settings")
+	case "imports":
+		return T(ctx, "nav.imports")
 	default:
 		return T(ctx, "nav.overview")
 	}

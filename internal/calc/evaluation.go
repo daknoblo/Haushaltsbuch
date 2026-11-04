@@ -64,7 +64,7 @@ func bookingValues(d Data, month string) []bookingValue {
 	}
 	values := make([]bookingValue, 0, len(d.Bookings))
 	for _, b := range d.Bookings {
-		if ActiveIn(b, month) {
+		if d.activeIn(b, month) {
 			values = append(values, evaluateBooking(b, d.Splits[b.ID], d.Overrides[b.ID], month))
 		}
 	}

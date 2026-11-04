@@ -9,11 +9,26 @@ templ OverviewPage(nav Nav, vm OverviewVM) {
 		if nav.ActiveHousehold.ID == 0 {
 			@noHousehold()
 		} else {
+			@basisSwitch(nav)
+			<p class="alert-info mb-4">{ SourceLabel(ctx, vm.Report.Source) } · { T(ctx, "basis.explanation") }</p>
 			<div class="grid gap-4 sm:grid-cols-3">
 				@statTile(T(ctx, "overview.income"), FormatEUR(vm.Report.IncomeCents), nav.CurrentMonthLabel(ctx), "text-emerald-600 dark:text-emerald-400")
-				@statTile(T(ctx, "overview.expenses"), FormatEUR(vm.Report.ExpenseCents), T(ctx, "overview.normalized"), "text-rose-600 dark:text-rose-400")
+				@statTile(T(ctx, "overview.expenses"), FormatEUR(vm.Report.ExpenseCents), SourceLabel(ctx, vm.Report.Source), "text-rose-600 dark:text-rose-400")
 				@statTile(T(ctx, "overview.balance"), FormatEUR(vm.Report.BalanceCents), T(ctx, "overview.balanceHint"), balanceTone(vm.Report.BalanceCents))
 			</div>
+			if vm.Compare {
+				<div class="card mt-4 overflow-x-auto">
+					<h2 class="mb-3 font-semibold">{ T(ctx, "basis.comparison") }</h2>
+					<table class="w-full">
+						<thead><tr><th class="table-head"></th><th class="table-head">{ T(ctx, "basis.plan") }</th><th class="table-head">{ SourceLabel(ctx, vm.Actual.Source) }</th></tr></thead>
+						<tbody>
+							<tr><td class="table-cell">{ T(ctx, "overview.income") }</td><td class="table-cell">{ FormatEUR(vm.Plan.IncomeCents) }</td><td class="table-cell">{ FormatEUR(vm.Actual.IncomeCents) }</td></tr>
+							<tr><td class="table-cell">{ T(ctx, "overview.expenses") }</td><td class="table-cell">{ FormatEUR(vm.Plan.ExpenseCents) }</td><td class="table-cell">{ FormatEUR(vm.Actual.ExpenseCents) }</td></tr>
+							<tr><td class="table-cell">{ T(ctx, "overview.balance") }</td><td class="table-cell">{ FormatEUR(vm.Plan.BalanceCents) }</td><td class="table-cell">{ FormatEUR(vm.Actual.BalanceCents) }</td></tr>
+						</tbody>
+					</table>
+				</div>
+			}
 			<div class="mt-4 grid gap-4 lg:grid-cols-2">
 				<div class="card-tight">
 					<div class="card-head">

@@ -7,8 +7,12 @@ import "github.com/daknoblo/Haushaltsbuch/internal/store"
 func MonthsWithIncome(d Data, months []string, member int64) []string {
 	out := make([]string, 0, len(months))
 	for _, month := range months {
+		if d.actualMonth(month) && d.ClosedMonths[month] {
+			out = append(out, month)
+			continue
+		}
 		for _, b := range d.Bookings {
-			if ActiveIn(b, month) && incomeForScope(b, d.Splits[b.ID], member) {
+			if d.activeIn(b, month) && incomeForScope(b, d.Splits[b.ID], member) {
 				out = append(out, month)
 				break
 			}

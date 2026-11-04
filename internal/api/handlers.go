@@ -223,6 +223,8 @@ func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 // ---- report ----
 
 type reportOut struct {
+	Basis           calc.Basis       `json:"basis"`
+	Source          string           `json:"source"`
 	Month           string           `json:"month"`
 	Member          int64            `json:"member"`
 	IncomeCents     int64            `json:"income_cents"`
@@ -243,6 +245,14 @@ type labeledOut struct {
 }
 
 func (s *Server) handleReport(w http.ResponseWriter, r *http.Request) {
+	basis := calc.Basis(r.URL.Query().Get("basis"))
+	if basis == "" {
+		basis = calc.BasisPlan
+	}
+	if !basis.Valid() {
+		writeError(w, http.StatusBadRequest, "basis muss plan, actual oder hybrid sein")
+		return
+	}
 	id, ok := s.household(w, r)
 	if !ok {
 		return
@@ -265,6 +275,12 @@ func (s *Server) handleReport(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	ledger, err := s.store.BankLedger(r.Context(), id)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	data = calc.WithBankLedger(data, ledger, basis, time.Now().Format("2006-01"))
 	rep := calc.BuildMonthReport(data, month, member)
 
 	classes := make(map[string]int64, len(rep.ByBudgetClass))
@@ -277,6 +293,7 @@ func (s *Server) handleReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, reportOut{
+		Basis: basis, Source: rep.Source,
 		Month: rep.Month, Member: rep.Member,
 		IncomeCents: rep.IncomeCents, ExpenseCents: rep.ExpenseCents,
 		BalanceCents: rep.BalanceCents, FixedCents: rep.FixedCents(),

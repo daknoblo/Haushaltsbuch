@@ -67,6 +67,8 @@ func ColorOr(c string) string {
 
 // Nav holds the data shared by the page chrome (header, navigation, month bar).
 type Nav struct {
+	Basis           calc.Basis
+	ReportQuery     string
 	Active          string // overview|bookings|dashboard|settings
 	Path            string // base path of the current page, e.g. "/bookings"
 	Households      []store.Household
@@ -103,7 +105,7 @@ func (n Nav) MonthURL(m string) string {
 	if p == "" {
 		p = "/"
 	}
-	return p + "?m=" + m + n.BookingFilters
+	return p + "?m=" + m + n.BookingFilters + "&basis=" + string(n.Basis)
 }
 
 // AssetURL returns the URL of a static asset with the build version appended.
@@ -129,7 +131,10 @@ func CentsToInput(c int64) string {
 
 // OverviewVM is the view model of the overview page.
 type OverviewVM struct {
-	Report calc.MonthReport
+	Report  calc.MonthReport
+	Plan    calc.MonthReport
+	Actual  calc.MonthReport
+	Compare bool
 }
 
 // BookingRow couples a booking with everything needed to show and edit it.
@@ -813,6 +818,7 @@ type ViewOption struct {
 // typical month of the selected period, so every card answers for the whole
 // range rather than only its last month.
 type DashboardVM struct {
+	Basis          calc.Basis
 	RecordedMonths []string
 	Report         calc.MonthReport
 	// ExpenseReport falls back to planning only when no income months exist.
@@ -826,6 +832,7 @@ type DashboardVM struct {
 	Rule              calc.RuleRing
 	Matrix            calc.Matrix
 	MatrixYear        string
+	MatrixSources     []string
 	Sankey            calc.Sankey
 	FixedTop          []calc.LabeledTotal
 	Periods           []PeriodOption
@@ -951,7 +958,7 @@ func (v DashboardVM) ViewName() string {
 
 // YearExportURL prints the same year and the same person the page is showing.
 func (v DashboardVM) YearExportURL(month string) string {
-	return "/export/year.pdf?m=" + month + "&view=" + strconv.FormatInt(v.ViewMember, 10)
+	return "/export/year.pdf?m=" + month + "&view=" + strconv.FormatInt(v.ViewMember, 10) + "&basis=" + string(v.Basis)
 }
 
 // SplitBadge distinguishes allocation methods without using warning colors for

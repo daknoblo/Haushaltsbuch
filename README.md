@@ -14,6 +14,8 @@ container (distroless, non-root).
 - **Frontend:** server-rendered with [templ](https://templ.guide) + HTMX and
   Tailwind CSS, compiled into the binary – no Node build step required
 - **PDF export:** pure Go via [maroto](https://maroto.tech)
+- **Optional statement import:** local PDF text extraction and Azure OpenAI
+  suggestions, with explicit review before any actual payment counts
 
 > The user interface ships in German and English and follows the browser's
 > `Accept-Language`. Code, comments and this documentation are in English.
@@ -25,6 +27,10 @@ _Not captured yet._
 ---
 
 ## Features
+
+- **Import & reconciliation** — multiple own bank accounts, reviewed actual
+  payments, duplicate warnings, internal-transfer exclusion and explicit month
+  closure. Plans remain separate and continue to describe the future.
 
 - **Multiple households**, exactly one of which is active at a time. Switch via
   the header dropdown; create, rename and delete them in the settings.
@@ -73,8 +79,9 @@ _Not captured yet._
     share on each member's ledger. In year view, settlement and its cost
     breakdown sum January through the current month (all twelve months for
     past years; no months for future years). Other periods retain monthly
-    averages. These are normalized **planned amounts**, not actual payments;
-    previously made settlement transfers are not recorded or deducted.
+    averages. The selected basis determines whether a month uses normalized
+    plans or actual payments. Previously made settlement transfers are not
+    deducted as repayments.
     Shares are rounded without losing cents, including transfers below one
     euro. Incomplete or excessive splits are explicitly listed and block
     transfer suggestions until corrected,
@@ -108,11 +115,79 @@ _Not captured yet._
   reachable from the dashboard.
 - **Custom ordering**: households and people can be moved up and down with the
   arrow buttons; bookings sort themselves by amount inside their category.
-- **Automatic saving**: every input is persisted as soon as a field changes –
-  there is no save button anywhere, and nothing you are typing in is ever
+- **Automatic saving for plans and settings**: each field is persisted when it
+  changes, and nothing you are typing in is ever
   replaced under your cursor. Failed saves are shown in the dialog and do not
   discard the input; correcting the invalid field clears the error after a
   successful save.
+  Statement review is deliberately different: its explicit actions approve,
+  correct, ignore or reopen a payment.
+
+### Statement import and Plan / Actual / Hybrid
+
+1. Configure the optional Azure application identity (see below).
+2. In **Import & reconciliation**, create an account for each statement source.
+   The selected member is the person fronting its payments. Use distinct account
+   labels; this is account identification, not a bank connection.
+3. Select the account and a discovered chat deployment, upload a text PDF and
+   explicitly consent to sending its extracted text to Azure. The text includes
+   personal financial information. The original PDF is never sent or persisted;
+   neither document text nor model responses are written to logs.
+4. Compare the suggestions with the original statement. Correct dates, positive
+   EUR amounts, income/expense direction, categories and allocations. A unique
+   name match suggests a plan and highlights amount deviations, but never edits
+   that plan. Allocations can use the account owner or proportionally copy a
+   complete linked plan, including its tags. Accepted cent allocations are
+   snapshots and do not change when a plan is edited later.
+5. Accept each actual payment, ignore irrelevant/duplicate rows, or explicitly
+   mark internal transfers to another own account. Similar opposite payments
+   on different accounts are only hints, never automatic transfer decisions.
+   Review both sides of transfers. Transfers do not count as income/expenses
+   and do not track settlement debt repayments.
+6. Once **all accounts** are complete, explicitly close the past month.
+   Pending rows block closure. Reopen it before making corrections or importing
+   another statement for that month. Current and future months stay open.
+
+The overview shows plan and actual side by side. Overview, dashboard, charts,
+matrix, member shares, settlement and their PDFs support three bases:
+
+- **Plan:** unchanged monthly normalization of recurring bookings.
+- **Actual:** accepted payments on their booking dates, excluding transfers.
+  Open months are visibly incomplete, not presumed complete. A closed month
+  without income is a known zero, not missing data.
+- **Hybrid** (browser default): actual payments replace plans for closed past
+  months. Open past months are marked **plan estimates**, while current/future
+  months retain plans. Plans and actuals are never added for the same month.
+
+An annual premium therefore counts entirely in its payment month in Actual,
+but as one twelfth each month in Plan. Hybrid is a planning forecast, not a
+bank-balance projection. The booking list and its PDF remain explicitly
+plan-only. The API report preserves its previous `plan` default and offers an
+explicit `basis` parameter; see [API reference](docs/API.md).
+
+Accepting a payment never creates a plan implicitly. An accepted, unlinked
+payment can explicitly create a new future plan with a chosen start and
+frequency. Existing plans are edited through the normal booking editor.
+
+Identical PDF bytes are rejected per account before another paid AI request.
+To re-analyze a file, undo any accepted decisions, reopen its affected months
+and discard that import from the history first. Unused accounts can be removed;
+accounts with import history or internal-transfer references are protected.
+Overlapping statements are checked by date, direction, amount and normalized
+payee/reference; an identical genuine payment needs explicit confirmation.
+These checks do **not** prove statement completeness: AI extraction can omit or
+misread rows. Always compare totals and rows with the original. When the AI
+provides opening/closing balances, their difference must match the transactions.
+
+Limits: EUR only, text PDFs only, 10 MiB, 100 pages, 200,000 bytes of extracted
+text and 1,000 transactions per file. No OCR, images, CSV or automatic bank
+access. Analysis runs one at a time, is time-bounded and rejects partial,
+truncated or malformed output without persisting a partial import.
+Bank account names, import digests, review decisions, allocations and month
+closures are included in backup format 2; format 1 backups remain readable.
+Resetting bookings also clears statements, actual payments and month closures,
+but keeps the account setup. Downgrading to a version without reconciliation
+does not support format 2 backups.
 
 ### Calculation rules
 
@@ -123,13 +198,14 @@ splits keep an explicit unassigned remainder rather than being silently
 rescaled. Percent splits show the configured percentages; fixed splits are
 labelled as fixed amounts, not as equal divisions.
 
-Dashboard metrics use only months with an income entry for the selected scope.
+Dashboard metrics use months with an income entry for the selected scope, plus
+closed months on an actual basis (where missing income means a confirmed zero).
 An explicitly recorded zero counts; a missing income entry is not treated as
 zero. Income, costs, ratios and breakdowns use the same included months, listed
 beside the metrics. Without any income entries, metrics display as unavailable.
 All dashboard sections remain visible. In that case, fixed costs, deliberate
-savings, categories and tags show the selected period's monthly expense plan,
-explicitly labelled as planning; income ratios and surplus remain unavailable.
+savings, categories and tags show the selected period's monthly expenses using
+the selected basis; income ratios and surplus remain unavailable.
 The 50/30/20 and flow sections explain that income is missing instead of drawing
 a fictitious deficit. Once income entries exist, these breakdowns continue to
 use only the recorded-income months, just like the other metrics.
@@ -140,7 +216,7 @@ its own expense-based period, independent of whether income has been entered.
 
 Period averages divide by the number of included months. Their remaining cents
 are distributed at booking level before categories and member figures are
-summed. The monthly overview and HTTP API remain planning reports. The year
+summed. All bases share the same rounding engine. The year
 matrix's **mean and median** describe the months a
 row was active: a genuine zero month counts, while months outside the active
 range do not. An active zero displays as `0 €`; inactive cells stay blank.
@@ -196,7 +272,8 @@ By default the application listens on `:8080` and creates its database at
 
 ## Configuration
 
-All settings are provided through environment variables prefixed with `HB_`:
+Runtime settings use `HB_` variables, `TZ`, and optional standard Azure identity
+variables:
 
 | Variable | Default | Description |
 | --- | --- | --- |
@@ -205,6 +282,24 @@ All settings are provided through environment variables prefixed with `HB_`:
 | `HB_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 | `HB_API_TOKEN` | *(unset)* | Bearer token for the HTTP API. Unset keeps the API off |
 | `TZ` | `Europe/Berlin` | IANA time zone |
+| `AZURE_RESOURCE_ID` | *(unset)* | Full ARM ID of the Cognitive Services / Azure OpenAI account |
+| `AZURE_TENANT_ID` | *(unset)* | Entra tenant UUID |
+| `AZURE_CLIENT_ID` | *(unset)* | Application/client UUID |
+| `AZURE_CLIENT_SECRET` | *(unset)* | Application credential, supplied at deployment time |
+
+Leave all four Azure variables unset to disable AI. Partial/invalid identity
+configuration fails startup; credentials are not copied from another project
+or stored in backups. Assign the application **Reader** on the configured
+resource for discovery and **Cognitive Services OpenAI User** for inference
+(or equivalent least-privilege custom roles). The identity must belong to the
+intended tenant and have access to the chosen deployment.
+
+This integration follows forecast-tool's explicit client-secret identity,
+ARM deployment discovery and bearer-token inference model, not waim's stored
+API-key model. It targets Azure public cloud, pins identity/discovery/inference
+hosts, refuses redirects, caches tokens through the Azure SDK and refreshes the
+deployment list every five minutes. It does not fall back to developer CLI
+credentials. No Azure resource or role assignment is created automatically.
 
 The database file is created as `<HB_DATA_DIR>/haushaltsbuch.db`. In the
 container `/appdata` is declared as a volume. Invalid values for `HB_HTTP_ADDR`

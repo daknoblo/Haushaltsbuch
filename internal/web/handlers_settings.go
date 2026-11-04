@@ -182,6 +182,10 @@ func (s *Server) handleMemberDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.DeleteMember(r.Context(), active, parseID(r.PathValue("id"))); err != nil {
+		if errors.Is(err, store.ErrBankMemberInUse) {
+			s.clientError(w, r, http.StatusConflict, "import.memberInUse")
+			return
+		}
 		s.writeStoreError(w, r, err)
 		return
 	}

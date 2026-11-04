@@ -9,7 +9,7 @@ import (
 // SnapshotVersion is the layout of a backup file. It is written into every
 // snapshot so a future change can tell an old file apart instead of importing
 // it into the wrong shape.
-const SnapshotVersion = 1
+const SnapshotVersion = 2
 
 // Snapshot is a household book in full: everything the application stores, in
 // one structure that survives a round trip through a file.
@@ -27,6 +27,7 @@ type HouseholdSnapshot struct {
 	Categories []Category        `json:"categories"`
 	Tags       []Tag             `json:"tags"`
 	Bookings   []BookingSnapshot `json:"bookings"`
+	Bank       BankLedger        `json:"bank"`
 }
 
 // BookingSnapshot is a booking with the rows that hang off it.
@@ -100,6 +101,9 @@ func (s *Store) exportSnapshot(ctx context.Context) (Snapshot, error) {
 				Overrides: overrides[b.ID],
 			})
 		}
+		if hs.Bank, err = s.BankLedger(ctx, h.ID); err != nil {
+			return Snapshot{}, err
+		}
 		snap.Households = append(snap.Households, hs)
 	}
 	return snap, nil
@@ -109,7 +113,7 @@ func (s *Store) exportSnapshot(ctx context.Context) (Snapshot, error) {
 // were exported with, which is what lets every reference between them stay
 // intact without a remapping pass.
 func (s *Store) Import(ctx context.Context, snap Snapshot) error {
-	if snap.Version != SnapshotVersion {
+	if snap.Version != 1 && snap.Version != SnapshotVersion {
 		return fmt.Errorf("%w: version %d", ErrBadSnapshot, snap.Version)
 	}
 	if len(snap.Households) == 0 {
@@ -182,7 +186,7 @@ func (s *Store) importHousehold(ctx context.Context, hs HouseholdSnapshot) error
 			return err
 		}
 	}
-	return nil
+	return s.importBankLedger(ctx, h.ID, hs.Bank)
 }
 
 func (s *Store) importBooking(ctx context.Context, householdID int64, bs BookingSnapshot) error {
@@ -277,8 +281,18 @@ func (s *Store) Reset(ctx context.Context) error {
 // ResetBookings drops every booking of one household, keeping the people,
 // categories and tags it was set up with.
 func (s *Store) ResetBookings(ctx context.Context, householdID int64) error {
-	_, err := s.q.ExecContext(ctx, `DELETE FROM bookings WHERE household_id = ?`, householdID)
-	return err
+	return s.withTx(ctx, func(tx *Store) error {
+		for _, query := range []string{
+			`DELETE FROM bank_imports WHERE household_id = ?`,
+			`DELETE FROM reconciled_months WHERE household_id = ?`,
+			`DELETE FROM bookings WHERE household_id = ?`,
+		} {
+			if _, err := tx.q.ExecContext(ctx, query, householdID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // wipe empties every table. Deleting the households cascades into everything
