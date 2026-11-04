@@ -14,7 +14,13 @@ var germanMonths = monthNames{
 // german is the default catalog. Keys are grouped by the page they appear on.
 var german = Catalog{
 	"settings.saveError":               "Änderung nicht gespeichert. Bitte erneut versuchen.",
-	"settings.importAI":                "KI für PDF-Importe",
+	"settings.importAI":                "KI für den Import",
+	"settings.envSet":                  "Gesetzt",
+	"settings.envMissing":              "Nicht gesetzt",
+	"settings.bankAccountsHelp":        "Standardkonten und weitere Konten",
+	"import.paymentOverview":           "Buchungen des Kontoauszugs",
+	"import.duplicateShort":            "Dublette?",
+	"import.transferShort":             "Umbuchung?",
 	"settings.importAIHint":            "Ein Modell für alle Haushalte. Die Auswahl wird automatisch gespeichert und bei jedem PDF-Import verwendet. Azure-Zugangsdaten werden weiterhin am Server konfiguriert.",
 	"settings.azureConnection":         "Azure-Verbindung konfigurieren",
 	"settings.aiChoose":                "Bitte ein Modell auswählen",
@@ -74,7 +80,6 @@ var german = Catalog{
 	"import.closed":                    "Monat abgeschlossen",
 	"import.reopenMonth":               "Monat wieder öffnen",
 	"import.closeMonth":                "Monat abschließen",
-	"import.reviewHint":                "KI-Vorschläge können fehlen oder falsch sein: mit dem Originalauszug vergleichen. Bestätige jede Zahlung, ihre Kategorie und Verteilung. Ein Planabgleich allein ändert den Plan nicht. Neue zukünftige Pläne können nach der Übernahme ausdrücklich angelegt werden.",
 	"import.empty":                     "Für diesen Monat sind noch keine Auszugszeilen vorhanden.",
 	"import.history":                   "Importhistorie und offene Zeilen anderer Monate",
 	"import.pending":                   "Zu prüfen",
@@ -365,7 +370,7 @@ var german = Catalog{
 
 	// Settings
 	"settings.title":                "Einstellungen",
-	"settings.subtitle":             "Haushalte, Personen, Bereiche, Kategorien und Tags verwalten.",
+	"settings.subtitle":             "Haushalte, Personen, Bankkonten und Import verwalten.",
 	"settings.households":           "Haushalte",
 	"settings.stats":                "Statistik",
 	"settings.statBookings":         "Buchungen",

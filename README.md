@@ -126,7 +126,7 @@ _Not captured yet._
 ### Statement import and Plan / Actual / Hybrid
 
 1. Configure the optional Azure application identity (see below), then select
-   the model once under **Settings → AI for PDF imports**. The selection is
+   the model once under **Settings → AI for imports**. The selection is
    saved automatically and applies to **all households**.
 2. Manage household members under **Settings → People**. Every member
    automatically receives a default bank account, including existing members
@@ -145,6 +145,7 @@ _Not captured yet._
    uses the saved model, never a model supplied by the upload form. If setup is
    missing, the import links to Settings. Model discovery occurs in Settings
    and during analysis, not when merely opening the import page.
+   The bank account and PDF controls sit side by side on wider screens.
 4. Compare the suggestions with the original statement. Correct dates, positive
    EUR amounts, income/expense direction, categories and allocations. A unique
    name match suggests a plan and highlights amount deviations, but never edits
@@ -159,6 +160,21 @@ _Not captured yet._
 6. Once **all accounts** are complete, explicitly close the past month.
    Pending rows block closure. Reopen it before making corrections or importing
    another statement for that month. Current and future months stay open.
+
+Settings group households, members and bank accounts into three compact desktop
+tiles, stacking them on smaller screens. **Configure the Azure connection**
+lists each of the four environment variables on its own row: green **Set** or
+red **Not set**. Only presence is displayed, never a variable's value; this is
+not a credential-validity check. The status reflects the configuration loaded
+at startup, so environment changes require a restart as before.
+
+Statement transactions appear as compact, expandable rows with booking date,
+payee, bank account, review state and signed amount. State counts summarize the
+selected month. Expand a row to edit or approve it; duplicate and possible
+transfer indicators remain visible even when collapsed. The generic AI warning
+banner has been removed; manual review and month-completeness confirmation are
+unchanged. The planned booking list also shows category names under booking
+names, retaining its filters, allocation badges and monthly totals.
 
 The overview shows plan and actual side by side. Overview, dashboard, charts,
 matrix, member shares, settlement and their PDFs support three bases:

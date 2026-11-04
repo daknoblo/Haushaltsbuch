@@ -189,3 +189,21 @@ func TestIdentityIsExplicitAndOptional(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestIdentityEnvironmentOnlyReportsPresence(t *testing.T) {
+	identity := Identity{ResourceID: "resource", TenantID: " ", ClientID: "client", ClientSecret: "secret-value"}
+	azure := &Azure{identity: identity}
+	status := azure.Environment()
+	want := []bool{true, false, true, true}
+	if len(status) != len(want) {
+		t.Fatal("expected all four variables")
+	}
+	for i, entry := range status {
+		if entry.Set != want[i] || !strings.HasPrefix(entry.Name, "AZURE_") {
+			t.Fatalf("invalid status: %+v", entry)
+		}
+		if strings.Contains(fmt.Sprint(entry), identity.ClientSecret) {
+			t.Fatal("secret leaked")
+		}
+	}
+}

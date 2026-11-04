@@ -137,12 +137,15 @@ templ bookingRow(b BookingRow) {
 			}
 		</span>
 		@categoryIcon(b.Category)
-		<span class="min-w-0 flex-1 truncate text-left font-medium text-slate-900 dark:text-slate-100">
-			if b.Booking.Name == "" {
-				<span class="italic text-slate-400 dark:text-slate-500">{ T(ctx, "bookings.unnamed") }</span>
-			} else {
-				{ b.Booking.Name }
-			}
+		<span class="booking-description min-w-0 flex-1 text-left">
+			<span class="block truncate font-medium text-slate-900 dark:text-slate-100" title={ b.Booking.Name }>
+				if b.Booking.Name == "" {
+					<span class="italic text-slate-400 dark:text-slate-500">{ T(ctx, "bookings.unnamed") }</span>
+				} else {
+					{ b.Booking.Name }
+				}
+			</span>
+			<span class="block truncate text-xs text-slate-500 dark:text-slate-400" title={ b.Category.Name }>{ b.Category.Name }</span>
 		</span>
 		<span class="row-flags">
 			if !b.ActiveInMonth() {

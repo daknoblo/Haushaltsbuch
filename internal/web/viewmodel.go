@@ -1019,5 +1019,19 @@ type SettingsVM struct {
 	Plan         calc.MonthReport
 }
 
+// ImportDecisionBadge gives each review state a stable, theme-aware visual cue.
+func ImportDecisionBadge(decision string) string {
+	switch decision {
+	case "accepted":
+		return "badge-ok"
+	case "transfer":
+		return "badge-info"
+	case "ignored":
+		return "badge-muted"
+	default:
+		return "badge-warn"
+	}
+}
+
 // UsageOf returns how many bookings still reference a category.
 func (v SettingsVM) UsageOf(id int64) int { return v.CatUsage[id] }

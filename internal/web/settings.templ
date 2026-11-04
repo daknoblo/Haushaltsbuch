@@ -11,49 +11,51 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 		@pageHeading(T(ctx, "settings.title"), T(ctx, "settings.subtitle")) {
 		}
 		<div class="grid gap-4 lg:grid-cols-2">
-			<div class="card-tight" id="households">
-				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "settings.households") }</h2></div>
-				<div class="card-body">
-					<div id="household-list" class="grid gap-2">
-						for _, h := range vm.Households {
-							@HouseholdRowView(h, vm.ActiveID)
-						}
+			<div class="settings-overview lg:col-span-2">
+				<div class="card-tight" id="households">
+					<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "settings.households") }</h2></div>
+					<div class="card-body">
+						<div id="household-list" class="grid gap-2">
+							for _, h := range vm.Households {
+								@HouseholdRowView(h, vm.ActiveID)
+							}
+						</div>
+						<form
+							class="mt-3 flex gap-2"
+							hx-post="/households"
+							hx-target="#household-list"
+							hx-swap="beforeend"
+							data-reset-on-success
+						>
+							<input class="input min-w-0 flex-1" type="text" name="name" placeholder={ T(ctx, "settings.newHousehold") } required/>
+							<button class="btn-primary shrink-0" type="submit">{ T(ctx, "action.add") }</button>
+						</form>
 					</div>
-					<form
-						class="mt-3 flex gap-2"
-						hx-post="/households"
-						hx-target="#household-list"
-						hx-swap="beforeend"
-						data-reset-on-success
-					>
-						<input class="input flex-1" type="text" name="name" placeholder={ T(ctx, "settings.newHousehold") } required/>
-						<button class="btn-primary shrink-0" type="submit">{ T(ctx, "action.add") }</button>
-					</form>
 				</div>
-			</div>
-			<div class="card-tight" id="people">
-				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "overview.people") }</h2></div>
-				<div class="card-body">
-					<div id="member-list" class="grid gap-2">
-						for _, m := range vm.Members {
-							@MemberRowView(m)
-						}
+				<div class="card-tight" id="people">
+					<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "overview.people") }</h2></div>
+					<div class="card-body">
+						<div id="member-list" class="grid gap-2">
+							for _, m := range vm.Members {
+								@MemberRowView(m)
+							}
+						</div>
+						<form
+							class="mt-3 flex gap-2"
+							hx-post="/members"
+							hx-target="#member-list"
+							hx-swap="beforeend"
+							data-reset-on-success
+						>
+							<input class="input min-w-0 flex-1" type="text" name="name" placeholder={ T(ctx, "settings.name") } required/>
+							<button class="btn-primary shrink-0" type="submit">{ T(ctx, "action.add") }</button>
+						</form>
 					</div>
-					<form
-						class="mt-3 flex gap-2"
-						hx-post="/members"
-						hx-target="#member-list"
-						hx-swap="beforeend"
-						data-reset-on-success
-					>
-						<input class="input flex-1" type="text" name="name" placeholder={ T(ctx, "settings.name") } required/>
-						<button class="btn-primary shrink-0" type="submit">{ T(ctx, "action.add") }</button>
-					</form>
 				</div>
+				if vm.ActiveID != 0 {
+					@bankAccountSettings(vm.ActiveID, vm.Members, vm.BankAccounts)
+				}
 			</div>
-			if vm.ActiveID != 0 {
-				@bankAccountSettings(vm.ActiveID, vm.Members, vm.BankAccounts)
-			}
 			@importAISettings(vm.ImportAI)
 			<div class="card-tight lg:col-span-2" id="categories">
 				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "settings.categories") }</h2></div>
@@ -280,7 +282,7 @@ templ HouseholdRowView(h store.Household, activeID int64) {
 			hx-trigger="change, keyup changed delay:600ms"
 			hx-swap="none"
 		>
-			<input class="input" type="text" name="name" value={ h.Name } required/>
+			<input class="input min-w-0" type="text" name="name" value={ h.Name } required/>
 		</form>
 		if h.ID == activeID {
 			<span class="badge badge-ok shrink-0">{ T(ctx, "settings.active") }</span>
@@ -312,7 +314,7 @@ templ MemberRowView(m store.Member) {
 		>
 			<input class="h-9 w-10 shrink-0 cursor-pointer rounded-md border border-slate-300 bg-transparent p-0.5 dark:border-slate-700" type="color" name="color" value={ ColorOr(m.Color) } aria-label={ T(ctx, "settings.color") }/>
 			// A person without a name cannot be told apart in a split.
-			<input class="input" type="text" name="name" value={ m.Name } aria-label={ T(ctx, "settings.name") } required/>
+			<input class="input min-w-0" type="text" name="name" value={ m.Name } aria-label={ T(ctx, "settings.name") } required/>
 		</form>
 		@moveButtons("/members/" + strconv.FormatInt(m.ID, 10))
 		<button
@@ -327,9 +329,9 @@ templ MemberRowView(m store.Member) {
 }
 
 templ CategoryRowView(c store.Category, usage int, icons []string) {
-	<div id={ "cat-" + strconv.FormatInt(c.ID, 10) } class="flex items-center gap-2 border-b border-slate-200/70 pb-2 last:border-0 last:pb-0 dark:border-slate-800/60">
+	<div id={ "cat-" + strconv.FormatInt(c.ID, 10) } class="category-settings-row">
 		<form
-			class="flex min-w-0 flex-1 flex-wrap items-center gap-2"
+			class="category-settings-fields"
 			hx-post={ "/categories/" + strconv.FormatInt(c.ID, 10) }
 			hx-trigger="change, keyup changed delay:600ms"
 			hx-swap="none"
@@ -341,7 +343,7 @@ templ CategoryRowView(c store.Category, usage int, icons []string) {
 				}
 			</select>
 			<input class="input h-11 w-12 shrink-0 p-1" type="color" name="color" value={ ColorOr(c.Color) } aria-label={ T(ctx, "settings.color") }/>
-			<input class="input min-w-0 flex-1" type="text" name="name" value={ c.Name } required/>
+			<input class="input min-w-0 flex-1 category-name" type="text" name="name" value={ c.Name } aria-label={ T(ctx, "settings.name") } required/>
 			<select class="input w-32 shrink-0" name="classification" aria-label={ T(ctx, "settings.kind") }>
 				for _, o := range DirectionOptions(ctx) {
 					<option value={ o.Value } selected?={ o.Value == string(c.Classification) }>{ o.Label }</option>

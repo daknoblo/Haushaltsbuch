@@ -22,6 +22,7 @@ import (
 
 // BankImporter is the optional, read-only AI suggestion service.
 type BankImporter interface {
+	Environment() []bankimport.EnvironmentVariable
 	Deployments(context.Context) ([]string, error)
 	Extract(context.Context, string, string) ([]store.BankTransaction, error)
 }
@@ -49,6 +50,25 @@ type ImportRow struct {
 	TransferCandidate string
 	PlanAmount        int64
 	PlanName          string
+}
+
+// DecisionCount summarizes the visible month's review state without mixing amounts.
+func (vm ImportVM) DecisionCount(decision string) int {
+	count := 0
+	for _, row := range vm.Rows {
+		if row.Payment.Decision == decision {
+			count++
+		}
+	}
+	return count
+}
+
+// SignedAmount distinguishes statement inflow and outflow at a glance.
+func (row ImportRow) SignedAmount() string {
+	if row.Payment.Direction == store.DirIncome {
+		return "+" + FormatEUR(row.Payment.AmountCents)
+	}
+	return "-" + FormatEUR(row.Payment.AmountCents)
 }
 
 // URL addresses the household-scoped review endpoint.

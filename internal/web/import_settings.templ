@@ -9,42 +9,57 @@ import (
 templ importAISettings(vm ImportAISettingsVM) {
 	<section class="card-tight lg:col-span-2" id="import-ai">
 		<div class="card-head"><h2 class="text-base font-semibold">{ T(ctx, "settings.importAI") }</h2></div>
-		<div class="card-body">
-			<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "settings.importAIHint") }</p>
-			<details class="mb-3 text-sm">
+		<div class="card-body grid gap-3 lg:grid-cols-2">
+			<p class="text-sm text-slate-500 dark:text-slate-400 lg:col-span-2">{ T(ctx, "settings.importAIHint") }</p>
+			<details class="min-w-0 text-sm">
 				<summary class="cursor-pointer">{ T(ctx, "settings.azureConnection") }</summary>
-				<p class="mt-2 text-slate-500 dark:text-slate-400">{ T(ctx, "import.azureConfig") }</p>
+				<dl class="mt-2 grid max-w-lg gap-1">
+					for _, variable := range vm.Environment {
+						<div class="flex min-w-0 items-center justify-between gap-2 rounded-md border border-slate-200 px-2 py-1.5 dark:border-slate-800" data-env-variable={ variable.Name }>
+							<dt class="min-w-0 break-all font-mono text-xs">{ variable.Name }</dt>
+							<dd class="shrink-0">
+								if variable.Set {
+									<span class="badge badge-ok whitespace-nowrap" data-env-set="true">{ T(ctx, "settings.envSet") }</span>
+								} else {
+									<span class="badge badge-danger whitespace-nowrap" data-env-set="false">{ T(ctx, "settings.envMissing") }</span>
+								}
+							</dd>
+						</div>
+					}
+				</dl>
 			</details>
-			if !vm.Enabled {
-				<p class="alert-info">{ T(ctx, "import.disabled") }</p>
-			} else {
-				if vm.Error != "" {
-					<p class="alert-error mb-3" role="alert">{ vm.Error }</p>
+			<div class="min-w-0">
+				if !vm.Enabled {
+					<p class="alert-info">{ T(ctx, "import.disabled") }</p>
+				} else {
+					if vm.Error != "" {
+						<p class="alert-error mb-3" role="alert">{ vm.Error }</p>
+					}
+					<form class="max-w-xl" hx-post="/settings/import-ai" hx-trigger="change" hx-swap="none" hx-sync="this:queue last" data-settings-save>
+						<p class="alert-error mb-3" role="alert" data-settings-error data-fallback={ T(ctx, "settings.saveError") } hidden?={ vm.Deployment == "" || vm.SelectedAvailable() }>{ T(ctx, "settings.aiUnavailable") } { vm.Deployment }</p>
+						<label class="block">
+							{ T(ctx, "import.deployment") }
+							<select class="input mt-1 w-full" name="deployment" aria-label={ T(ctx, "import.deployment") }>
+								<option value="" selected?={ vm.Deployment == "" }>{ T(ctx, "settings.aiChoose") }</option>
+								if vm.Deployment != "" && !vm.SelectedAvailable() {
+									<option value={ vm.Deployment } selected disabled>{ vm.Deployment }</option>
+								}
+								for _, d := range vm.Deployments {
+									<option value={ d } selected?={ d == vm.Deployment }>{ d }</option>
+								}
+							</select>
+						</label>
+					</form>
+					<a class="btn-ghost mt-3" href="/settings#import-ai">{ T(ctx, "settings.aiReload") }</a>
 				}
-				<form hx-post="/settings/import-ai" hx-trigger="change" hx-swap="none" hx-sync="this:queue last" data-settings-save>
-					<p class="alert-error mb-3" role="alert" data-settings-error data-fallback={ T(ctx, "settings.saveError") } hidden?={ vm.Deployment == "" || vm.SelectedAvailable() }>{ T(ctx, "settings.aiUnavailable") } { vm.Deployment }</p>
-					<label class="block">
-						{ T(ctx, "import.deployment") }
-						<select class="input mt-1 w-full" name="deployment" aria-label={ T(ctx, "import.deployment") }>
-							<option value="" selected?={ vm.Deployment == "" }>{ T(ctx, "settings.aiChoose") }</option>
-							if vm.Deployment != "" && !vm.SelectedAvailable() {
-								<option value={ vm.Deployment } selected disabled>{ vm.Deployment }</option>
-							}
-							for _, d := range vm.Deployments {
-								<option value={ d } selected?={ d == vm.Deployment }>{ d }</option>
-							}
-						</select>
-					</label>
-				</form>
-				<a class="btn-ghost mt-3" href="/settings#import-ai">{ T(ctx, "settings.aiReload") }</a>
-			}
+			</div>
 		</div>
 	</section>
 }
 
 templ bankAccountSettings(householdID int64, members []store.Member, accounts []store.BankAccount) {
 	<section
-		class="card-tight lg:col-span-2"
+		class="card-tight"
 		id="bank-accounts"
 		hx-get="/settings/bank-accounts"
 		hx-trigger="hb:members-changed from:body"
@@ -53,14 +68,17 @@ templ bankAccountSettings(householdID int64, members []store.Member, accounts []
 	>
 		<div class="card-head"><h2 class="text-base font-semibold">{ T(ctx, "settings.bankAccounts") }</h2></div>
 		<div class="card-body">
-			<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "settings.bankAccountsHint") }</p>
+			<details class="mb-2 text-xs text-slate-500 dark:text-slate-400">
+				<summary class="cursor-pointer">{ T(ctx, "settings.bankAccountsHelp") }</summary>
+				<p class="mt-1">{ T(ctx, "settings.bankAccountsHint") }</p>
+			</details>
 			if len(members) == 0 {
 				<p class="alert-info">{ T(ctx, "import.accountSetup") }</p>
 				<a class="btn-ghost mt-3" href="#people">{ T(ctx, "import.openPeopleSettings") }</a>
 			}
 			for _, m := range members {
-				<fieldset class="mb-4 grid gap-2" data-member-bank-accounts={ strconv.FormatInt(m.ID, 10) }>
-					<legend class="mb-2 font-semibold">{ m.Name }</legend>
+				<fieldset class="mb-3 grid gap-1.5 last:mb-0" data-member-bank-accounts={ strconv.FormatInt(m.ID, 10) }>
+					<legend class="mb-1 text-sm font-semibold">{ m.Name }</legend>
 					for _, a := range accounts {
 						if a.MemberID == m.ID {
 							<div class="flex flex-wrap items-center gap-2">
@@ -70,15 +88,15 @@ templ bankAccountSettings(householdID int64, members []store.Member, accounts []
 									<p class="alert-error mt-2" role="alert" data-settings-error data-fallback={ T(ctx, "settings.saveError") } hidden></p>
 								</form>
 								if a.Default {
-									<span class="badge badge-ok">{ T(ctx, "settings.defaultAccount") }</span>
+									<span class="badge badge-ok shrink-0 whitespace-nowrap">{ T(ctx, "settings.defaultAccount") }</span>
 								} else {
 									<form method="post" action={ "/settings/bank-accounts/" + strconv.FormatInt(a.ID, 10) + "/default" }>
 										<input type="hidden" name="household" value={ strconv.FormatInt(householdID, 10) }/>
-										<button type="submit" class="btn-ghost">{ T(ctx, "settings.makeDefaultAccount") }</button>
+										<button type="submit" class="btn-ghost" title={ T(ctx, "settings.makeDefaultAccount") }>{ T(ctx, "settings.defaultAccount") }</button>
 									</form>
 									<form method="post" action={ "/settings/bank-accounts/" + strconv.FormatInt(a.ID, 10) + "/delete" }>
 										<input type="hidden" name="household" value={ strconv.FormatInt(householdID, 10) }/>
-										<button type="submit" class="btn-ghost">{ T(ctx, "import.deleteUnusedAccount") }</button>
+										<button type="submit" class="btn-icon btn-icon-danger" aria-label={ T(ctx, "import.deleteUnusedAccount") }>✕</button>
 									</form>
 								}
 							</div>
@@ -88,7 +106,7 @@ templ bankAccountSettings(householdID int64, members []store.Member, accounts []
 						<input type="hidden" name="household" value={ strconv.FormatInt(householdID, 10) }/>
 						<input type="hidden" name="member" value={ strconv.FormatInt(m.ID, 10) }/>
 						<input class="input min-w-0 flex-1" name="name" maxlength="120" aria-label={ Tf(ctx, "settings.newAccountFor", m.Name) } placeholder={ T(ctx, "import.accountExample") } required/>
-						<button class="btn-primary" type="submit">{ T(ctx, "settings.addBankAccount") }</button>
+						<button class="btn-primary shrink-0" type="submit" aria-label={ T(ctx, "settings.addBankAccount") }>{ T(ctx, "action.add") }</button>
 					</form>
 				</fieldset>
 			}

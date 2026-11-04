@@ -28,6 +28,22 @@ type Identity struct {
 	ClientSecret string
 }
 
+// EnvironmentVariable exposes only presence, never an identity value or secret.
+type EnvironmentVariable struct {
+	Name string
+	Set  bool
+}
+
+// Environment lists the four configured identity variables in a stable order.
+func (i Identity) Environment() []EnvironmentVariable {
+	return []EnvironmentVariable{
+		{Name: "AZURE_RESOURCE_ID", Set: strings.TrimSpace(i.ResourceID) != ""},
+		{Name: "AZURE_TENANT_ID", Set: strings.TrimSpace(i.TenantID) != ""},
+		{Name: "AZURE_CLIENT_ID", Set: strings.TrimSpace(i.ClientID) != ""},
+		{Name: "AZURE_CLIENT_SECRET", Set: strings.TrimSpace(i.ClientSecret) != ""},
+	}
+}
+
 // Enabled distinguishes disabled configuration from a partially entered identity.
 func (i Identity) Enabled() bool {
 	return i.ResourceID != "" || i.TenantID != "" || i.ClientID != "" || i.ClientSecret != ""
@@ -65,6 +81,9 @@ type Azure struct {
 	deployments []string
 	refreshed   time.Time
 }
+
+// Environment reports the configuration captured at startup without disclosing it.
+func (c *Azure) Environment() []EnvironmentVariable { return c.identity.Environment() }
 
 // NewAzure returns nil when the optional integration is disabled.
 func NewAzure(i Identity) (*Azure, error) {

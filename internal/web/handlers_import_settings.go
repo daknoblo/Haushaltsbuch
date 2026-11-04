@@ -10,6 +10,7 @@ import (
 
 // ImportAISettingsVM separates global inference configuration from import data.
 type ImportAISettingsVM struct {
+	Environment []bankimport.EnvironmentVariable
 	Enabled     bool
 	Deployment  string
 	Deployments []string
@@ -22,12 +23,13 @@ func (v ImportAISettingsVM) SelectedAvailable() bool {
 }
 
 func (s *Server) importAISettings(r *http.Request) (ImportAISettingsVM, error) {
-	vm := ImportAISettingsVM{Enabled: s.bankAI != nil}
+	vm := ImportAISettingsVM{Enabled: s.bankAI != nil, Environment: (bankimport.Identity{}).Environment()}
 	var err error
 	if vm.Deployment, err = s.store.AIDeployment(r.Context()); err != nil {
 		return vm, err
 	}
 	if s.bankAI != nil {
+		vm.Environment = s.bankAI.Environment()
 		vm.Deployments, err = s.bankAI.Deployments(r.Context())
 		if err != nil {
 			s.logger.Warn("bank import deployment discovery failed")

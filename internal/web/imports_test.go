@@ -22,6 +22,10 @@ import (
 
 type testBankImporter struct{ calls, discoveryCalls int }
 
+func (*testBankImporter) Environment() []bankimport.EnvironmentVariable {
+	return (bankimport.Identity{ResourceID: "test-resource", TenantID: "test-tenant", ClientID: "test-client", ClientSecret: "test-secret"}).Environment()
+}
+
 func (i *testBankImporter) Deployments(context.Context) ([]string, error) {
 	i.discoveryCalls++
 	return []string{"synthetic-router"}, nil
@@ -195,8 +199,8 @@ func TestImportUsesDefaultAccountsAndSettingsLinks(t *testing.T) {
 			strings.Contains(body, `action="/imports/accounts"`) {
 			t.Fatal("configuration must not appear in the import workflow")
 		}
-		if !strings.Contains(body, i18n.T(lang, "import.reviewHint")) {
-			t.Fatal("the review warning must remain")
+		if strings.Contains(body, "KI-Vorschläge können") || strings.Contains(body, "AI suggestions may") {
+			t.Fatal("the removed general AI warning is still shown")
 		}
 		return body, selectHTML, button
 	}

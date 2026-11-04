@@ -17,6 +17,10 @@ import (
 
 type unavailableBankImporter struct{}
 
+func (unavailableBankImporter) Environment() []bankimport.EnvironmentVariable {
+	return (bankimport.Identity{}).Environment()
+}
+
 func (unavailableBankImporter) Deployments(context.Context) ([]string, error) {
 	return nil, bankimport.ErrUpstream
 }

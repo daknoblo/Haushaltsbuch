@@ -14,7 +14,13 @@ var englishMonths = monthNames{
 // english mirrors the German catalog key by key.
 var english = Catalog{
 	"settings.saveError":               "Change not saved. Please try again.",
-	"settings.importAI":                "AI for PDF imports",
+	"settings.importAI":                "AI for imports",
+	"settings.envSet":                  "Set",
+	"settings.envMissing":              "Not set",
+	"settings.bankAccountsHelp":        "Default and additional accounts",
+	"import.paymentOverview":           "Statement transactions",
+	"import.duplicateShort":            "Duplicate?",
+	"import.transferShort":             "Transfer?",
 	"settings.importAIHint":            "One model for all households. Your selection is saved automatically and used for every PDF import. Azure credentials are still configured on the server.",
 	"settings.azureConnection":         "Configure the Azure connection",
 	"settings.aiChoose":                "Please select a model",
@@ -74,7 +80,6 @@ var english = Catalog{
 	"import.closed":                    "Month closed",
 	"import.reopenMonth":               "Reopen month",
 	"import.closeMonth":                "Close month",
-	"import.reviewHint":                "AI suggestions may be wrong or missing: compare them with the original statement. Confirm each payment, category and allocation. Matching a plan does not modify it. New future plans can be created explicitly after acceptance.",
 	"import.empty":                     "No statement rows for this month yet.",
 	"import.history":                   "Import history and pending rows in other months",
 	"import.pending":                   "Pending review",
@@ -368,7 +373,7 @@ var english = Catalog{
 
 	// Settings
 	"settings.title":                "Settings",
-	"settings.subtitle":             "Manage households, people, areas, categories and tags.",
+	"settings.subtitle":             "Manage households, people, bank accounts and imports.",
 	"settings.households":           "Households",
 	"settings.stats":                "Statistics",
 	"settings.statBookings":         "Bookings",
