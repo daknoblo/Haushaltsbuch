@@ -1,0 +1,54 @@
+package web
+
+templ statementTableOptionsForm() {
+	<details class="text-sm" data-table-options>
+		<summary class="cursor-pointer font-medium">{ T(ctx, "import.tableOptions") }</summary>
+		<p class="my-2 text-slate-500 dark:text-slate-400">{ T(ctx, "import.tableOptionsHint") }</p>
+		<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+			<label>
+				{ T(ctx, "import.decimal") }
+				<select class="input mt-1" name="table_decimal">
+					<option value="comma">{ T(ctx, "import.decimalComma") }</option>
+					<option value="dot">{ T(ctx, "import.decimalDot") }</option>
+				</select>
+			</label>
+			<label>
+				{ T(ctx, "import.dateOrder") }
+				<select class="input mt-1" name="table_date_order">
+					<option value="dmy">{ T(ctx, "import.dateDMY") }</option>
+					<option value="mdy">{ T(ctx, "import.dateMDY") }</option>
+				</select>
+			</label>
+			<label>
+				{ T(ctx, "import.delimiter") }
+				<select class="input mt-1" name="table_delimiter">
+					<option value="auto">{ T(ctx, "import.detectAuto") }</option>
+					<option value="semicolon">{ T(ctx, "import.semicolon") }</option>
+					<option value="comma">{ T(ctx, "import.comma") }</option>
+					<option value="tab">{ T(ctx, "import.tab") }</option>
+				</select>
+			</label>
+			<label>
+				{ T(ctx, "import.encoding") }
+				<select class="input mt-1" name="table_encoding">
+					<option value="auto">{ T(ctx, "import.detectAuto") }</option>
+					<option value="utf8">UTF-8</option>
+					<option value="windows1252">Windows-1252</option>
+				</select>
+			</label>
+			<label>{ T(ctx, "import.sheet") }<input class="input mt-1" name="table_sheet" maxlength="31" placeholder={ T(ctx, "import.singleSheet") }/></label>
+			<label>{ T(ctx, "import.headerRow") }<input class="input mt-1" name="table_header" type="number" min="1" max="50" placeholder={ T(ctx, "import.detectAuto") }/></label>
+		</div>
+		<p class="mb-2 mt-4 text-slate-500 dark:text-slate-400">{ T(ctx, "import.columnHint") }</p>
+		<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+			<label>{ T(ctx, "import.date") }<input class="input mt-1" name="column_date" maxlength="128" placeholder={ T(ctx, "import.detectAuto") }/></label>
+			<label>{ T(ctx, "import.columnAmount") }<input class="input mt-1" name="column_amount" maxlength="128" placeholder={ T(ctx, "import.detectAuto") }/></label>
+			<label>{ T(ctx, "import.payee") }<input class="input mt-1" name="column_name" maxlength="128" placeholder={ T(ctx, "import.detectAuto") }/></label>
+			<label>{ T(ctx, "import.reference") }<input class="input mt-1" name="column_reference" maxlength="128" placeholder={ T(ctx, "import.detectAuto") }/></label>
+			<label>{ T(ctx, "import.debit") }<input class="input mt-1" name="column_debit" maxlength="128" placeholder={ T(ctx, "import.detectAuto") }/></label>
+			<label>{ T(ctx, "import.credit") }<input class="input mt-1" name="column_credit" maxlength="128" placeholder={ T(ctx, "import.detectAuto") }/></label>
+			<label>{ T(ctx, "import.directionColumn") }<input class="input mt-1" name="column_direction" maxlength="128" placeholder={ T(ctx, "import.detectAuto") }/></label>
+			<label>{ T(ctx, "import.currency") }<input class="input mt-1" name="column_currency" maxlength="128" placeholder={ T(ctx, "import.detectAuto") }/></label>
+		</div>
+	</details>
+}

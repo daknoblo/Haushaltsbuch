@@ -33,6 +33,11 @@ Daraus folgt für den Betrieb:
   Ist-Zahlungen. Die Prüfung ersetzt keinen Vergleich mit dem Originalauszug.
   Es gibt weiterhin keine direkte Bankanbindung, Telemetrie oder externen
   Schriftarten.
+- CSV und XLSX werden ausschließlich lokal eingelesen und benötigen keine
+  KI-Verbindung. Zellinhalte sind untrusted Eingaben; Formeln, Makros,
+  verschlüsselte Arbeitsmappen und alte XLS-Dateien werden nicht unterstützt.
+  ZIP-, Tabellen- und Zellgrößen sind begrenzt. Ungültige Zeilen brechen den
+  gesamten Import ab; externe Verknüpfungen werden nicht geladen.
 
 ## Eine Lücke melden
 

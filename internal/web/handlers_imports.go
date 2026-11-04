@@ -220,10 +220,6 @@ func (s *Server) handleBankImportDiscard(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
-	if s.bankAI == nil {
-		s.clientError(w, r, http.StatusServiceUnavailable, "import.disabled")
-		return
-	}
 	select {
 	case s.importGate <- struct{}{}:
 		defer func() { <-s.importGate }()
@@ -238,21 +234,12 @@ func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
 		if r.MultipartForm != nil {
 			_ = r.MultipartForm.RemoveAll()
 		}
-		s.clientError(w, r, http.StatusBadRequest, "import.pdfError")
+		s.clientError(w, r, http.StatusBadRequest, "import.fileError")
 		return
 	}
 	defer func() { _ = r.MultipartForm.RemoveAll() }()
 	hh, ok := s.importHousehold(w, r)
 	if !ok {
-		return
-	}
-	deployment, err := s.store.AIDeployment(ctx)
-	if err != nil {
-		s.bankError(w, r, err)
-		return
-	}
-	if deployment == "" {
-		s.clientError(w, r, http.StatusBadRequest, "import.configureModel")
 		return
 	}
 	accountID := parseID(r.FormValue("account"))
@@ -267,13 +254,13 @@ func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	file, header, err := r.FormFile("statement")
 	if err != nil {
-		s.bankError(w, r, bankimport.ErrPDF)
+		s.bankError(w, r, bankimport.ErrFile)
 		return
 	}
 	defer func() { _ = file.Close() }()
-	content, err := io.ReadAll(io.LimitReader(file, bankimport.MaxPDFBytes+1))
-	if err != nil || len(content) > bankimport.MaxPDFBytes {
-		s.bankError(w, r, bankimport.ErrPDF)
+	content, err := io.ReadAll(io.LimitReader(file, bankimport.MaxFileBytes+1))
+	if err != nil || len(content) > bankimport.MaxFileBytes {
+		s.bankError(w, r, bankimport.ErrFile)
 		return
 	}
 	hash := sha256.Sum256(content)
@@ -287,12 +274,7 @@ func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
 		s.bankError(w, r, store.ErrDuplicateImport)
 		return
 	}
-	text, err := bankimport.PDFText(ctx, content)
-	if err != nil {
-		s.bankError(w, r, err)
-		return
-	}
-	payments, err := s.bankAI.Extract(ctx, deployment, text)
+	payments, err := s.extractStatement(ctx, r, header.Filename, content)
 	if err != nil {
 		s.bankError(w, r, err)
 		return
@@ -465,6 +447,16 @@ func (s *Server) handleBankPlan(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) bankError(w http.ResponseWriter, r *http.Request, err error) {
+	var tableErr *bankimport.TableError
+	if errors.As(err, &tableErr) {
+		s.logger.Warn("structured statement rejected", "reason", tableErr.Kind, "row", tableErr.Row)
+		message := T(r.Context(), tableErrorKey(tableErr.Kind))
+		if tableErr.Row > 0 {
+			message = Tf(r.Context(), "import.tableRow", tableErr.Row) + " " + message
+		}
+		http.Error(w, message, http.StatusBadRequest)
+		return
+	}
 	status, key := http.StatusBadRequest, i18n.Key("import.invalid")
 	switch {
 	case errors.Is(err, store.ErrNotFound):
@@ -485,6 +477,12 @@ func (s *Server) bankError(w http.ResponseWriter, r *http.Request, err error) {
 		status, key = http.StatusConflict, "settings.accountNameInUse"
 	case errors.Is(err, bankimport.ErrPDF):
 		key = "import.pdfError"
+	case errors.Is(err, bankimport.ErrFile):
+		key = "import.fileError"
+	case errors.Is(err, bankimport.ErrSheet):
+		key = "import.sheetError"
+	case errors.Is(err, bankimport.ErrConfiguration):
+		status, key = http.StatusServiceUnavailable, "import.configureModel"
 	case errors.Is(err, bankimport.ErrNoText):
 		key = "import.noText"
 	case errors.Is(err, bankimport.ErrResult):

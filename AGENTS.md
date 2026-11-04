@@ -6,7 +6,7 @@ Haushaltsbuch is a self-hosted household budget book. It records recurring and
 one-off bookings, normalizes them to a monthly figure, splits them between the
 people of a household and derives a monthly overview, a trend chart, a
 fixed-cost and savings dashboard, a settlement between the members, a Sankey
-flow diagram and PDF exports. It is a planning tool: figures are maintained as plans, with optional reviewed PDF statement imports
+flow diagram and PDF exports. It is a planning tool: figures are maintained as plans, with reviewed PDF, CSV and XLSX statement imports
 for actual payments. There is no direct bank connection.
 
 ## Shared conventions
@@ -113,7 +113,12 @@ client-secret identity. It never uses ambient developer credentials.
 The deployment is selected in Settings and saved globally in `app_state`, not
 per household or per upload. Import requests use that saved selection, ignoring
 any submitted deployment. Account administration also belongs in Settings;
-Import only selects the member's bank account and performs analysis/review.
+Import selects the member's bank account and performs reading/review. CSV and
+XLSX are parsed locally without AI, even when Azure is disabled. `internal/bankimport`
+owns strict column mapping, cent-exact parsing and bounded spreadsheet decoding.
+Invalid rows fail the whole import; never silently skip rows, guess ambiguous
+columns or evaluate spreadsheet formulas. PDF-only configuration guards must
+not block CSV/XLSX uploads.
 Backup format 3 includes the non-secret model selection and default-account
 markers; formats 1 and 2 still restore, with missing account defaults backfilled
 only after all original IDs have been restored.
@@ -135,14 +140,15 @@ code has nothing else to go on.
 
 ## Non-goals
 
-- **No bank connection** (FinTS/PSD2) and no CSV import. Certification effort and
+- **No bank connection** (FinTS/PSD2). Certification effort and
   attack surface do not fit an app that runs without authentication.
 - **No multi-currency and no double-entry bookkeeping.** Firefly III exists for
   that; this project stays a household budget book.
 - **No authentication.** Operated on a private network behind a reverse proxy.
   The API token guards the machine-facing routes only; the pages stay open.
 - **No automatic bank synchronization or autonomous posting.** Actual payments
-  come from explicitly reviewed text PDFs; OCR and CSV import remain out of scope.
+  come from explicitly reviewed PDF, CSV or XLSX files; OCR, images and legacy
+  XLS remain out of scope.
 
 ## Releases
 

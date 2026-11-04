@@ -13,7 +13,7 @@ import (
 
 // Limits bound uploaded bytes and extracted statement text independently.
 const (
-	MaxPDFBytes  = 10 << 20
+	MaxPDFBytes  = MaxFileBytes
 	MaxTextBytes = 200_000
 )
 

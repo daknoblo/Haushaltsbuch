@@ -14,8 +14,9 @@ container (distroless, non-root).
 - **Frontend:** server-rendered with [templ](https://templ.guide) + HTMX and
   Tailwind CSS, compiled into the binary – no Node build step required
 - **PDF export:** pure Go via [maroto](https://maroto.tech)
-- **Optional statement import:** local PDF text extraction and Azure OpenAI
-  suggestions, with explicit review before any actual payment counts
+- **Statement import:** CSV and Excel (`.xlsx`) read locally without AI;
+  optional PDF text extraction with Azure OpenAI. All formats require explicit
+  review before an actual payment counts.
 
 > The user interface ships in German and English and follows the browser's
 > `Accept-Language`. Code, comments and this documentation are in English.
@@ -28,7 +29,7 @@ _Not captured yet._
 
 ## Features
 
-- **Import & reconciliation** — multiple own bank accounts, reviewed actual
+- **Import & reconciliation** — PDF, CSV and XLSX statements, multiple own bank accounts, reviewed actual
   payments, duplicate warnings, internal-transfer exclusion and explicit month
   closure. Plans remain separate and continue to describe the future.
 
@@ -125,9 +126,10 @@ _Not captured yet._
 
 ### Statement import and Plan / Actual / Hybrid
 
-1. Configure the optional Azure application identity (see below), then select
+1. For **PDFs**, configure the optional Azure application identity (see below), then select
    the model once under **Settings → AI for imports**. The selection is
-   saved automatically and applies to **all households**.
+   saved automatically and applies to **all households**. CSV and XLSX work
+   without an AI connection or selected model and never invoke Azure.
 2. Manage household members under **Settings → People**. Every member
    automatically receives a default bank account, including existing members
    during upgrade. If a member already owns accounts, their oldest account is
@@ -137,14 +139,13 @@ _Not captured yet._
    unrelated to the Azure identity. Renaming a member does not change account
    IDs or statement history.
 3. In **Import & reconciliation**, select the **bank account shown on the
-   statement** (labelled with its member), upload a text PDF and
-   start the analysis. Starting analysis sends the extracted text to Azure
-   without an additional confirmation checkbox. The text includes personal
-   financial information. The original PDF is never sent or persisted;
-   neither document text nor model responses are written to logs. The import
-   uses the saved model, never a model supplied by the upload form. If setup is
-   missing, the import links to Settings. Model discovery occurs in Settings
-   and during analysis, not when merely opening the import page.
+   statement** (labelled with its member), upload a PDF, CSV or XLSX file and
+   start reading it. Only PDF analysis sends extracted text to Azure, without an
+   additional confirmation checkbox. CSV/XLSX are parsed locally. Original files
+   are not retained, and document text and model responses are not logged. PDFs
+   use the saved model, never a model supplied by the upload form. Missing AI
+   setup blocks only PDF analysis and links to Settings. Model discovery occurs
+   in Settings and during PDF analysis, not when opening the import page.
    The bank account and PDF controls sit side by side on wider screens.
 4. Compare the suggestions with the original statement. Correct dates, positive
    EUR amounts, income/expense direction, categories and allocations. A unique
@@ -197,7 +198,7 @@ Accepting a payment never creates a plan implicitly. An accepted, unlinked
 payment can explicitly create a new future plan with a chosen start and
 frequency. Existing plans are edited through the normal booking editor.
 
-Identical PDF bytes are rejected per account before another paid AI request.
+Identical file bytes are rejected per account, before any paid AI request.
 To re-analyze a file, undo any accepted decisions, reopen its affected months
 and discard that import from the history first. Unused non-default accounts can
 be removed in Settings; select another default before deleting a default
@@ -210,10 +211,10 @@ These checks do **not** prove statement completeness: AI extraction can omit or
 misread rows. Always compare totals and rows with the original. When the AI
 provides opening/closing balances, their difference must match the transactions.
 
-Limits: EUR only, text PDFs only, 10 MiB, 100 pages, 200,000 bytes of extracted
-text and 1,000 transactions per file. No OCR, images, CSV or automatic bank
-access. Analysis runs one at a time, is time-bounded and rejects partial,
-truncated or malformed output without persisting a partial import.
+Limits: EUR only, 10 MiB and 1,000 transactions per file. PDFs need selectable
+text, with at most 100 pages and 200,000 bytes of extracted text. No OCR, images
+or automatic bank access. Processing runs one at a time, is time-bounded and
+rejects partial, truncated or malformed input without persisting a partial import.
 Bank account names, default-account markers, import digests, review decisions,
 allocations, month closures and the non-secret global model selection are
 included in backup format 3. Formats 1 and 2 remain readable; missing accounts
@@ -224,6 +225,55 @@ but keeps the account setup and model selection. A full reset clears the model
 selection and creates default accounts for the newly seeded members. Versions
 before this change cannot read format 3 backups. Back up before upgrading;
 migration 0009 adds defaults without modifying imported payment history.
+
+### CSV and Excel formats
+
+The collapsed **CSV/Excel options and column mapping** section permits
+bank-specific adjustments. Normally, headings are found in the first 50 rows:
+
+| Meaning | Examples of recognized headings |
+| --- | --- |
+| Booking date | `Buchungstag`, `Buchungsdatum`, `Datum`, `Booking date`, `Date` |
+| Signed amount | `Betrag`, `Betrag (EUR)`, `Amount`, `Umsatz` |
+| Separate debit / credit | `Soll` / `Haben`, `Debit` / `Credit`, `Belastung` / `Gutschrift` |
+| Counterparty | `Name`, `Payee`, `Begünstigter/Zahlungspflichtiger`, `Empfänger/Auftraggeber` |
+| Reference | `Verwendungszweck`, `Buchungstext`, `Reference`, `Description` |
+| Direction (optional) | `Soll/Haben`, `S/H`, `Direction`; values such as `S`/`H`, `debit`/`credit` |
+| Currency (optional) | `Währung`, `Currency`; only `EUR` or `€` is accepted |
+
+Headers are case-insensitive. Ambiguous headings require an explicit mapping,
+not a guessed column. `Wertstellung` is never automatically substituted for the
+booking date. Use the exact heading text to override a mapping or specify the
+header row. Without a counterparty column, the reference supplies a short
+display name while the full reference is retained. Multiple recognized reference
+columns are joined in source order.
+
+- **CSV:** automatic semicolon, comma or tab detection; quoted fields, embedded
+  newlines, UTF-8 (with or without BOM), UTF-16 with BOM and Windows-1252.
+  Separator and encoding can be set explicitly; an initial `sep=;`-style
+  directive is supported. Header-row numbers start after that directive.
+- **XLSX:** numeric cells are read directly, including Excel date serials and
+  the 1900/1904 date systems. With multiple sheets, explicitly select a worksheet.
+  One sheet is imported per file; because duplicate-file protection applies to
+  the entire workbook, export sheets as separate files to import more than one
+  sheet into the same bank account. Legacy `.xls`, encrypted workbooks, macros
+  and formulas are not supported. Export formulas as values first.
+- **Numbers:** text defaults to German notation (`1.234,56`); choose English
+  (`1,234.56`) when needed. Numeric Excel amounts are independent of this
+  setting. Cents are parsed exactly without floating-point rounding; fractional
+  cents and conflicting debit/credit indicators are rejected.
+- **Dates:** full-year ISO dates always work; other text defaults to day/month/year.
+  Month/day/year is an explicit option. Two-digit years are not guessed.
+- **Currency:** without a currency column, amounts are assumed to be EUR.
+  If the column exists, every transaction must explicitly contain EUR.
+- **Validation:** blank rows are ignored, but invalid transaction rows, totals
+  and footers fail the entire file. Errors identify the affected row without
+  reflecting cell contents. Nothing counts as an actual payment until reviewed.
+
+Tables are limited to 64 columns, 50 preamble/header rows, 2 MiB of cell text,
+and 16 KiB per cell. XLSX ZIP content is bounded to 32 MiB and 256 entries,
+with worksheet row/cell limits enforced before loading. No spreadsheet formulas
+are evaluated and no external links are fetched.
 
 ### Calculation rules
 

@@ -16,39 +16,38 @@ templ ImportsPage(nav Nav, vm ImportVM) {
 				<div class="card-body">
 					<h2 class="mb-3 font-semibold">{ T(ctx, "import.upload") }</h2>
 					if !vm.AIEnabled || !vm.AIConfigured {
-						<p class="alert-info">{ T(ctx, "import.configureModel") }</p>
-						<a class="btn-ghost mt-3" href="/settings#import-ai">{ T(ctx, "import.openAISettings") }</a>
-					} else {
-						<form method="post" action="/imports/upload" enctype="multipart/form-data" class="grid gap-3" data-bank-upload>
-							@importHouseholdField(nav)
-							<div class="grid min-w-0 gap-3 md:grid-cols-2" data-import-upload-fields>
-								<label class="min-w-0">
-									{ T(ctx, "import.account") }
-									<select class="input mt-1 w-full" name="account" required disabled?={ len(vm.Ledger.Accounts) == 0 }>
-										if len(vm.Ledger.Accounts) == 0 {
-											<option value="" selected>{ T(ctx, "import.noAccounts") }</option>
-										} else {
-											for _, a := range vm.Ledger.Accounts {
-												<option value={ strconv.FormatInt(a.ID, 10) }>{ BankAccountLabel(ctx, a, vm.Data.Members) }</option>
-											}
-										}
-									</select>
-								</label>
-								<label class="min-w-0">{ T(ctx, "import.file") }<input class="input mt-1 w-full min-w-0" type="file" name="statement" accept="application/pdf,.pdf" required/></label>
-							</div>
-							if len(vm.Ledger.Accounts) == 0 {
-								<p class="text-sm text-slate-500 dark:text-slate-400">
-									{ T(ctx, "import.accountSetup") }
-									<a class="font-medium text-indigo-600 underline dark:text-indigo-400" href="/settings#people">{ T(ctx, "import.openPeopleSettings") }</a>
-								</p>
-							}
-							<div class="flex flex-wrap items-center justify-between gap-3">
-								<a class="text-sm text-indigo-600 underline dark:text-indigo-400" href="/settings#bank-accounts">{ T(ctx, "import.manageBankAccounts") }</a>
-								<button class="btn-primary" type="submit" disabled?={ len(vm.Ledger.Accounts) == 0 }>{ T(ctx, "import.analyze") }</button>
-							</div>
-							<p class="alert-info" data-bank-progress hidden>{ T(ctx, "import.progress") }</p>
-						</form>
+						<p class="alert-info mb-3">{ T(ctx, "import.localFormats") } <a class="underline" href="/settings#import-ai">{ T(ctx, "import.openAISettings") }</a></p>
 					}
+					<form method="post" action="/imports/upload" enctype="multipart/form-data" class="grid gap-3" data-bank-upload>
+						@importHouseholdField(nav)
+						<div class="grid min-w-0 gap-3 md:grid-cols-2" data-import-upload-fields>
+							<label class="min-w-0">
+								{ T(ctx, "import.account") }
+								<select class="input mt-1 w-full" name="account" required disabled?={ len(vm.Ledger.Accounts) == 0 }>
+									if len(vm.Ledger.Accounts) == 0 {
+										<option value="" selected>{ T(ctx, "import.noAccounts") }</option>
+									} else {
+										for _, a := range vm.Ledger.Accounts {
+											<option value={ strconv.FormatInt(a.ID, 10) }>{ BankAccountLabel(ctx, a, vm.Data.Members) }</option>
+										}
+									}
+								</select>
+							</label>
+							<label class="min-w-0">{ T(ctx, "import.file") }<input class="input mt-1 w-full min-w-0" type="file" name="statement" accept=".pdf,.csv,.xlsx,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required/></label>
+						</div>
+						if len(vm.Ledger.Accounts) == 0 {
+							<p class="text-sm text-slate-500 dark:text-slate-400">
+								{ T(ctx, "import.accountSetup") }
+								<a class="font-medium text-indigo-600 underline dark:text-indigo-400" href="/settings#people">{ T(ctx, "import.openPeopleSettings") }</a>
+							</p>
+						}
+						@statementTableOptionsForm()
+						<div class="flex flex-wrap items-center justify-between gap-3">
+							<a class="text-sm text-indigo-600 underline dark:text-indigo-400" href="/settings#bank-accounts">{ T(ctx, "import.manageBankAccounts") }</a>
+							<button class="btn-primary" type="submit" disabled?={ len(vm.Ledger.Accounts) == 0 }>{ T(ctx, "import.analyze") }</button>
+						</div>
+						<p class="alert-info" data-bank-progress hidden>{ T(ctx, "import.progress") }</p>
+					</form>
 				</div>
 			</section>
 			<section class="card mt-4">

@@ -99,7 +99,7 @@ func TestPDFImportReviewAndHybridHTTP(t *testing.T) {
 	if err := srv.store.SetAIDeployment(ctx, ""); err != nil {
 		t.Fatal(err)
 	}
-	if w := upload(account); w.Code != http.StatusBadRequest || mock.calls != 0 {
+	if w := upload(account); w.Code != http.StatusServiceUnavailable || mock.calls != 0 {
 		t.Fatalf("upload-supplied model bypassed missing global setting: %d calls %d", w.Code, mock.calls)
 	}
 	if err := srv.store.SetAIDeployment(ctx, "synthetic-router"); err != nil {
@@ -244,8 +244,8 @@ func TestImportDisabledAndStaleHousehold(t *testing.T) {
 	if w := get(t, handler, "/imports"); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `href="/settings#import-ai"`) {
 		t.Fatalf("disabled page: %d %s", w.Code, w.Body)
 	}
-	if w := post(t, handler, "/imports/upload", nil); w.Code != http.StatusServiceUnavailable {
-		t.Fatalf("disabled upload: %d", w.Code)
+	if w := post(t, handler, "/imports/upload", nil); w.Code != http.StatusBadRequest {
+		t.Fatalf("malformed upload: %d", w.Code)
 	}
 	members, _ := srv.store.ListMembers(t.Context(), hh.ID)
 	if w := post(t, handler, "/imports/accounts", url.Values{
