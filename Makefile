@@ -42,9 +42,9 @@ fmt-check:
 vet:
 	go vet ./...
 
-# golangci-lint must analyse with the same toolchain the module declares,
-# otherwise it fails to parse a newer standard library.
+# Keep local checks and builds on the same toolchain as CI.
 GO_TOOLCHAIN := $(shell awk '/^toolchain /{print $$2}' go.mod)
+export GOTOOLCHAIN := $(GO_TOOLCHAIN)
 
 ## lint: run golangci-lint (same version as CI)
 lint:

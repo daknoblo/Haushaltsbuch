@@ -101,10 +101,12 @@ annotation becomes the body of the GitHub release, so write it properly.
 - **`go.mod` pins a patch version and carries a `toolchain` directive.** The
   standard requires `go 1.26` and no toolchain line. `github.com/johnfercher/maroto/v2`,
   which renders the PDF exports, declares `go 1.26.1`, so `go mod tidy` raises the
-  directive and a plain `go 1.26` no longer builds. Without `toolchain go1.26.6`,
+  directive and a plain `go 1.26` no longer builds. Without `toolchain go1.26.10`,
   `setup-go` would then install exactly 1.26.1, whose standard library carries
   known advisories, and the mandatory `govulncheck` step would fail. The
-  directive is removed as soon as maroto relaxes its requirement.
+  directive is removed as soon as maroto relaxes its requirement. All Make
+  targets export the declared toolchain so local checks match CI, even when a
+  newer Go version is installed.
 - **`darkMode: "class"` with a light palette.** waim and CFTM are dark-only. This
   app keeps a theme toggle, so every component class carries a `dark:` variant.
 - **Bookings are edited in a `<dialog>` that opens on an already created draft.**

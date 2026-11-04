@@ -5,7 +5,7 @@
 # means the build is not reproducible and cannot be audited after the fact. The
 # readable tag stays in front of the digest to say what the digest is; Docker
 # resolves the digest and ignores the tag. Dependabot keeps both in step.
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine@sha256:28d89ee9cc0ff9fec75c82ca201e6bf7fdf9a679d4b7b24dfa04f2bb766bb468 AS build
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine@sha256:a2012b4a1d1f9f7e9f44e0d39b805a901e856b1dd80b4e6ee4338db547050308 AS build
 WORKDIR /src
 RUN apk add --no-cache git ca-certificates
 COPY go.mod go.sum ./
