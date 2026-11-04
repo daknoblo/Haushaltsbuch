@@ -14,12 +14,14 @@ import (
 
 // Bank errors distinguish review conflicts from persistence failures.
 var (
-	ErrBankMemberInUse  = errors.New("store: member needed by bank ledger")
-	ErrBankHistoryInUse = errors.New("store: accepted payments or account history must be retained")
-	ErrDuplicateImport  = errors.New("store: statement already imported")
-	ErrDuplicatePayment = errors.New("store: possible duplicate payment")
-	ErrClosedMonth      = errors.New("store: month is closed")
-	ErrPendingPayments  = errors.New("store: month has pending payments")
+	ErrBankMemberInUse    = errors.New("store: member needed by bank ledger")
+	ErrBankHistoryInUse   = errors.New("store: accepted payments or account history must be retained")
+	ErrDefaultBankAccount = errors.New("store: default bank account must be retained")
+	ErrBankAccountName    = errors.New("store: bank account name already in use")
+	ErrDuplicateImport    = errors.New("store: statement already imported")
+	ErrDuplicatePayment   = errors.New("store: possible duplicate payment")
+	ErrClosedMonth        = errors.New("store: month is closed")
+	ErrPendingPayments    = errors.New("store: month has pending payments")
 )
 
 // BankAccount identifies a statement source and the member fronting its payments.
@@ -27,6 +29,7 @@ type BankAccount struct {
 	ID       int64
 	MemberID int64
 	Name     string
+	Default  bool
 }
 
 // BankImport retains provenance and a document digest, never the PDF itself.
@@ -79,9 +82,17 @@ func (s *Store) CreateBankAccount(ctx context.Context, householdID int64, accoun
 	if strings.TrimSpace(account.Name) == "" || utf8.RuneCountInString(account.Name) > 120 {
 		return ErrInvalid
 	}
-	return affected(s.q.ExecContext(ctx, `INSERT INTO bank_accounts (household_id, member_id, name)
-		SELECT ?, id, ? FROM members WHERE id = ? AND household_id = ?`,
-		householdID, strings.TrimSpace(account.Name), account.MemberID, householdID))
+	return s.withTx(ctx, func(tx *Store) error {
+		if err := tx.checkBankAccountName(ctx, householdID, 0, strings.TrimSpace(account.Name)); err != nil {
+			return err
+		}
+		if err := affected(tx.q.ExecContext(ctx, `INSERT INTO bank_accounts (household_id, member_id, name)
+			SELECT ?, id, ? FROM members WHERE id = ? AND household_id = ?`,
+			householdID, strings.TrimSpace(account.Name), account.MemberID, householdID)); err != nil {
+			return err
+		}
+		return tx.ensureMemberBankAccount(ctx, householdID, account.MemberID)
+	})
 }
 
 // DeleteBankAccount permits correcting unused account setup without erasing history.
@@ -96,6 +107,18 @@ func (s *Store) DeleteBankAccount(ctx context.Context, householdID, id int64) er
 		}
 		if count > 0 {
 			return ErrBankHistoryInUse
+		}
+		var isDefault bool
+		err := tx.q.QueryRowContext(ctx, `SELECT is_default FROM bank_accounts WHERE id = ? AND household_id = ?`,
+			id, householdID).Scan(&isDefault)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		if isDefault {
+			return ErrDefaultBankAccount
 		}
 		return affected(tx.q.ExecContext(ctx, `DELETE FROM bank_accounts WHERE id = ? AND household_id = ?`, id, householdID))
 	})
@@ -134,18 +157,15 @@ func (s *Store) BankLedger(ctx context.Context, householdID int64) (BankLedger, 
 }
 
 func (s *Store) readBankLedger(ctx context.Context, householdID int64, l *BankLedger) error {
+	var err error
+	l.Accounts, err = s.ListBankAccounts(ctx, householdID)
+	if err != nil {
+		return err
+	}
 	queries := []struct {
 		sql  string
 		scan func(*sql.Rows) error
 	}{
-		{`SELECT id, member_id, name FROM bank_accounts WHERE household_id = ? ORDER BY id`, func(r *sql.Rows) error {
-			var a BankAccount
-			if err := r.Scan(&a.ID, &a.MemberID, &a.Name); err != nil {
-				return err
-			}
-			l.Accounts = append(l.Accounts, a)
-			return nil
-		}},
 		{`SELECT id, account_id, digest, filename, created_at FROM bank_imports WHERE household_id = ? ORDER BY id`, func(r *sql.Rows) error {
 			var b BankImport
 			if err := r.Scan(&b.ID, &b.AccountID, &b.Digest, &b.Filename, &b.CreatedAt); err != nil {

@@ -43,19 +43,27 @@ func (s *Store) GetMember(ctx context.Context, householdID, id int64) (Member, e
 
 // CreateMember inserts a new member and returns it.
 func (s *Store) CreateMember(ctx context.Context, householdID int64, name, color string) (Member, error) {
-	res, err := s.q.ExecContext(ctx,
-		`INSERT INTO members (household_id, name, color, sort_order)
+	var member Member
+	err := s.withTx(ctx, func(tx *Store) error {
+		res, err := tx.q.ExecContext(ctx,
+			`INSERT INTO members (household_id, name, color, sort_order)
 		 VALUES (?, ?, ?, (SELECT COALESCE(MAX(sort_order)+1, 0) FROM members WHERE household_id = ?))`,
-		householdID, name, color, householdID,
-	)
-	if err != nil {
-		return Member{}, err
-	}
-	id, err := res.LastInsertId()
-	if err != nil {
-		return Member{}, err
-	}
-	return s.GetMember(ctx, householdID, id)
+			householdID, name, color, householdID,
+		)
+		if err != nil {
+			return err
+		}
+		id, err := res.LastInsertId()
+		if err != nil {
+			return err
+		}
+		if err := tx.ensureMemberBankAccount(ctx, householdID, id); err != nil {
+			return err
+		}
+		member, err = tx.GetMember(ctx, householdID, id)
+		return err
+	})
+	return member, err
 }
 
 // UpdateMember updates a member's name and color within a household.
@@ -70,13 +78,19 @@ func (s *Store) DeleteMember(ctx context.Context, householdID, id int64) error {
 	return s.withTx(ctx, func(tx *Store) error {
 		var count int
 		if err := tx.q.QueryRowContext(ctx, `SELECT
-			(SELECT COUNT(*) FROM bank_accounts WHERE member_id = ? AND household_id = ?) +
+			(SELECT COUNT(*) FROM bank_accounts a WHERE a.member_id = ? AND a.household_id = ?
+			 AND (EXISTS (SELECT 1 FROM bank_imports i WHERE i.account_id = a.id)
+			      OR EXISTS (SELECT 1 FROM bank_transactions t WHERE t.transfer_account_id = a.id))) +
 			(SELECT COUNT(*) FROM bank_splits sp JOIN bank_transactions t ON t.id = sp.transaction_id
 			 WHERE sp.member_id = ? AND t.household_id = ?)`, id, householdID, id, householdID).Scan(&count); err != nil {
 			return err
 		}
 		if count > 0 {
 			return ErrBankMemberInUse
+		}
+		if _, err := tx.q.ExecContext(ctx, `DELETE FROM bank_accounts WHERE member_id = ? AND household_id = ?`,
+			id, householdID); err != nil {
+			return err
 		}
 		return affected(tx.q.ExecContext(ctx,
 			`DELETE FROM members WHERE id = ? AND household_id = ?`, id, householdID))

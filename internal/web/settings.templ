@@ -51,6 +51,10 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 					</form>
 				</div>
 			</div>
+			if vm.ActiveID != 0 {
+				@bankAccountSettings(vm.ActiveID, vm.Members, vm.BankAccounts)
+			}
+			@importAISettings(vm.ImportAI)
 			<div class="card-tight lg:col-span-2" id="categories">
 				<div class="card-head"><h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">{ T(ctx, "settings.categories") }</h2></div>
 				<div class="card-body">

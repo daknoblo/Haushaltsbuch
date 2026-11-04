@@ -29,15 +29,14 @@ type BankImporter interface {
 // SetBankImporter wires the optional service before serving requests.
 func (s *Server) SetBankImporter(importer BankImporter) { s.bankAI = importer }
 
-// ImportVM combines persisted review state with available AI deployments.
+// ImportVM combines persisted review state with global AI readiness.
 type ImportVM struct {
-	Ledger      store.BankLedger
-	Data        calc.Data
-	Rows        []ImportRow
-	Deployments []string
-	AIEnabled   bool
-	AIError     string
-	Closed      bool
+	Ledger       store.BankLedger
+	Data         calc.Data
+	Rows         []ImportRow
+	AIEnabled    bool
+	AIConfigured bool
+	Closed       bool
 }
 
 // ImportRow adds non-binding duplicate, transfer and plan hints to a payment.
@@ -64,6 +63,12 @@ func (s *Server) handleImports(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	vm := ImportVM{AIEnabled: s.bankAI != nil}
+	deployment, err := s.store.AIDeployment(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	vm.AIConfigured = deployment != ""
 	if nav.ActiveHousehold.ID != 0 {
 		vm.Ledger, err = s.store.BankLedger(r.Context(), nav.ActiveHousehold.ID)
 		if err != nil {
@@ -76,24 +81,17 @@ func (s *Server) handleImports(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		vm.Closed = slices.Contains(vm.Ledger.ClosedMonths, nav.Month)
-		vm.Rows = importRows(vm.Ledger, vm.Data, nav.Month)
-	}
-	if s.bankAI != nil {
-		vm.Deployments, err = s.bankAI.Deployments(r.Context())
-		if err != nil {
-			s.logger.Warn("bank import deployment discovery failed")
-			vm.AIError = T(r.Context(), "import.aiError")
-		}
+		vm.Rows = importRows(r.Context(), vm.Ledger, vm.Data, nav.Month)
 	}
 	s.render(w, r, ImportsPage(nav, vm))
 }
 
-func importRows(l store.BankLedger, data calc.Data, month string) []ImportRow {
+func importRows(ctx context.Context, l store.BankLedger, data calc.Data, month string) []ImportRow {
 	accounts := make(map[int64]string)
 	batches := make(map[int64]store.BankImport)
 	plans := make(map[int64]store.Booking)
 	for _, a := range l.Accounts {
-		accounts[a.ID] = a.Name
+		accounts[a.ID] = BankAccountLabel(ctx, a, data.Members)
 	}
 	for _, b := range l.Imports {
 		batches[b.ID] = b
@@ -168,7 +166,7 @@ func (s *Server) handleBankAccount(w http.ResponseWriter, r *http.Request) {
 		s.bankError(w, r, err)
 		return
 	}
-	http.Redirect(w, r, "/imports", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings#bank-accounts", http.StatusSeeOther)
 }
 
 func (s *Server) handleBankAccountDelete(w http.ResponseWriter, r *http.Request) {
@@ -183,7 +181,7 @@ func (s *Server) handleBankAccountDelete(w http.ResponseWriter, r *http.Request)
 		s.bankError(w, r, err)
 		return
 	}
-	http.Redirect(w, r, "/imports", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings#bank-accounts", http.StatusSeeOther)
 }
 
 func (s *Server) handleBankImportDiscard(w http.ResponseWriter, r *http.Request) {
@@ -228,6 +226,15 @@ func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	deployment, err := s.store.AIDeployment(ctx)
+	if err != nil {
+		s.bankError(w, r, err)
+		return
+	}
+	if deployment == "" {
+		s.clientError(w, r, http.StatusBadRequest, "import.configureModel")
+		return
+	}
 	accountID := parseID(r.FormValue("account"))
 	ledger, err := s.store.BankLedger(ctx, hh)
 	if err != nil {
@@ -265,7 +272,7 @@ func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
 		s.bankError(w, r, err)
 		return
 	}
-	payments, err := s.bankAI.Extract(ctx, r.FormValue("deployment"), text)
+	payments, err := s.bankAI.Extract(ctx, deployment, text)
 	if err != nil {
 		s.bankError(w, r, err)
 		return
@@ -452,6 +459,10 @@ func (s *Server) bankError(w http.ResponseWriter, r *http.Request, err error) {
 		status, key = http.StatusConflict, "import.pendingError"
 	case errors.Is(err, store.ErrBankHistoryInUse):
 		status, key = http.StatusConflict, "import.historyInUse"
+	case errors.Is(err, store.ErrDefaultBankAccount):
+		status, key = http.StatusConflict, "settings.defaultAccountProtected"
+	case errors.Is(err, store.ErrBankAccountName):
+		status, key = http.StatusConflict, "settings.accountNameInUse"
 	case errors.Is(err, bankimport.ErrPDF):
 		key = "import.pdfError"
 	case errors.Is(err, bankimport.ErrNoText):

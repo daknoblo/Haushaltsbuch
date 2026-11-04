@@ -1,0 +1,97 @@
+package web
+
+import (
+	"strconv"
+
+	"github.com/daknoblo/Haushaltsbuch/internal/store"
+)
+
+templ importAISettings(vm ImportAISettingsVM) {
+	<section class="card-tight lg:col-span-2" id="import-ai">
+		<div class="card-head"><h2 class="text-base font-semibold">{ T(ctx, "settings.importAI") }</h2></div>
+		<div class="card-body">
+			<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "settings.importAIHint") }</p>
+			<details class="mb-3 text-sm">
+				<summary class="cursor-pointer">{ T(ctx, "settings.azureConnection") }</summary>
+				<p class="mt-2 text-slate-500 dark:text-slate-400">{ T(ctx, "import.azureConfig") }</p>
+			</details>
+			if !vm.Enabled {
+				<p class="alert-info">{ T(ctx, "import.disabled") }</p>
+			} else {
+				if vm.Error != "" {
+					<p class="alert-error mb-3" role="alert">{ vm.Error }</p>
+				}
+				<form hx-post="/settings/import-ai" hx-trigger="change" hx-swap="none" hx-sync="this:queue last" data-settings-save>
+					<p class="alert-error mb-3" role="alert" data-settings-error data-fallback={ T(ctx, "settings.saveError") } hidden?={ vm.Deployment == "" || vm.SelectedAvailable() }>{ T(ctx, "settings.aiUnavailable") } { vm.Deployment }</p>
+					<label class="block">
+						{ T(ctx, "import.deployment") }
+						<select class="input mt-1 w-full" name="deployment" aria-label={ T(ctx, "import.deployment") }>
+							<option value="" selected?={ vm.Deployment == "" }>{ T(ctx, "settings.aiChoose") }</option>
+							if vm.Deployment != "" && !vm.SelectedAvailable() {
+								<option value={ vm.Deployment } selected disabled>{ vm.Deployment }</option>
+							}
+							for _, d := range vm.Deployments {
+								<option value={ d } selected?={ d == vm.Deployment }>{ d }</option>
+							}
+						</select>
+					</label>
+				</form>
+				<a class="btn-ghost mt-3" href="/settings#import-ai">{ T(ctx, "settings.aiReload") }</a>
+			}
+		</div>
+	</section>
+}
+
+templ bankAccountSettings(householdID int64, members []store.Member, accounts []store.BankAccount) {
+	<section
+		class="card-tight lg:col-span-2"
+		id="bank-accounts"
+		hx-get="/settings/bank-accounts"
+		hx-trigger="hb:members-changed from:body"
+		hx-swap="outerHTML"
+		hx-sync="this:replace"
+	>
+		<div class="card-head"><h2 class="text-base font-semibold">{ T(ctx, "settings.bankAccounts") }</h2></div>
+		<div class="card-body">
+			<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "settings.bankAccountsHint") }</p>
+			if len(members) == 0 {
+				<p class="alert-info">{ T(ctx, "import.accountSetup") }</p>
+				<a class="btn-ghost mt-3" href="#people">{ T(ctx, "import.openPeopleSettings") }</a>
+			}
+			for _, m := range members {
+				<fieldset class="mb-4 grid gap-2" data-member-bank-accounts={ strconv.FormatInt(m.ID, 10) }>
+					<legend class="mb-2 font-semibold">{ m.Name }</legend>
+					for _, a := range accounts {
+						if a.MemberID == m.ID {
+							<div class="flex flex-wrap items-center gap-2">
+								<form class="min-w-0 flex-1" hx-post={ "/settings/bank-accounts/" + strconv.FormatInt(a.ID, 10) } hx-trigger="change, keyup changed delay:600ms" hx-swap="none" hx-sync="this:queue last" data-settings-save>
+									<input type="hidden" name="household" value={ strconv.FormatInt(householdID, 10) }/>
+									<input class="input w-full" name="name" value={ a.Name } maxlength="120" aria-label={ Tf(ctx, "settings.accountFor", m.Name) } required/>
+									<p class="alert-error mt-2" role="alert" data-settings-error data-fallback={ T(ctx, "settings.saveError") } hidden></p>
+								</form>
+								if a.Default {
+									<span class="badge badge-ok">{ T(ctx, "settings.defaultAccount") }</span>
+								} else {
+									<form method="post" action={ "/settings/bank-accounts/" + strconv.FormatInt(a.ID, 10) + "/default" }>
+										<input type="hidden" name="household" value={ strconv.FormatInt(householdID, 10) }/>
+										<button type="submit" class="btn-ghost">{ T(ctx, "settings.makeDefaultAccount") }</button>
+									</form>
+									<form method="post" action={ "/settings/bank-accounts/" + strconv.FormatInt(a.ID, 10) + "/delete" }>
+										<input type="hidden" name="household" value={ strconv.FormatInt(householdID, 10) }/>
+										<button type="submit" class="btn-ghost">{ T(ctx, "import.deleteUnusedAccount") }</button>
+									</form>
+								}
+							</div>
+						}
+					}
+					<form method="post" action="/settings/bank-accounts" class="mt-2 flex flex-wrap gap-2">
+						<input type="hidden" name="household" value={ strconv.FormatInt(householdID, 10) }/>
+						<input type="hidden" name="member" value={ strconv.FormatInt(m.ID, 10) }/>
+						<input class="input min-w-0 flex-1" name="name" maxlength="120" aria-label={ Tf(ctx, "settings.newAccountFor", m.Name) } placeholder={ T(ctx, "import.accountExample") } required/>
+						<button class="btn-primary" type="submit">{ T(ctx, "settings.addBankAccount") }</button>
+					</form>
+				</fieldset>
+			}
+		</div>
+	</section>
+}

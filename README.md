@@ -125,17 +125,26 @@ _Not captured yet._
 
 ### Statement import and Plan / Actual / Hybrid
 
-1. Configure the optional Azure application identity (see below).
-2. In **Import & reconciliation**, create an account for each statement source.
-   The selected member is the person fronting its payments. Use distinct account
-   labels; this is account identification, not a bank connection.
-   Until an account exists, the upload selector explains the missing setup and
-   links to the account form. Newly created accounts are immediately selectable.
-3. Select the account and a discovered chat deployment, upload a text PDF and
+1. Configure the optional Azure application identity (see below), then select
+   the model once under **Settings → AI for PDF imports**. The selection is
+   saved automatically and applies to **all households**.
+2. Manage household members under **Settings → People**. Every member
+   automatically receives a default bank account, including existing members
+   during upgrade. If a member already owns accounts, their oldest account is
+   made the default rather than creating a duplicate. Under **Members' bank
+   accounts**, rename labels, add accounts or choose another default.
+   The member is the person fronting that bank account's payments; this is
+   unrelated to the Azure identity. Renaming a member does not change account
+   IDs or statement history.
+3. In **Import & reconciliation**, select the **bank account shown on the
+   statement** (labelled with its member), upload a text PDF and
    start the analysis. Starting analysis sends the extracted text to Azure
    without an additional confirmation checkbox. The text includes personal
    financial information. The original PDF is never sent or persisted;
-   neither document text nor model responses are written to logs.
+   neither document text nor model responses are written to logs. The import
+   uses the saved model, never a model supplied by the upload form. If setup is
+   missing, the import links to Settings. Model discovery occurs in Settings
+   and during analysis, not when merely opening the import page.
 4. Compare the suggestions with the original statement. Correct dates, positive
    EUR amounts, income/expense direction, categories and allocations. A unique
    name match suggests a plan and highlights amount deviations, but never edits
@@ -174,8 +183,11 @@ frequency. Existing plans are edited through the normal booking editor.
 
 Identical PDF bytes are rejected per account before another paid AI request.
 To re-analyze a file, undo any accepted decisions, reopen its affected months
-and discard that import from the history first. Unused accounts can be removed;
-accounts with import history or internal-transfer references are protected.
+and discard that import from the history first. Unused non-default accounts can
+be removed in Settings; select another default before deleting a default
+account. Accounts with import history or internal-transfer references remain
+protected. Deleting a member also removes their unused accounts, but is refused
+when their bank history or actual payment allocations still need the member.
 Overlapping statements are checked by date, direction, amount and normalized
 payee/reference; an identical genuine payment needs explicit confirmation.
 These checks do **not** prove statement completeness: AI extraction can omit or
@@ -186,11 +198,16 @@ Limits: EUR only, text PDFs only, 10 MiB, 100 pages, 200,000 bytes of extracted
 text and 1,000 transactions per file. No OCR, images, CSV or automatic bank
 access. Analysis runs one at a time, is time-bounded and rejects partial,
 truncated or malformed output without persisting a partial import.
-Bank account names, import digests, review decisions, allocations and month
-closures are included in backup format 2; format 1 backups remain readable.
+Bank account names, default-account markers, import digests, review decisions,
+allocations, month closures and the non-secret global model selection are
+included in backup format 3. Formats 1 and 2 remain readable; missing accounts
+and defaults are filled in without changing existing IDs. Older backups do not
+contain a model selection, so select one in Settings after restoring them.
 Resetting bookings also clears statements, actual payments and month closures,
-but keeps the account setup. Downgrading to a version without reconciliation
-does not support format 2 backups.
+but keeps the account setup and model selection. A full reset clears the model
+selection and creates default accounts for the newly seeded members. Versions
+before this change cannot read format 3 backups. Back up before upgrading;
+migration 0009 adds defaults without modifying imported payment history.
 
 ### Calculation rules
 
@@ -297,10 +314,16 @@ resource for discovery and **Cognitive Services OpenAI User** for inference
 (or equivalent least-privilege custom roles). The identity must belong to the
 intended tenant and have access to the chosen deployment.
 
+The selected model name is stored in the application database, independently
+of the active household. Changing households or restarting the application
+keeps that selection. Azure credentials remain environment-only, not in the
+database or backups. An unavailable saved model is shown as unavailable in
+Settings; it is never silently replaced by another deployment.
+
 This integration uses an explicit client-secret identity, ARM deployment
-discovery and bearer-token inference. It targets Azure public cloud and pins
-identity/discovery/inference
-hosts, refuses redirects, caches tokens through the Azure SDK and refreshes the
+discovery and bearer-token inference. It targets Azure public cloud, pins
+identity/discovery/inference hosts, refuses redirects, caches tokens through
+the Azure SDK and refreshes the
 deployment list every five minutes. It does not fall back to developer CLI
 credentials. No Azure resource or role assignment is created automatically.
 

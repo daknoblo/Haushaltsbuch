@@ -12,9 +12,9 @@ func (s *Store) importBankLedger(ctx context.Context, householdID int64, l BankL
 		if a.ID <= 0 || a.Name == "" || len(a.Name) > 480 {
 			return ErrBadSnapshot
 		}
-		if err := affected(s.q.ExecContext(ctx, `INSERT INTO bank_accounts (id, household_id, member_id, name)
-			SELECT ?, ?, id, ? FROM members WHERE id = ? AND household_id = ?`,
-			a.ID, householdID, a.Name, a.MemberID, householdID)); err != nil {
+		if err := affected(s.q.ExecContext(ctx, `INSERT INTO bank_accounts (id, household_id, member_id, name, is_default)
+			SELECT ?, ?, id, ?, ? FROM members WHERE id = ? AND household_id = ?`,
+			a.ID, householdID, a.Name, a.Default, a.MemberID, householdID)); err != nil {
 			return err
 		}
 	}

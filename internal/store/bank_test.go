@@ -30,7 +30,13 @@ func bankFixture(t *testing.T) (*Store, int64, BankAccount, BankTransaction) {
 		AmountCents: 101, Decision: "pending", CategoryID: firstExpenseCategory(ctx, t, st, hh).ID,
 		CostNature: CostVariable, BudgetClass: ClassNeed, Settle: true,
 	}
-	return st, hh.ID, l.Accounts[0], row
+	for _, a := range l.Accounts {
+		if a.Name == "Test account" {
+			return st, hh.ID, a, row
+		}
+	}
+	t.Fatal("test account missing")
+	return nil, 0, BankAccount{}, BankTransaction{}
 }
 
 func TestBankImportReviewClosureAndBackup(t *testing.T) {
@@ -114,7 +120,7 @@ func TestBankImportReviewClosureAndBackup(t *testing.T) {
 		t.Fatal(err)
 	}
 	l, _ = st.BankLedger(ctx, hh)
-	if len(l.Transactions) != 0 || len(l.Imports) != 0 || len(l.ClosedMonths) != 0 || len(l.Accounts) != 1 {
+	if len(l.Transactions) != 0 || len(l.Imports) != 0 || len(l.ClosedMonths) != 0 || len(l.Accounts) != 3 {
 		t.Fatalf("reset ledger: %+v", l)
 	}
 	if err := st.DeleteBankAccount(ctx, hh, account.ID); err != nil {
@@ -198,7 +204,11 @@ func TestBankTransferAndFuturePlan(t *testing.T) {
 	if err := st.ReviewBankTransaction(ctx, hh, p, false); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("self transfer: %v", err)
 	}
-	p.TransferAccountID = l.Accounts[1].ID
+	for _, a := range l.Accounts {
+		if a.Name == "Savings" {
+			p.TransferAccountID = a.ID
+		}
+	}
 	if err := st.ReviewBankTransaction(ctx, hh, p, false); err != nil {
 		t.Fatal(err)
 	}

@@ -20,9 +20,10 @@ import (
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
 
-type testBankImporter struct{ calls int }
+type testBankImporter struct{ calls, discoveryCalls int }
 
-func (*testBankImporter) Deployments(context.Context) ([]string, error) {
+func (i *testBankImporter) Deployments(context.Context) ([]string, error) {
+	i.discoveryCalls++
 	return []string{"synthetic-router"}, nil
 }
 func (i *testBankImporter) Extract(_ context.Context, deployment, content string) ([]store.BankTransaction, error) {
@@ -42,6 +43,9 @@ func TestPDFImportReviewAndHybridHTTP(t *testing.T) {
 	mock := &testBankImporter{}
 	srv.SetBankImporter(mock)
 	ctx := t.Context()
+	if err := srv.store.SetAIDeployment(ctx, "synthetic-router"); err != nil {
+		t.Fatal(err)
+	}
 	members, _ := srv.store.ListMembers(ctx, hh.ID)
 	categories, _ := srv.store.ListCategories(ctx, hh.ID)
 	var category int64
@@ -67,7 +71,7 @@ func TestPDFImportReviewAndHybridHTTP(t *testing.T) {
 	upload := func(selectedAccount string) *httptest.ResponseRecorder {
 		var body bytes.Buffer
 		writer := multipart.NewWriter(&body)
-		for key, value := range map[string]string{"household": hhID, "account": selectedAccount, "deployment": "synthetic-router"} {
+		for key, value := range map[string]string{"household": hhID, "account": selectedAccount, "deployment": "forged-upload-model"} {
 			if err := writer.WriteField(key, value); err != nil {
 				t.Fatal(err)
 			}
@@ -87,6 +91,15 @@ func TestPDFImportReviewAndHybridHTTP(t *testing.T) {
 	}
 	if w := upload(""); w.Code != http.StatusNotFound || mock.calls != 0 {
 		t.Fatalf("missing account: %d calls %d", w.Code, mock.calls)
+	}
+	if err := srv.store.SetAIDeployment(ctx, ""); err != nil {
+		t.Fatal(err)
+	}
+	if w := upload(account); w.Code != http.StatusBadRequest || mock.calls != 0 {
+		t.Fatalf("upload-supplied model bypassed missing global setting: %d calls %d", w.Code, mock.calls)
+	}
+	if err := srv.store.SetAIDeployment(ctx, "synthetic-router"); err != nil {
+		t.Fatal(err)
 	}
 	if w := upload(account); w.Code != http.StatusSeeOther {
 		t.Fatalf("upload without consent checkbox: %d %s", w.Code, w.Body)
@@ -143,9 +156,13 @@ func TestPDFImportReviewAndHybridHTTP(t *testing.T) {
 	}
 }
 
-func TestImportAccountSetupAndUploadHints(t *testing.T) {
+func TestImportUsesDefaultAccountsAndSettingsLinks(t *testing.T) {
 	srv, handler, hh := newTestServer(t)
-	srv.SetBankImporter(&testBankImporter{})
+	mock := &testBankImporter{}
+	srv.SetBankImporter(mock)
+	if err := srv.store.SetAIDeployment(t.Context(), "synthetic-router"); err != nil {
+		t.Fatal(err)
+	}
 	accountSelect := regexp.MustCompile(`(?s)<select\b[^>]*name="account"[^>]*>.*?</select>`)
 	analyzeButton := regexp.MustCompile(`(?s)<button\b[^>]*type="submit"[^>]*>[^<]*</button>`)
 	render := func(lang i18n.Lang) (string, string, string) {
@@ -174,48 +191,53 @@ func TestImportAccountSetupAndUploadHints(t *testing.T) {
 		if strings.Contains(strings.ToLower(body), "forecast-tool") || strings.Contains(body, `name="consent"`) {
 			t.Fatal("removed project reference or consent checkbox still rendered")
 		}
+		if strings.Contains(body, `name="deployment"`) || strings.Contains(body, "AZURE_RESOURCE_ID") ||
+			strings.Contains(body, `action="/imports/accounts"`) {
+			t.Fatal("configuration must not appear in the import workflow")
+		}
 		if !strings.Contains(body, i18n.T(lang, "import.reviewHint")) {
 			t.Fatal("the review warning must remain")
 		}
 		return body, selectHTML, button
 	}
-	for _, lang := range []i18n.Lang{i18n.German, i18n.English} {
-		body, selectHTML, button := render(lang)
-		if !strings.Contains(selectHTML, " disabled") || !strings.Contains(selectHTML, i18n.T(lang, "import.noAccounts")) ||
-			!strings.Contains(button, " disabled") || !strings.Contains(body, `href="#bank-account-name"`) ||
-			!strings.Contains(body, `id="bank-account-name"`) {
-			t.Fatalf("missing actionable empty account state for %s", lang)
-		}
-	}
 	members, err := srv.store.ListMembers(t.Context(), hh.ID)
 	if err != nil {
 		t.Fatal(err)
-	}
-	w := post(t, handler, "/imports/accounts", url.Values{
-		"household": {strconv.FormatInt(hh.ID, 10)}, "name": {"Synthetic account"},
-		"member": {strconv.FormatInt(members[0].ID, 10)},
-	})
-	if w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/imports" {
-		t.Fatalf("account creation must refresh the import page: %d %s", w.Code, w.Body)
 	}
 	ledger, err := srv.store.BankLedger(t.Context(), hh.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, lang := range []i18n.Lang{i18n.German, i18n.English} {
-		_, selectHTML, button := render(lang)
+		body, selectHTML, button := render(lang)
 		if strings.Contains(selectHTML, " disabled") || strings.Contains(button, " disabled") ||
-			!strings.Contains(selectHTML, "Synthetic account") ||
+			!strings.Contains(selectHTML, members[0].Name) ||
+			!strings.Contains(selectHTML, i18n.T(lang, "settings.defaultAccount")) ||
 			!strings.Contains(selectHTML, `value="`+strconv.FormatInt(ledger.Accounts[0].ID, 10)+`"`) ||
-			strings.Contains(selectHTML, i18n.T(lang, "import.noAccounts")) {
-			t.Fatalf("created account is not selectable for %s", lang)
+			!strings.Contains(body, `href="/settings#bank-accounts"`) {
+			t.Fatalf("default account is not selectable for %s", lang)
+		}
+	}
+	if mock.discoveryCalls != 0 {
+		t.Fatal("opening Import must not discover models")
+	}
+	for _, m := range members {
+		if err := srv.store.DeleteMember(t.Context(), hh.ID, m.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, lang := range []i18n.Lang{i18n.German, i18n.English} {
+		body, selectHTML, button := render(lang)
+		if !strings.Contains(selectHTML, " disabled") || !strings.Contains(selectHTML, i18n.T(lang, "import.noAccounts")) ||
+			!strings.Contains(button, " disabled") || !strings.Contains(body, `href="/settings#people"`) {
+			t.Fatalf("missing actionable empty member state for %s", lang)
 		}
 	}
 }
 
 func TestImportDisabledAndStaleHousehold(t *testing.T) {
 	srv, handler, hh := newTestServer(t)
-	if w := get(t, handler, "/imports"); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "KI-Import ist deaktiviert") {
+	if w := get(t, handler, "/imports"); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `href="/settings#import-ai"`) {
 		t.Fatalf("disabled page: %d %s", w.Code, w.Body)
 	}
 	if w := post(t, handler, "/imports/upload", nil); w.Code != http.StatusServiceUnavailable {

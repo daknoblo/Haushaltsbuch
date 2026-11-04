@@ -281,6 +281,15 @@
   document.body.addEventListener("htmx:afterRequest", function (e) {
     var d = e.detail;
     if (!d) return;
+    var settingsForm = d.elt && d.elt.closest("[data-settings-save]");
+    if (settingsForm) {
+      var settingsError = settingsForm.querySelector("[data-settings-error]");
+      if (settingsError) {
+        settingsError.textContent = d.successful ? "" :
+          (d.xhr && d.xhr.responseText.trim()) || settingsError.getAttribute("data-fallback");
+        settingsError.hidden = d.successful;
+      }
+    }
     var dlg = currentDialog();
     if (dlg && d.elt && dlg.contains(d.elt)) {
       var error = dlg.querySelector("[data-save-errors]");

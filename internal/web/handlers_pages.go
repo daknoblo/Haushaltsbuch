@@ -115,6 +115,10 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
+	if vm.ImportAI, err = s.importAISettings(r); err != nil {
+		s.serverError(w, r, err)
+		return
+	}
 	s.render(w, r, SettingsPage(nav, vm))
 }
 
@@ -574,6 +578,9 @@ func (s *Server) buildSettingsVM(ctx context.Context) (SettingsVM, error) {
 		return vm, nil
 	}
 	if vm.Members, err = s.store.ListMembers(ctx, activeID); err != nil {
+		return SettingsVM{}, err
+	}
+	if vm.BankAccounts, err = s.store.ListBankAccounts(ctx, activeID); err != nil {
 		return SettingsVM{}, err
 	}
 	if vm.Categories, err = s.store.ListCategories(ctx, activeID); err != nil {

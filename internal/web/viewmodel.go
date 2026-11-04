@@ -1004,17 +1004,19 @@ func ShareAllocation(l calc.ShareLine, member int64) string {
 
 // SettingsVM is the view model of the settings page.
 type SettingsVM struct {
-	Households  []store.Household
-	ActiveID    int64
-	Members     []store.Member
-	Categories  []store.Category
-	Tags        []store.Tag
-	CatUsage    map[int64]int
-	Suggestions []store.SeedCategory
-	Icons       []string
-	Carry       CarryVM
-	Stats       store.Stats
-	Plan        calc.MonthReport
+	BankAccounts []store.BankAccount
+	ImportAI     ImportAISettingsVM
+	Households   []store.Household
+	ActiveID     int64
+	Members      []store.Member
+	Categories   []store.Category
+	Tags         []store.Tag
+	CatUsage     map[int64]int
+	Suggestions  []store.SeedCategory
+	Icons        []string
+	Carry        CarryVM
+	Stats        store.Stats
+	Plan         calc.MonthReport
 }
 
 // UsageOf returns how many bookings still reference a category.

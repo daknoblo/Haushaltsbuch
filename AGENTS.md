@@ -49,6 +49,11 @@ document wins over this file unless a deviation is listed below.
   integer-cent snapshots. Transfers between own accounts never count as income
   or expenses. Exact files are deduplicated per account; identical payments
   require explicit confirmation rather than silently dropping repeated rows.
+  Each member has exactly one default bank account and may have additional
+  accounts. Member creation and default-account creation are atomic; upgrades
+  and old backup restores reuse existing accounts without changing their IDs.
+  Only unused non-default accounts can be deleted individually. Deleting an
+  unused member removes their unused accounts; history still blocks deletion.
 - **Reconciled month** – an explicit household-wide completeness assertion.
   Pending rows block closure; current/future months stay open. Closed months
   must be reopened before importing or reviewing additional payments.
@@ -105,6 +110,13 @@ Optional PDF import uses `AZURE_RESOURCE_ID`, `AZURE_TENANT_ID`,
 configuration fails startup. `internal/bankimport` extracts PDF text locally,
 discovers chat deployments via ARM and authenticates using an explicit
 client-secret identity. It never uses ambient developer credentials.
+The deployment is selected in Settings and saved globally in `app_state`, not
+per household or per upload. Import requests use that saved selection, ignoring
+any submitted deployment. Account administration also belongs in Settings;
+Import only selects the member's bank account and performs analysis/review.
+Backup format 3 includes the non-secret model selection and default-account
+markers; formats 1 and 2 still restore, with missing account defaults backfilled
+only after all original IDs have been restored.
 Text is sent only when the user starts analysis; there is no separate consent
 checkbox. Never log document text,
 model output or credentials. AI output is an untrusted proposal and never

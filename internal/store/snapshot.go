@@ -9,15 +9,16 @@ import (
 // SnapshotVersion is the layout of a backup file. It is written into every
 // snapshot so a future change can tell an old file apart instead of importing
 // it into the wrong shape.
-const SnapshotVersion = 2
+const SnapshotVersion = 3
 
 // Snapshot is a household book in full: everything the application stores, in
 // one structure that survives a round trip through a file.
 type Snapshot struct {
-	Version    int                 `json:"version"`
-	CreatedAt  string              `json:"created_at"`
-	ActiveID   int64               `json:"active_household_id"`
-	Households []HouseholdSnapshot `json:"households"`
+	Version      int                 `json:"version"`
+	CreatedAt    string              `json:"created_at"`
+	ActiveID     int64               `json:"active_household_id"`
+	AIDeployment string              `json:"ai_deployment,omitempty"`
+	Households   []HouseholdSnapshot `json:"households"`
 }
 
 // HouseholdSnapshot is one household with everything that belongs to it.
@@ -60,6 +61,9 @@ func (s *Store) exportSnapshot(ctx context.Context) (Snapshot, error) {
 		return Snapshot{}, err
 	}
 	snap.ActiveID = active
+	if snap.AIDeployment, err = s.AIDeployment(ctx); err != nil {
+		return Snapshot{}, err
+	}
 
 	households, err := s.ListHouseholds(ctx)
 	if err != nil {
@@ -113,7 +117,7 @@ func (s *Store) exportSnapshot(ctx context.Context) (Snapshot, error) {
 // were exported with, which is what lets every reference between them stay
 // intact without a remapping pass.
 func (s *Store) Import(ctx context.Context, snap Snapshot) error {
-	if snap.Version != 1 && snap.Version != SnapshotVersion {
+	if snap.Version < 1 || snap.Version > SnapshotVersion {
 		return fmt.Errorf("%w: version %d", ErrBadSnapshot, snap.Version)
 	}
 	if len(snap.Households) == 0 {
@@ -128,6 +132,17 @@ func (s *Store) Import(ctx context.Context, snap Snapshot) error {
 			if err := tx.importHousehold(ctx, hs); err != nil {
 				return err
 			}
+		}
+		// Restore all original IDs before creating accounts missing from old backups.
+		for _, hs := range snap.Households {
+			for _, m := range hs.Members {
+				if err := tx.ensureMemberBankAccount(ctx, hs.Household.ID, m.ID); err != nil {
+					return err
+				}
+			}
+		}
+		if err := tx.SetAIDeployment(ctx, snap.AIDeployment); err != nil {
+			return fmt.Errorf("%w: %w", ErrBadSnapshot, err)
 		}
 		active := snap.ActiveID
 		if !hasHousehold(snap, active) {

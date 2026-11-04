@@ -12,80 +12,39 @@ templ ImportsPage(nav Nav, vm ImportVM) {
 		if nav.ActiveHousehold.ID == 0 {
 			@noHousehold()
 		} else {
-			<div class="grid gap-4 lg:grid-cols-2">
-				<section class="card">
-					<h2 class="mb-3 font-semibold">{ T(ctx, "import.accounts") }</h2>
-					for _, a := range vm.Ledger.Accounts {
-						<p class="mb-2">
-							{ a.Name } ·
-							for _, m := range vm.Data.Members {
-								if m.ID == a.MemberID {
-									{ m.Name }
-								}
-							}
-						</p>
-						<form method="post" action={ "/imports/accounts/" + strconv.FormatInt(a.ID, 10) + "/delete" } class="mb-3">
-							@importHouseholdField(nav)
-							<button type="submit" class="btn-ghost">{ T(ctx, "import.deleteUnusedAccount") }</button>
-						</form>
-					}
-					<form method="post" action="/imports/accounts" class="grid gap-3">
+			<section class="card">
+				<h2 class="mb-3 font-semibold">{ T(ctx, "import.upload") }</h2>
+				if !vm.AIEnabled || !vm.AIConfigured {
+					<p class="alert-info">{ T(ctx, "import.configureModel") }</p>
+					<a class="btn-ghost mt-3" href="/settings#import-ai">{ T(ctx, "import.openAISettings") }</a>
+				} else {
+					<form method="post" action="/imports/upload" enctype="multipart/form-data" class="grid gap-3" data-bank-upload>
 						@importHouseholdField(nav)
-						<label>{ T(ctx, "import.accountName") }<input id="bank-account-name" class="input w-full" name="name" placeholder={ T(ctx, "import.accountExample") } maxlength="120" required/></label>
 						<label>
-							{ T(ctx, "import.owner") }
-							<select class="input w-full" name="member" required>
-								for _, m := range vm.Data.Members {
-									<option value={ strconv.FormatInt(m.ID, 10) }>{ m.Name }</option>
+							{ T(ctx, "import.account") }
+							<select class="input w-full" name="account" required disabled?={ len(vm.Ledger.Accounts) == 0 }>
+								if len(vm.Ledger.Accounts) == 0 {
+									<option value="" selected>{ T(ctx, "import.noAccounts") }</option>
+								} else {
+									for _, a := range vm.Ledger.Accounts {
+										<option value={ strconv.FormatInt(a.ID, 10) }>{ BankAccountLabel(ctx, a, vm.Data.Members) }</option>
+									}
 								}
 							</select>
 						</label>
-						<button class="btn-primary" type="submit">{ T(ctx, "action.add") }</button>
+						if len(vm.Ledger.Accounts) == 0 {
+							<p class="text-sm text-slate-500 dark:text-slate-400">
+								{ T(ctx, "import.accountSetup") }
+								<a class="font-medium text-indigo-600 underline dark:text-indigo-400" href="/settings#people">{ T(ctx, "import.openPeopleSettings") }</a>
+							</p>
+						}
+						<a class="text-sm text-indigo-600 underline dark:text-indigo-400" href="/settings#bank-accounts">{ T(ctx, "import.manageBankAccounts") }</a>
+						<label>{ T(ctx, "import.file") }<input class="input w-full" type="file" name="statement" accept="application/pdf,.pdf" required/></label>
+						<button class="btn-primary" type="submit" disabled?={ len(vm.Ledger.Accounts) == 0 }>{ T(ctx, "import.analyze") }</button>
+						<p class="alert-info" data-bank-progress hidden>{ T(ctx, "import.progress") }</p>
 					</form>
-				</section>
-				<section class="card">
-					<h2 class="mb-3 font-semibold">{ T(ctx, "import.upload") }</h2>
-					<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "import.azureConfig") }</p>
-					if !vm.AIEnabled {
-						<p class="alert-info">{ T(ctx, "import.disabled") }</p>
-					} else if vm.AIError != "" {
-						<p class="alert-error" role="alert">{ vm.AIError }</p>
-					} else {
-						<form method="post" action="/imports/upload" enctype="multipart/form-data" class="grid gap-3" data-bank-upload>
-							@importHouseholdField(nav)
-							<label>
-								{ T(ctx, "import.account") }
-								<select class="input w-full" name="account" required disabled?={ len(vm.Ledger.Accounts) == 0 }>
-									if len(vm.Ledger.Accounts) == 0 {
-										<option value="" selected>{ T(ctx, "import.noAccounts") }</option>
-									} else {
-										for _, a := range vm.Ledger.Accounts {
-											<option value={ strconv.FormatInt(a.ID, 10) }>{ a.Name }</option>
-										}
-									}
-								</select>
-							</label>
-							if len(vm.Ledger.Accounts) == 0 {
-								<p class="text-sm text-slate-500 dark:text-slate-400">
-									{ T(ctx, "import.accountSetup") }
-									<a class="font-medium text-indigo-600 underline dark:text-indigo-400" href="#bank-account-name">{ T(ctx, "import.addAccount") }</a>
-								</p>
-							}
-							<label>
-								{ T(ctx, "import.deployment") }
-								<select class="input w-full" name="deployment" required>
-									for _, d := range vm.Deployments {
-										<option value={ d }>{ d }</option>
-									}
-								</select>
-							</label>
-							<label>{ T(ctx, "import.file") }<input class="input w-full" type="file" name="statement" accept="application/pdf,.pdf" required/></label>
-							<button class="btn-primary" type="submit" disabled?={ len(vm.Deployments) == 0 || len(vm.Ledger.Accounts) == 0 }>{ T(ctx, "import.analyze") }</button>
-							<p class="alert-info" data-bank-progress hidden>{ T(ctx, "import.progress") }</p>
-						</form>
-					}
-				</section>
-			</div>
+				}
+			</section>
 			<section class="card mt-4">
 				<div class="flex flex-wrap items-center gap-3">
 					<h2 class="font-semibold">{ nav.CurrentMonthLabel(ctx) }</h2>
@@ -228,7 +187,7 @@ templ importPayment(nav Nav, vm ImportVM, row ImportRow) {
 							<option value="0">{ T(ctx, "import.choose") }</option>
 							for _, a := range vm.Ledger.Accounts {
 								if a.ID != row.AccountID {
-									<option value={ strconv.FormatInt(a.ID, 10) } selected?={ a.ID == row.Payment.TransferAccountID }>{ a.Name }</option>
+									<option value={ strconv.FormatInt(a.ID, 10) } selected?={ a.ID == row.Payment.TransferAccountID }>{ BankAccountLabel(ctx, a, vm.Data.Members) }</option>
 								}
 							}
 						</select>

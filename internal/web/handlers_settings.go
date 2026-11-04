@@ -140,6 +140,7 @@ func (s *Server) handleMemberCreate(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
+	memberSettingsChanged(w)
 	s.render(w, r, MemberRowView(m))
 }
 
@@ -173,7 +174,8 @@ func (s *Server) handleMemberUpdate(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, r, err)
 		return
 	}
-	hxChanged(w)
+	memberSettingsChanged(w)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleMemberDelete(w http.ResponseWriter, r *http.Request) {
@@ -189,6 +191,7 @@ func (s *Server) handleMemberDelete(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, r, err)
 		return
 	}
+	memberSettingsChanged(w)
 	w.WriteHeader(http.StatusOK)
 }
 

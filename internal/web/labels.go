@@ -57,6 +57,21 @@ func DirectionOptions(ctx context.Context) []Option {
 	}
 }
 
+// BankAccountLabel makes the owner and bank account distinct from Azure identity.
+func BankAccountLabel(ctx context.Context, account store.BankAccount, members []store.Member) string {
+	label := account.Name
+	for _, m := range members {
+		if m.ID == account.MemberID {
+			label = m.Name + " · " + account.Name
+			break
+		}
+	}
+	if account.Default {
+		label += " (" + T(ctx, "settings.defaultAccount") + ")"
+	}
+	return label
+}
+
 // CostNatureLabel returns the localized label for a cost nature.
 func CostNatureLabel(ctx context.Context, c store.CostNature) string {
 	if c == store.CostVariable {
