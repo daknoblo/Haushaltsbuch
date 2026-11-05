@@ -14,6 +14,13 @@ for actual payments. There is no direct bank connection.
 Repository-wide conventions are defined in `daknoblo/REPO-STANDARD.md`. That
 document wins over this file unless a deviation is listed below.
 
+## UI design principles
+
+Contextually unavailable actions stay visible, visually muted and functionally
+disabled rather than disappearing. Keep their place in the layout, use native
+`disabled` controls where possible, and explain the restriction when helpful.
+Visual disabling never replaces server-side validation.
+
 ## Domain model
 
 - **Household** – the top-level container. Exactly one is active at a time; the

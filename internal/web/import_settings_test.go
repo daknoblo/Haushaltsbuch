@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net/http"
@@ -9,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"golang.org/x/net/html"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/bankimport"
 	"github.com/daknoblo/Haushaltsbuch/internal/i18n"
@@ -112,6 +115,45 @@ func TestImportModelSettingsAreGlobalAndValidated(t *testing.T) {
 	}
 	if model, _ := srv.store.AIDeployment(ctx); model != "" {
 		t.Fatal("clearing not global")
+	}
+}
+
+func TestDefaultAccountDeleteRemainsVisibleAndDisabled(t *testing.T) {
+	var body bytes.Buffer
+	if err := bankAccountSettings(1, []store.Member{{ID: 1, Name: "Example"}},
+		[]store.BankAccount{{ID: 1, MemberID: 1, Name: "Default", Default: true}, {ID: 2, MemberID: 1, Name: "Additional"}},
+	).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	document, err := html.Parse(&body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buttons []map[string]string
+	var visit func(*html.Node)
+	visit = func(node *html.Node) {
+		if node.Type == html.ElementNode && node.Data == "button" {
+			attributes := map[string]string{}
+			for _, attribute := range node.Attr {
+				attributes[attribute.Key] = attribute.Val
+			}
+			if attributes["aria-label"] == T(t.Context(), "import.deleteUnusedAccount") {
+				buttons = append(buttons, attributes)
+			}
+		}
+		for child := node.FirstChild; child != nil; child = child.NextSibling {
+			visit(child)
+		}
+	}
+	visit(document)
+	if len(buttons) != 2 {
+		t.Fatalf("delete controls = %d, want one per account", len(buttons))
+	}
+	if _, disabled := buttons[0]["disabled"]; !disabled || buttons[0]["type"] != "button" || buttons[0]["title"] != T(t.Context(), "settings.defaultAccountProtected") {
+		t.Fatal("default delete icon must be visible, natively disabled and explain the restriction")
+	}
+	if _, disabled := buttons[1]["disabled"]; disabled || buttons[1]["type"] != "submit" {
+		t.Fatal("additional account deletion was disabled")
 	}
 }
 
