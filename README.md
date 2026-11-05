@@ -223,6 +223,37 @@ Accepting a payment never creates a plan implicitly. An accepted, unlinked
 payment can explicitly create a new future plan with a chosen start and
 frequency. Existing plans are edited through the normal booking editor.
 
+#### Plausibility check
+
+Open **Settings → Plausibility check**, select a calendar year, then run the
+check explicitly. It reads a transaction-consistent snapshot of the active
+household, without AI, corrections, generated booking rows or saved report
+copies. Plan bookings, imported rows and accepted actual payments are counted
+separately; keeping a plan and its linked payment is not itself a duplicate.
+
+The check covers relationships, allocations, default accounts, closed-month
+consistency and possible duplicates across the whole household, including
+overlapping same-name recurring plans. Recurring date ranges are evaluated by
+month, not prorated by day; consecutive prices must not share a month. For the selected
+year it checks Plan, Actual and Hybrid for the household and every member:
+monthly amounts against an independent rational-cent reference, period averages,
+categories/tags, fixed/variable costs, budget classes, matrix totals/active-month
+averages/medians, chart values, flow conservation and settlement. It also renders
+the actual overview/dashboard headline components and checks their visible text,
+including income-coverage-based period selection. Monetary normalization and
+allocation use exact fractions; equal remainders go to stable IDs. Explicitly
+allocated zero payments stay valid, and display formatting does not truncate
+aggregates at the single-input limit.
+
+Invalid source data prevents the calculation phase; incomplete plan allocations
+and possible duplicates are review notices, not automatic corrections. Actual
+allocations remain their original snapshots after plan changes. Missing income,
+closed actual zero-income months, historical plan estimates, N:M tags and
+elapsed-year settlement retain their distinct meanings. No discrepancies means
+only that the checked values agree: it does not prove complete statements,
+correct real-world inputs or visual PDF correctness. Run again after edits.
+At most 100 findings are displayed; the summary counts all findings.
+
 Identical file bytes are rejected per account, before any paid AI request.
 To re-analyze a file, undo any accepted decisions, reopen its affected months
 and discard that import from the history first. Unused non-default accounts can

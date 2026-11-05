@@ -15,6 +15,8 @@ type Stats struct {
 	Recurring        int
 	Overrides        int
 	Splits           int
+	BankTransactions int
+	AcceptedPayments int
 	// FirstMonth and LastMonth are the outer edges of what the book plans for,
 	// which says at a glance whether it still reaches into the coming year.
 	FirstMonth string
@@ -36,10 +38,12 @@ func (s *Store) Stats(ctx context.Context, householdID int64) (Stats, error) {
 			(SELECT COUNT(*) FROM members WHERE household_id = ?1),
 			(SELECT COUNT(*) FROM categories WHERE household_id = ?1),
 			(SELECT COUNT(*) FROM categories c WHERE c.household_id = ?1
-			   AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.category_id = c.id)),
+			   AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.category_id = c.id)
+			   AND NOT EXISTS (SELECT 1 FROM bank_transactions b WHERE b.category_id = c.id)),
 			(SELECT COUNT(*) FROM tags WHERE household_id = ?1),
 			(SELECT COUNT(*) FROM tags t WHERE t.household_id = ?1
-			   AND NOT EXISTS (SELECT 1 FROM booking_tags bt WHERE bt.tag_id = t.id)),
+			   AND NOT EXISTS (SELECT 1 FROM booking_tags bt WHERE bt.tag_id = t.id)
+			   AND NOT EXISTS (SELECT 1 FROM bank_tags bt WHERE bt.tag_id = t.id)),
 			(SELECT COUNT(*) FROM bookings WHERE household_id = ?1),
 			(SELECT COUNT(*) FROM bookings WHERE household_id = ?1 AND frequency <> ?2),
 			(SELECT COUNT(*) FROM booking_overrides o
@@ -48,12 +52,15 @@ func (s *Store) Stats(ctx context.Context, householdID int64) (Stats, error) {
 			   JOIN bookings b ON b.id = sp.booking_id WHERE b.household_id = ?1),
 			(SELECT COALESCE(MIN(starts_on), '') FROM bookings WHERE household_id = ?1 AND starts_on <> ''),
 			(SELECT COALESCE(MAX(ends_on), '') FROM bookings WHERE household_id = ?1 AND ends_on <> ''),
-			(SELECT COALESCE(MAX(updated_at), '') FROM bookings WHERE household_id = ?1)`,
+			(SELECT COALESCE(MAX(updated_at), '') FROM bookings WHERE household_id = ?1),
+			(SELECT COUNT(*) FROM bank_transactions WHERE household_id = ?1),
+			(SELECT COUNT(*) FROM bank_transactions WHERE household_id = ?1 AND decision = 'accepted')`,
 		householdID, string(FreqOnce),
 	).Scan(
 		&out.Households, &out.Members, &out.Categories, &out.UnusedCategories,
 		&out.Tags, &out.UnusedTags, &out.Bookings, &out.Recurring,
 		&out.Overrides, &out.Splits, &out.FirstMonth, &out.LastMonth, &out.UpdatedAt,
+		&out.BankTransactions, &out.AcceptedPayments,
 	)
 	if err != nil {
 		return Stats{}, err

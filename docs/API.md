@@ -51,6 +51,11 @@ the rate limit still apply.
 - Money travels as **integer cents** in every response. A request may use either
   `amount` (Euro, may have decimals) or `amount_cents` (integer). If both are
   given, `amount_cents` wins.
+  Monthly normalization and allocation use exact rational arithmetic before
+  rounding to cents. Equal fractional remainders are assigned by stable IDs.
+  Percentage shares must sum to exactly 100 in decimal notation to count as a
+  complete allocation; use `equal` for an equal split that cannot be expressed
+  as finite decimal percentages.
 - Dates are `YYYY-MM-DD`, months are `YYYY-MM`.
 - Date ranges allow empty, open bounds and include both endpoints. A nonempty
   end must not precede the start; invalid dates or reversed ranges return `400`.

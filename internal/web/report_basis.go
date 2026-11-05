@@ -32,15 +32,11 @@ func withReportBasis(next http.Handler) http.Handler {
 }
 
 func (s *Server) loadReportData(ctx context.Context, householdID int64) (calc.Data, error) {
-	data, err := s.loadHouseholdData(ctx, householdID)
+	snapshot, err := s.store.ReadHousehold(ctx, householdID)
 	if err != nil {
 		return calc.Data{}, err
 	}
-	ledger, err := s.store.BankLedger(ctx, householdID)
-	if err != nil {
-		return calc.Data{}, err
-	}
-	return calc.WithBankLedger(data, ledger, reportBasis(ctx), time.Now().Format("2006-01")), nil
+	return calc.WithBankLedger(calc.FromSnapshot(snapshot), snapshot.Bank, reportBasis(ctx), time.Now().Format("2006-01")), nil
 }
 
 // SourceLabel distinguishes confirmed actuals from partial data and estimates.

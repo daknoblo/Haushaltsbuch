@@ -1,6 +1,7 @@
 package web
 
 import "github.com/daknoblo/Haushaltsbuch/internal/store"
+import "github.com/daknoblo/Haushaltsbuch/internal/calc"
 
 templ OverviewPage(nav Nav, vm OverviewVM) {
 	@Layout(nav) {
@@ -11,11 +12,7 @@ templ OverviewPage(nav Nav, vm OverviewVM) {
 		} else {
 			@basisSwitch(nav)
 			<p class="alert-info mb-4">{ SourceLabel(ctx, vm.Report.Source) } · { T(ctx, "basis.explanation") }</p>
-			<div class="grid gap-4 sm:grid-cols-3">
-				@statTile(T(ctx, "overview.income"), FormatEUR(vm.Report.IncomeCents), nav.CurrentMonthLabel(ctx), "text-emerald-600 dark:text-emerald-400")
-				@statTile(T(ctx, "overview.expenses"), FormatEUR(vm.Report.ExpenseCents), SourceLabel(ctx, vm.Report.Source), "text-rose-600 dark:text-rose-400")
-				@statTile(T(ctx, "overview.balance"), FormatEUR(vm.Report.BalanceCents), T(ctx, "overview.balanceHint"), balanceTone(vm.Report.BalanceCents))
-			</div>
+			@overviewTiles(nav, vm.Report)
 			if vm.Compare {
 				<div class="card mt-4 overflow-x-auto">
 					<h2 class="mb-3 font-semibold">{ T(ctx, "basis.comparison") }</h2>
@@ -100,10 +97,18 @@ templ OverviewPage(nav Nav, vm OverviewVM) {
 	}
 }
 
+templ overviewTiles(nav Nav, report calc.MonthReport) {
+	<div class="grid gap-4 sm:grid-cols-3">
+		@statTile(T(ctx, "overview.income"), FormatEUR(report.IncomeCents), nav.CurrentMonthLabel(ctx), "text-emerald-600 dark:text-emerald-400")
+		@statTile(T(ctx, "overview.expenses"), FormatEUR(report.ExpenseCents), SourceLabel(ctx, report.Source), "text-rose-600 dark:text-rose-400")
+		@statTile(T(ctx, "overview.balance"), FormatEUR(report.BalanceCents), T(ctx, "overview.balanceHint"), balanceTone(report.BalanceCents))
+	</div>
+}
+
 templ statTile(label string, value string, sub string, tone string) {
 	<div class="card text-center">
 		<div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{ label }</div>
-		<div class={ "tnum mt-1 text-2xl font-semibold tracking-tight", tone }>{ value }</div>
+		<div data-stat={ label } class={ "tnum mt-1 text-2xl font-semibold tracking-tight", tone }>{ value }</div>
 		<div class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">{ sub }</div>
 	</div>
 }

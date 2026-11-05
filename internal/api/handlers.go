@@ -270,17 +270,12 @@ func (s *Server) handleReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := s.load(r, id)
+	snapshot, err := s.store.ReadHousehold(r.Context(), id)
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	ledger, err := s.store.BankLedger(r.Context(), id)
-	if err != nil {
-		s.fail(w, r, err)
-		return
-	}
-	data = calc.WithBankLedger(data, ledger, basis, time.Now().Format("2006-01"))
+	data := calc.WithBankLedger(calc.FromSnapshot(snapshot), snapshot.Bank, basis, time.Now().Format("2006-01"))
 	rep := calc.BuildMonthReport(data, month, member)
 
 	classes := make(map[string]int64, len(rep.ByBudgetClass))
@@ -330,33 +325,11 @@ func (s *Server) member(w http.ResponseWriter, r *http.Request, householdID int6
 
 // load assembles what the calc package needs for a report.
 func (s *Server) load(r *http.Request, householdID int64) (calc.Data, error) {
-	ctx := r.Context()
-	var (
-		d   calc.Data
-		err error
-	)
-	if d.Members, err = s.store.ListMembers(ctx, householdID); err != nil {
+	snapshot, err := s.store.ReadHousehold(r.Context(), householdID)
+	if err != nil {
 		return calc.Data{}, err
 	}
-	if d.Categories, err = s.store.ListCategories(ctx, householdID); err != nil {
-		return calc.Data{}, err
-	}
-	if d.Tags, err = s.store.ListTags(ctx, householdID); err != nil {
-		return calc.Data{}, err
-	}
-	if d.Bookings, err = s.store.ListBookings(ctx, householdID); err != nil {
-		return calc.Data{}, err
-	}
-	if d.Splits, err = s.store.ListSplitsForHousehold(ctx, householdID); err != nil {
-		return calc.Data{}, err
-	}
-	if d.TagLinks, err = s.store.ListBookingTags(ctx, householdID); err != nil {
-		return calc.Data{}, err
-	}
-	if d.Overrides, err = s.store.ListOverridesForHousehold(ctx, householdID); err != nil {
-		return calc.Data{}, err
-	}
-	return d, nil
+	return calc.FromSnapshot(snapshot), nil
 }
 
 // resolveCategory accepts a name as readily as an id, because a script reads

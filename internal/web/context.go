@@ -100,30 +100,11 @@ func (s *Server) buildNav(r *http.Request, active, path string, showMonth bool) 
 // loadHouseholdData reads everything the reports are built from in one go, so
 // several months can be aggregated without re-querying the same rows.
 func (s *Server) loadHouseholdData(ctx context.Context, householdID int64) (calc.Data, error) {
-	var d calc.Data
-	var err error
-	if d.Members, err = s.store.ListMembers(ctx, householdID); err != nil {
+	snapshot, err := s.store.ReadHousehold(ctx, householdID)
+	if err != nil {
 		return calc.Data{}, err
 	}
-	if d.Categories, err = s.store.ListCategories(ctx, householdID); err != nil {
-		return calc.Data{}, err
-	}
-	if d.Tags, err = s.store.ListTags(ctx, householdID); err != nil {
-		return calc.Data{}, err
-	}
-	if d.Bookings, err = s.store.ListBookings(ctx, householdID); err != nil {
-		return calc.Data{}, err
-	}
-	if d.Splits, err = s.store.ListSplitsForHousehold(ctx, householdID); err != nil {
-		return calc.Data{}, err
-	}
-	if d.TagLinks, err = s.store.ListBookingTags(ctx, householdID); err != nil {
-		return calc.Data{}, err
-	}
-	if d.Overrides, err = s.store.ListOverridesForHousehold(ctx, householdID); err != nil {
-		return calc.Data{}, err
-	}
-	return d, nil
+	return calc.FromSnapshot(snapshot), nil
 }
 
 // buildMonthReport aggregates one month for the whole household, which is the

@@ -70,47 +70,79 @@ func (s *Store) exportSnapshot(ctx context.Context) (Snapshot, error) {
 		return Snapshot{}, err
 	}
 	for _, h := range households {
-		hs := HouseholdSnapshot{Household: h}
-		if hs.Members, err = s.ListMembers(ctx, h.ID); err != nil {
-			return Snapshot{}, err
-		}
-		if hs.Categories, err = s.ListCategories(ctx, h.ID); err != nil {
-			return Snapshot{}, err
-		}
-		if hs.Tags, err = s.ListTags(ctx, h.ID); err != nil {
-			return Snapshot{}, err
-		}
-
-		bookings, err := s.ListBookings(ctx, h.ID)
+		hs, err := s.readHousehold(ctx, h.ID)
 		if err != nil {
-			return Snapshot{}, err
-		}
-		splits, err := s.ListSplitsForHousehold(ctx, h.ID)
-		if err != nil {
-			return Snapshot{}, err
-		}
-		tags, err := s.ListBookingTags(ctx, h.ID)
-		if err != nil {
-			return Snapshot{}, err
-		}
-		overrides, err := s.ListOverridesForHousehold(ctx, h.ID)
-		if err != nil {
-			return Snapshot{}, err
-		}
-		for _, b := range bookings {
-			hs.Bookings = append(hs.Bookings, BookingSnapshot{
-				Booking:   b,
-				Splits:    splits[b.ID],
-				TagIDs:    tags[b.ID],
-				Overrides: overrides[b.ID],
-			})
-		}
-		if hs.Bank, err = s.BankLedger(ctx, h.ID); err != nil {
 			return Snapshot{}, err
 		}
 		snap.Households = append(snap.Households, hs)
 	}
 	return snap, nil
+}
+
+// ReadHousehold reads plans and payments in one transaction. Reports must not
+// combine a booking from before an edit with its allocation from after it.
+func (s *Store) ReadHousehold(ctx context.Context, id int64) (HouseholdSnapshot, error) {
+	var out HouseholdSnapshot
+	err := s.withTx(ctx, func(tx *Store) error {
+		var err error
+		out, err = tx.readHousehold(ctx, id)
+		return err
+	})
+	return out, err
+}
+
+// InspectHousehold reads the inventory and its underlying rows consistently.
+func (s *Store) InspectHousehold(ctx context.Context, id int64) (HouseholdSnapshot, Stats, error) {
+	var snapshot HouseholdSnapshot
+	var stats Stats
+	err := s.withTx(ctx, func(tx *Store) error {
+		var err error
+		snapshot, err = tx.readHousehold(ctx, id)
+		if err != nil {
+			return err
+		}
+		stats, err = tx.Stats(ctx, id)
+		return err
+	})
+	return snapshot, stats, err
+}
+
+func (s *Store) readHousehold(ctx context.Context, id int64) (HouseholdSnapshot, error) {
+	var out HouseholdSnapshot
+	var err error
+	if out.Household, err = s.GetHousehold(ctx, id); err != nil {
+		return out, err
+	}
+	if out.Members, err = s.ListMembers(ctx, id); err != nil {
+		return out, err
+	}
+	if out.Categories, err = s.ListCategories(ctx, id); err != nil {
+		return out, err
+	}
+	if out.Tags, err = s.ListTags(ctx, id); err != nil {
+		return out, err
+	}
+	bookings, err := s.ListBookings(ctx, id)
+	if err != nil {
+		return out, err
+	}
+	splits, err := s.ListSplitsForHousehold(ctx, id)
+	if err != nil {
+		return out, err
+	}
+	tags, err := s.ListBookingTags(ctx, id)
+	if err != nil {
+		return out, err
+	}
+	overrides, err := s.ListOverridesForHousehold(ctx, id)
+	if err != nil {
+		return out, err
+	}
+	for _, b := range bookings {
+		out.Bookings = append(out.Bookings, BookingSnapshot{Booking: b, Splits: splits[b.ID], TagIDs: tags[b.ID], Overrides: overrides[b.ID]})
+	}
+	out.Bank, err = s.BankLedger(ctx, id)
+	return out, err
 }
 
 // Import replaces the entire database with a snapshot. Rows keep the ids they

@@ -20,23 +20,15 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	}
 	var vm OverviewVM
 	if nav.ActiveHousehold.ID != 0 {
-		rep, err := s.buildMonthReport(r.Context(), nav.ActiveHousehold.ID, nav.Month)
+		snapshot, err := s.store.ReadHousehold(r.Context(), nav.ActiveHousehold.ID)
 		if err != nil {
 			s.serverError(w, r, err)
 			return
 		}
-		vm.Report = rep
-		ledger, err := s.store.BankLedger(r.Context(), nav.ActiveHousehold.ID)
-		if err != nil {
-			s.serverError(w, r, err)
-			return
-		}
+		data := calc.FromSnapshot(snapshot)
+		ledger := snapshot.Bank
+		vm.Report = calc.BuildMonthReport(calc.WithBankLedger(data, ledger, reportBasis(r.Context()), NormalizeMonth("")), nav.Month, calc.Everyone)
 		if len(ledger.Accounts) > 0 {
-			data, err := s.loadHouseholdData(r.Context(), nav.ActiveHousehold.ID)
-			if err != nil {
-				s.serverError(w, r, err)
-				return
-			}
 			vm.Compare = true
 			vm.Plan = calc.BuildMonthReport(data, nav.Month, calc.Everyone)
 			actual := calc.WithBankLedger(data, ledger, calc.BasisActual, NormalizeMonth(""))
@@ -171,8 +163,7 @@ func (s *Server) buildBookingsVM(ctx context.Context, householdID int64, month, 
 }
 
 // carriers names the members a booking is split between, keeping the household
-// order. Nobody picked means nobody carries it, and so does a share of zero:
-// the row must not name someone the report then leaves out.
+// order. A zero fixed share remains visible when the whole booking is zero.
 func carriers(b store.Booking, members []store.Member, splits []store.BookingSplit) []store.Member {
 	out := make([]store.Member, 0, len(splits))
 	for _, m := range members {
@@ -180,7 +171,7 @@ func carriers(b store.Booking, members []store.Member, splits []store.BookingSpl
 			if s.MemberID != m.ID {
 				continue
 			}
-			if b.SplitMode != store.SplitEqual && s.Value == 0 {
+			if b.SplitMode != store.SplitEqual && s.Value == 0 && (b.SplitMode != store.SplitFixed || b.AmountCents != 0) {
 				break
 			}
 			out = append(out, m)
@@ -433,18 +424,22 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 	if err != nil {
 		return DashboardVM{}, err
 	}
+	return dashboardFromData(ctx, data, month, period, member, grouping), nil
+}
+
+func dashboardFromData(ctx context.Context, data calc.Data, month, period string, member int64, grouping string) DashboardVM {
 	period = cleanPeriod(period)
 	member = knownMember(data.Members, member)
 	grouping = calc.CleanGrouping(grouping)
 	months := rangeMonths(period, month)
 	span := len(months)
 	year := calendarYear(month)
-	elapsed := elapsedYearMonths(month, NormalizeMonth(""))
+	elapsed := elapsedYearMonths(month, data.CurrentMonth)
 	recorded := calc.MonthsWithIncome(data, months, member)
 	data = calc.Prepare(data, months, year, elapsed, recorded)
 
 	vm := DashboardVM{
-		Basis:          reportBasis(ctx),
+		Basis:          data.Basis,
 		Report:         calc.PeriodReport(data, recorded, member),
 		RecordedMonths: recorded,
 		Trend:          calc.Trend(data, months, member),
@@ -538,7 +533,7 @@ func (s *Server) buildDashboardVM(ctx context.Context, householdID int64, month,
 	for i := range vm.Views {
 		vm.Views[i].URL += suffix
 	}
-	return vm, nil
+	return vm
 }
 
 // knownMember drops a member id that does not belong to the household, so a
@@ -577,32 +572,26 @@ func (s *Server) buildSettingsVM(ctx context.Context) (SettingsVM, error) {
 	if activeID == 0 {
 		return vm, nil
 	}
-	if vm.Members, err = s.store.ListMembers(ctx, activeID); err != nil {
+	snapshot, stats, err := s.store.InspectHousehold(ctx, activeID)
+	if err != nil {
 		return SettingsVM{}, err
 	}
-	if vm.BankAccounts, err = s.store.ListBankAccounts(ctx, activeID); err != nil {
-		return SettingsVM{}, err
+	vm.Members, vm.Categories, vm.Tags = snapshot.Members, snapshot.Categories, snapshot.Tags
+	vm.BankAccounts, vm.Stats = snapshot.Bank.Accounts, stats
+	vm.CatUsage = make(map[int64]int)
+	for _, row := range snapshot.Bookings {
+		vm.CatUsage[row.Booking.CategoryID]++
 	}
-	if vm.Categories, err = s.store.ListCategories(ctx, activeID); err != nil {
-		return SettingsVM{}, err
-	}
-	if vm.Tags, err = s.store.ListTags(ctx, activeID); err != nil {
-		return SettingsVM{}, err
-	}
-	if vm.CatUsage, err = s.store.CountCategoryUsage(ctx, activeID); err != nil {
-		return SettingsVM{}, err
+	for _, row := range snapshot.Bank.Transactions {
+		if row.CategoryID != 0 {
+			vm.CatUsage[row.CategoryID]++
+		}
 	}
 	vm.Suggestions = suggestCategories(vm.Categories)
 	if vm.Carry, err = s.buildCarryVM(ctx, activeID, vm.Categories); err != nil {
 		return SettingsVM{}, err
 	}
-	if vm.Stats, err = s.store.Stats(ctx, activeID); err != nil {
-		return SettingsVM{}, err
-	}
-	data, err := s.loadHouseholdData(ctx, activeID)
-	if err != nil {
-		return SettingsVM{}, err
-	}
+	data := calc.FromSnapshot(snapshot)
 	vm.Plan = calc.PeriodReport(data, []string{CurrentMonth()}, calc.Everyone)
 	return vm, nil
 }

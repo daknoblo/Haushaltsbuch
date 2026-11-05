@@ -2,6 +2,7 @@ package calc
 
 import (
 	"maps"
+	"math/big"
 	"slices"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
@@ -95,23 +96,29 @@ func ActualAllocation(plan store.Booking, splits []store.BookingSplit, amount in
 	if !completeSplit(plan, splits, plan.AmountCents) {
 		return nil
 	}
-	raw := make(map[int64]float64, len(splits))
-	var total float64
+	raw := make(map[int64]*big.Rat, len(splits))
+	total := new(big.Rat)
 	for _, sp := range splits {
-		weight := sp.Value
+		weight := clampAmount(sp.Value)
+		if plan.SplitMode == store.SplitPercent {
+			weight = ClampPercent(sp.Value)
+		}
 		if plan.SplitMode == store.SplitEqual {
 			weight = 1
 		}
-		if weight > 0 {
-			raw[sp.MemberID] += weight
-			total += weight
+		if weight > 0 || (weight == 0 && amount == 0) {
+			value := decimalAmount(weight)
+			addAmount(raw, sp.MemberID, value)
+			total.Add(total, value)
 		}
 	}
-	if total == 0 {
+	if total.Sign() == 0 && amount != 0 {
 		return nil
 	}
 	for id, weight := range raw {
-		raw[id] = float64(amount) * weight / total
+		if total.Sign() > 0 {
+			raw[id] = new(big.Rat).Quo(new(big.Rat).Mul(big.NewRat(amount, 1), weight), total)
+		}
 	}
 	values := balancedCents(raw, amount)
 	ids := slices.Sorted(maps.Keys(values))

@@ -1,7 +1,7 @@
 package calc
 
 import (
-	"math"
+	"math/big"
 	"sort"
 	"strings"
 
@@ -77,26 +77,26 @@ func evaluateBooking(b store.Booking, splits []store.BookingSplit, overrides []s
 		Cents:    MonthlyCents(b, overrides, month),
 		Complete: completeSplit(b, splits, AmountFor(b, overrides, month)),
 	}
-	raw := make(map[int64]float64, len(splits))
+	raw := make(map[int64]*big.Rat, len(splits))
 	for _, s := range splits {
 		switch b.SplitMode {
 		case store.SplitPercent:
 			if percent := ClampPercent(s.Value); percent > 0 {
-				raw[s.MemberID] += float64(v.Cents) * percent / 100
+				addAmount(raw, s.MemberID, new(big.Rat).Mul(big.NewRat(v.Cents, 100), decimalAmount(percent)))
 			}
 		case store.SplitFixed:
-			if cents := clampAmount(s.Value); cents != 0 {
-				raw[s.MemberID] += cents * monthlyFactor(b)
+			if cents := clampAmount(s.Value); cents != 0 || AmountFor(b, overrides, month) == 0 {
+				addAmount(raw, s.MemberID, monthlyAmount(b, decimalAmount(cents)))
 			}
 		default:
-			raw[s.MemberID] += float64(v.Cents) / float64(len(splits))
+			addAmount(raw, s.MemberID, big.NewRat(v.Cents, int64(len(splits))))
 		}
 	}
-	var assigned float64
+	assigned := new(big.Rat)
 	for _, cents := range raw {
-		assigned += cents
+		assigned.Add(assigned, cents)
 	}
-	target := round(assigned)
+	target := roundAmount(assigned)
 	if v.Complete && len(raw) > 0 {
 		target = v.Cents
 	}
@@ -108,18 +108,18 @@ func evaluateBooking(b store.Booking, splits []store.BookingSplit, overrides []s
 // Validate before monthly normalization, so even a missing cent in a yearly
 // fixed split remains visible rather than disappearing into rounding.
 func completeSplit(b store.Booking, splits []store.BookingSplit, amount int64) bool {
-	var sum float64
+	sum := new(big.Rat)
 	switch b.SplitMode {
 	case store.SplitPercent:
 		for _, s := range splits {
-			sum += ClampPercent(s.Value)
+			sum.Add(sum, decimalAmount(ClampPercent(s.Value)))
 		}
-		return math.Abs(sum-100) < 1e-9
+		return sum.Cmp(big.NewRat(100, 1)) == 0
 	case store.SplitFixed:
 		for _, s := range splits {
-			sum += clampAmount(s.Value)
+			sum.Add(sum, decimalAmount(clampAmount(s.Value)))
 		}
-		return sum == float64(amount)
+		return sum.Cmp(big.NewRat(amount, 1)) == 0
 	default:
 		return len(splits) > 0
 	}
@@ -170,11 +170,11 @@ func averageBookingValues(totals []bookingValue, n int64) []bookingValue {
 	}
 	amounts := make(map[int64]int64, len(totals))
 	for _, direction := range []store.Direction{store.DirIncome, store.DirExpense} {
-		raw := make(map[int64]float64)
+		raw := make(map[int64]*big.Rat)
 		var total int64
 		for _, v := range totals {
 			if v.Booking.Direction == direction {
-				raw[v.Booking.ID] = float64(v.Cents) / float64(n)
+				raw[v.Booking.ID] = big.NewRat(v.Cents, n)
 				total += v.Cents
 			}
 		}
@@ -186,9 +186,9 @@ func averageBookingValues(totals []bookingValue, n int64) []bookingValue {
 	for _, total := range totals {
 		v := total
 		v.Cents = amounts[v.Booking.ID]
-		raw := make(map[int64]float64, len(v.Shares))
+		raw := make(map[int64]*big.Rat, len(v.Shares))
 		for id, cents := range v.Shares {
-			raw[id] = float64(cents) / float64(n)
+			raw[id] = big.NewRat(cents, n)
 		}
 		target := sumCents(v.Shares) / n
 		if v.Complete {
@@ -211,19 +211,25 @@ func sumCents(values map[int64]int64) int64 {
 
 // balancedCents uses largest remainders and stable IDs to conserve cents.
 // The target must be a rounding of the sum of the supplied values.
-func balancedCents(values map[int64]float64, total int64) map[int64]int64 {
+func balancedCents(values map[int64]*big.Rat, total int64) map[int64]int64 {
 	out := make(map[int64]int64, len(values))
 	ids := make([]int64, 0, len(values))
+	remainders := make(map[int64]*big.Rat, len(values))
 	var assigned int64
 	for id, v := range values {
-		out[id] = int64(math.Floor(v))
+		whole, remainder := new(big.Int), new(big.Int)
+		whole.QuoRem(v.Num(), v.Denom(), remainder)
+		if remainder.Sign() < 0 {
+			whole.Sub(whole, big.NewInt(1))
+		}
+		out[id] = whole.Int64()
+		remainders[id] = new(big.Rat).Sub(v, big.NewRat(out[id], 1))
 		assigned += out[id]
 		ids = append(ids, id)
 	}
 	sort.Slice(ids, func(i, j int) bool {
-		a, b := values[ids[i]]-float64(out[ids[i]]), values[ids[j]]-float64(out[ids[j]])
-		if a != b {
-			return a > b
+		if comparison := remainders[ids[i]].Cmp(remainders[ids[j]]); comparison != 0 {
+			return comparison > 0
 		}
 		return ids[i] < ids[j]
 	})

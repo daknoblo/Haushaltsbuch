@@ -16,17 +16,10 @@ import (
 // (e.g. 123456 -> "1.234,56").
 func FormatCents(c int64) string {
 	neg := c < 0
-	// Negating math.MinInt64 overflows back to itself, so clamp first.
-	if c < -MaxAmountCents {
-		c = -MaxAmountCents
-	} else if c > MaxAmountCents {
-		c = MaxAmountCents
-	}
-	if neg {
-		c = -c
-	}
-	euros := c / 100
-	cents := c % 100
+	amount := centMagnitude(c)
+	// Aggregates can exceed the input limit; retain the full int64 range.
+	euros := int64(amount / 100) // #nosec G115 -- uint64 absolute int64 divided by 100 fits int64.
+	cents := amount % 100
 	out := groupThousands(euros) + "," + fmt.Sprintf("%02d", cents)
 	if neg {
 		out = "-" + out
@@ -42,19 +35,19 @@ func FormatEUR(c int64) string {
 // FormatEURShort drops the cents, for captions where a figure has to stay
 // short enough to be read at a glance.
 func FormatEURShort(c int64) string {
-	if c < -MaxAmountCents {
-		c = -MaxAmountCents
-	} else if c > MaxAmountCents {
-		c = MaxAmountCents
-	}
-	euros := (c + 50) / 100
-	if c < 0 {
-		euros = (c - 50) / 100
-	}
-	if euros < 0 {
-		return "-" + groupThousands(-euros) + " €"
+	amount := centMagnitude(c)
+	euros := int64((amount + 50) / 100) // #nosec G115 -- rounded euros fit int64, including MinInt64 cents.
+	if c < 0 && euros > 0 {
+		return "-" + groupThousands(euros) + " €"
 	}
 	return groupThousands(euros) + " €"
+}
+
+func centMagnitude(c int64) uint64 {
+	if c >= 0 {
+		return uint64(c)
+	}
+	return uint64(-(c + 1)) + 1 // #nosec G115 -- c is negative; -(c+1) is nonnegative, even for MinInt64.
 }
 
 func groupThousands(n int64) string {

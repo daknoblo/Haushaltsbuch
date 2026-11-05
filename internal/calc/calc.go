@@ -7,6 +7,7 @@ package calc
 
 import (
 	"math"
+	"math/big"
 	"sort"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
@@ -169,19 +170,10 @@ func AmountFor(b store.Booking, overrides []store.BookingOverride, month string)
 	return amount
 }
 
-// monthlyFactor is how much of a booking's amount falls into a single month.
-func monthlyFactor(b store.Booking) float64 {
-	factor := b.Frequency.MonthlyFactor()
-	if b.Frequency.Recurring() && b.Interval > 1 {
-		factor /= float64(b.Interval)
-	}
-	return factor
-}
-
 // MonthlyCents returns the rounded monthly-equivalent amount of a booking in a
 // given month, overrides included.
 func MonthlyCents(b store.Booking, overrides []store.BookingOverride, month string) int64 {
-	return round(float64(AmountFor(b, overrides, month)) * monthlyFactor(b))
+	return roundAmount(monthlyAmount(b, big.NewRat(AmountFor(b, overrides, month), 1)))
 }
 
 // BuildMonthReport aggregates all figures of a household for one month. With a
@@ -316,6 +308,9 @@ func Trend(d Data, months []string, member int64) []MonthReport {
 // month, so every breakdown answers for the selected period instead of only
 // its last month. A single-month range yields exactly BuildMonthReport.
 func PeriodReport(d Data, months []string, member int64) MonthReport {
+	if len(months) == 1 {
+		return BuildMonthReport(d, months[0], member)
+	}
 	month := ""
 	if len(months) > 0 {
 		month = months[len(months)-1]
@@ -357,10 +352,6 @@ func sortByCentsDesc(t []LabeledTotal) {
 		}
 		return t[i].Key < t[j].Key
 	})
-}
-
-func round(f float64) int64 {
-	return int64(math.Round(f))
 }
 
 // ClampPercent keeps a percentage within 0-100 and rejects NaN, so a single

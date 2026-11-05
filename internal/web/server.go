@@ -78,6 +78,7 @@ func (s *Server) Handler() http.Handler {
 
 	// The whole book out of the app and back in, and the way to start over.
 	mux.HandleFunc("GET /settings/backup.json", s.handleBackupDownload)
+	mux.HandleFunc("GET /settings/plausibility", s.handlePlausibility)
 	mux.HandleFunc("POST /settings/restore", s.handleBackupRestore)
 	mux.HandleFunc("POST /settings/reset", s.handleDataReset)
 	mux.HandleFunc("POST /settings/reset-bookings", s.handleBookingsReset)

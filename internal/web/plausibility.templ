@@ -1,0 +1,75 @@
+package web
+
+import "strconv"
+
+templ PlausibilityPage(nav Nav, vm PlausibilityVM) {
+	@Layout(nav) {
+		@pageHeading(T(ctx, "check.title"), T(ctx, "check.subtitle")) {
+			<a href="/settings" class="btn-ghost">{ T(ctx,"nav.settings") }</a>
+		}
+		if nav.ActiveHousehold.ID==0 {
+			@noHousehold()
+		} else {
+			<div class="card mb-4">
+				<form action="/settings/plausibility" method="get" class="flex flex-wrap items-end gap-3">
+					<div>
+						<label class="field-label" for="check-year">{ T(ctx,"check.year") }</label>
+						<input class="input w-32" id="check-year" type="number" name="year" min="1" max="9999" value={ strconv.Itoa(vm.Year) } required/>
+					</div>
+					<button class="btn-primary" type="submit" name="run" value="1">{ T(ctx,"check.run") }</button>
+				</form>
+				<p class="mt-3 text-sm text-slate-500 dark:text-slate-400">{ T(ctx,"check.scope") }</p>
+			</div>
+			if vm.Result!=nil {
+				<div class="card mb-4" role="status" data-plausibility-result>
+					if vm.Result.Errors>0 {
+						<h2 class="font-semibold text-rose-600 dark:text-rose-400">{ T(ctx,"check.failed") }</h2>
+					} else if vm.Result.Warnings>0 {
+						<h2 class="font-semibold text-amber-600 dark:text-amber-400">{ T(ctx,"check.review") }</h2>
+					} else {
+						<h2 class="font-semibold text-emerald-600 dark:text-emerald-400">{ T(ctx,"check.passed") }</h2>
+					}
+					<p class="mt-2 text-sm">{ Tf(ctx,"check.summary",vm.Result.Checks,vm.Result.Errors,vm.Result.Warnings) }</p>
+					<p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{ Tf(ctx,"check.counts",vm.Plans,vm.Payments,len(vm.Members)) }</p>
+					if !vm.Result.Calculated {
+						<p class="alert-error mt-3">{ T(ctx,"check.skipped") }</p>
+					}
+				</div>
+				if len(vm.Result.Findings)>0 {
+					<div class="card mb-4">
+						<p class="mb-3 text-xs text-slate-500 dark:text-slate-400">{ T(ctx,"check.units") }</p>
+						<ul class="grid gap-3">
+							for _, f:=range vm.Result.Findings {
+								<li class="border-b border-slate-200 pb-3 last:border-0 dark:border-slate-800">
+									<div class="flex flex-wrap items-center gap-2">
+										if f.Warning {
+											<span class="badge badge-warn">{ T(ctx,"check.warning") }</span>
+										} else {
+											<span class="badge badge-danger">{ T(ctx,"check.error") }</span>
+										}
+										<strong class="text-sm">{ T(ctx,plausibilityKey(f.Code)) }</strong>
+									</div>
+									<p class="mt-1 break-words text-sm">{ f.Name }</p>
+									if f.Basis!="" {
+										<p class="text-xs text-slate-500 dark:text-slate-400">{ BasisLabel(ctx,string(f.Basis)) } · { vm.scope(ctx,f.Member) } · { f.Month }</p>
+									} else if f.Month!="" {
+										<p class="text-xs text-slate-500 dark:text-slate-400">{ f.Month }</p>
+									}
+									if f.Numbers {
+										<p class="text-xs tnum">{ Tf(ctx,"check.difference",strconv.FormatInt(f.Expected,10),strconv.FormatInt(f.Actual,10)) }</p>
+									} else if f.ExpectedText!=""||f.ActualText!="" {
+										<p class="text-xs tnum">{ Tf(ctx,"check.difference",f.ExpectedText,f.ActualText) }</p>
+									}
+								</li>
+							}
+						</ul>
+						if vm.Result.Errors+vm.Result.Warnings>len(vm.Result.Findings) {
+							<p class="mt-3 text-sm">{ T(ctx,"check.limit") }</p>
+						}
+					</div>
+				}
+			}
+			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx,"check.limits") }</p>
+		}
+	}
+}

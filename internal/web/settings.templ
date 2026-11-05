@@ -9,6 +9,9 @@ import (
 templ SettingsPage(nav Nav, vm SettingsVM) {
 	@Layout(nav) {
 		@pageHeading(T(ctx, "settings.title"), T(ctx, "settings.subtitle")) {
+			if vm.ActiveID!=0 {
+				<a class="btn-ghost" href="/settings/plausibility">{ T(ctx,"check.title") }</a>
+			}
 		}
 		<div class="grid gap-4 lg:grid-cols-2">
 			<div class="settings-overview lg:col-span-2">
@@ -158,12 +161,14 @@ templ statsCard(vm SettingsVM) {
 			<div class="stat-grid">
 				@statCell(T(ctx, "settings.statBookings"), strconv.Itoa(vm.Stats.Bookings),
 					Tf(ctx, "settings.statRhythm", vm.Stats.Recurring, vm.Stats.OneOff()), "")
+				@statCell(T(ctx, "check.actualPayments"), strconv.Itoa(vm.Stats.AcceptedPayments),
+					Tf(ctx, "check.importRows", vm.Stats.BankTransactions), "")
 				@statCell(T(ctx, "overview.income"), FormatEUR(vm.Plan.IncomeCents),
-					T(ctx, "dash.perMonth"), "text-emerald-600 dark:text-emerald-400")
+					T(ctx, "check.planMonth"), "text-emerald-600 dark:text-emerald-400")
 				@statCell(T(ctx, "overview.expenses"), FormatEUR(vm.Plan.ExpenseCents),
-					T(ctx, "dash.perMonth"), "text-rose-600 dark:text-rose-400")
+					T(ctx, "check.planMonth"), "text-rose-600 dark:text-rose-400")
 				@statCell(T(ctx, "dash.surplus"), FormatEUR(vm.Plan.BalanceCents),
-					T(ctx, "dash.perMonth"), "text-indigo-600 dark:text-indigo-400")
+					T(ctx, "check.planMonth"), "text-indigo-600 dark:text-indigo-400")
 				@statCell(T(ctx, "settings.categories"), strconv.Itoa(vm.Stats.Categories),
 					Tf(ctx, "settings.statUnused", vm.Stats.UnusedCategories), "")
 				@statCell(T(ctx, "settings.tags"), strconv.Itoa(vm.Stats.Tags),

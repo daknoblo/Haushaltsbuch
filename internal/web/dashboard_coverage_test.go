@@ -26,7 +26,7 @@ func TestMissingIncomeKeepsDashboardSectionsAndExpensePlanning(t *testing.T) {
 	if err := srv.store.SaveBooking(t.Context(), saving, []store.SplitInput{{MemberID: members[0].ID}}, []int64{tag.ID}); err != nil {
 		t.Fatal(err)
 	}
-	data, err := srv.loadHouseholdData(t.Context(), hh.ID)
+	data, err := srv.loadReportData(t.Context(), hh.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
