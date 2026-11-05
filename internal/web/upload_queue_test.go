@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/net/html"
+
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
 
@@ -24,6 +26,70 @@ func queueUpload(t *testing.T, h http.Handler, household, account int64, filenam
 	response := httptest.NewRecorder()
 	h.ServeHTTP(response, request)
 	return response
+}
+
+func TestUploadDetectsPerFileAndRetainsManualCorrection(t *testing.T) {
+	srv, handler, household := newTestServer(t)
+	accounts, err := srv.store.ListBankAccounts(t.Context(), household.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := "Date,Payee,Amount\n01/15/2020,Private synthetic payee,-12.34\n"
+	response := queueUpload(t, handler, household.ID, accounts[0].ID, "us.csv", []byte(input), nil)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("automatic US import: %d %s", response.Code, response.Body)
+	}
+	var result uploadOutcome
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	detection := strings.Join(result.Detected, "\n")
+	if !strings.Contains(detection, "Date") || !strings.Contains(detection, T(t.Context(), "import.decimalDot")) || strings.Contains(detection, "Private synthetic payee") {
+		t.Fatal("detection details missing or leaking cell values")
+	}
+	ambiguous := []byte("Date;Payee;Amount\n01/02/2020;Example;-1.23\n")
+	response = queueUpload(t, handler, household.ID, accounts[0].ID, "ambiguous.csv", ambiguous, nil)
+	if response.Code != http.StatusBadRequest || response.Header().Get("X-Import-Configure") != "1" {
+		t.Fatal("ambiguous date did not request correction")
+	}
+	ledger, err := srv.store.BankLedger(t.Context(), household.ID)
+	if err != nil || len(ledger.Imports) != 1 {
+		t.Fatal("ambiguous upload partially persisted")
+	}
+	response = queueUpload(t, handler, household.ID, accounts[0].ID, "ambiguous.csv", ambiguous, url.Values{"table_date_order": {"mdy"}})
+	if response.Code != http.StatusCreated {
+		t.Fatalf("corrected import: %d %s", response.Code, response.Body)
+	}
+	page := get(t, handler, "/imports").Body.String()
+	if !strings.Contains(page, T(t.Context(), "import.uploadAutomatic")) || strings.Contains(page, "Wartet auf Start") {
+		t.Fatal("manual-start interface remains")
+	}
+	doc, err := html.Parse(strings.NewReader(page))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var visit func(*html.Node, bool)
+	visit = func(node *html.Node, inUpload bool) {
+		if node.Type == html.ElementNode && node.Data == "noscript" {
+			return
+		}
+		kind := ""
+		for _, attr := range node.Attr {
+			if attr.Key == "data-bank-upload" {
+				inUpload = true
+			}
+			if attr.Key == "type" {
+				kind = attr.Val
+			}
+		}
+		if inUpload && node.Data == "button" && (kind == "" || kind == "submit") {
+			t.Error("upload start button remains for JavaScript users")
+		}
+		for child := node.FirstChild; child != nil; child = child.NextSibling {
+			visit(child, inUpload)
+		}
+	}
+	visit(doc, false)
 }
 
 func TestImportMonthURLRemainsLocal(t *testing.T) {

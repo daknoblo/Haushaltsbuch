@@ -305,11 +305,17 @@ func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	sources, err := s.extractStatement(ctx, r, filename, content)
+	extracted, err := s.extractStatement(ctx, r, filename, content)
 	if err != nil {
+		var tableErr *bankimport.TableError
+		if errors.As(err, &tableErr) || errors.Is(err, bankimport.ErrSheet) {
+			w.Header().Set("X-Import-Configure", "1")
+		}
 		s.bankError(w, r, err)
 		return
 	}
+	sources := extracted.Accounts
+	detected := detectedTable(r.Context(), extracted)
 	if len(sources) == 0 {
 		s.bankError(w, r, bankimport.ErrResult)
 		return
@@ -343,7 +349,7 @@ func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
 		for _, source := range sources {
 			count += len(source.Payments)
 		}
-		s.uploadResult(w, r, uploadOutcome{Status: "mapping", URL: importMappingURL(token), Digest: digest, Transactions: count, Accounts: len(sources)})
+		s.uploadResult(w, r, uploadOutcome{Status: "mapping", URL: importMappingURL(token), Digest: digest, Transactions: count, Accounts: len(sources), Detected: detected})
 		return
 	}
 	payments := sources[0].Payments
@@ -359,7 +365,7 @@ func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
 		s.bankError(w, r, err)
 		return
 	}
-	s.uploadResult(w, r, uploadOutcome{Status: "imported", URL: importMonthURL(payments[0].BookedOn[:7]), Digest: digest, Transactions: len(payments), Accounts: 1})
+	s.uploadResult(w, r, uploadOutcome{Status: "imported", URL: importMonthURL(payments[0].BookedOn[:7]), Digest: digest, Transactions: len(payments), Accounts: 1, Detected: detected})
 }
 
 func suggestPlan(p *store.BankTransaction, data calc.Data) {

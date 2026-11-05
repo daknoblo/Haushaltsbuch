@@ -9,7 +9,6 @@
     var queue = form.querySelector("[data-upload-queue]");
     var queueArea = form.querySelector("[data-upload-queue-area]");
     var template = form.querySelector("[data-upload-item]");
-    var start = form.querySelector('button[type="submit"]');
     var message = form.querySelector("[data-upload-message]");
     var runningHint = form.querySelector("[data-bank-progress]");
     var refreshError = form.querySelector("[data-upload-refresh-error]");
@@ -17,6 +16,8 @@
     var labels = form.querySelector("[data-upload-labels]").dataset;
     var entries = [];
     var running = false;
+    var paused = false;
+    var activeFields = null;
     var refreshing = false;
     var refreshAgain = false;
     var uploadRevision = 0;
@@ -29,11 +30,16 @@
       message.hidden = !text;
     }
 
-    function updateStart() {
-      var account = form.elements.account;
-      start.disabled = running || stale || account.disabled || !account.value ||
-        !entries.some(function (entry) { return entry.state === "queued"; });
+    function updateQueue() {
       queueArea.hidden = entries.length === 0;
+      entries.forEach(function (entry) { entry.retry.disabled = running || stale; });
+    }
+
+    function snapshotFields() {
+      if (running) return activeFields;
+      var fields = new FormData(form);
+      fields.delete("statement");
+      return fields;
     }
 
     function state(entry, value, error) {
@@ -52,14 +58,15 @@
       if (value === "uploading") entry.progress.value = 0;
       if (value === "processing") entry.progress.removeAttribute("value");
       entry.remove.disabled = value === "uploading" || value === "processing";
-      entry.retry.hidden = value !== "error" || !entry.valid;
+      entry.retry.hidden = !["error", "paused"].includes(value) || !entry.valid;
+      entry.retry.textContent = value === "paused" ? labels.resume : labels.retry;
       entry.link.hidden = value !== "imported" && value !== "mapping";
       if (!entry.link.hidden) {
         entry.link.href = entry.result.url;
         entry.link.textContent = value === "mapping" ? labels.mapLink : labels.review;
       }
       entry.actions.hidden = entry.retry.hidden && entry.link.hidden;
-      updateStart();
+      updateQueue();
     }
 
     function addFiles(files) {
@@ -72,7 +79,7 @@
         }
         var element = template.content.firstElementChild.cloneNode(true);
         var entry = {
-          key: key, file: file, element: element, state: "queued", result: null,
+          key: key, file: file, fields: snapshotFields(), element: element, state: "queued", result: null,
           valid: /\.(pdf|csv|xlsx)$/i.test(file.name) && file.size > 0 && file.size <= Number(form.dataset.maxBytes),
           status: element.querySelector("[data-upload-state-label]"),
           error: element.querySelector("[data-upload-error]"),
@@ -89,17 +96,27 @@
           entry.state = "removed";
           entries = entries.filter(function (candidate) { return candidate !== entry; });
           element.remove();
-          updateStart();
+          updateQueue();
         });
         entry.retry.addEventListener("click", function () {
+          if (running || stale || !form.reportValidity()) return;
+          entry.fields = snapshotFields();
           entry.result = null;
+          entry.element.querySelector("[data-upload-detection]").hidden = true;
+          paused = false;
+          entries.forEach(function (pending) {
+            if (pending.state === "paused") state(pending, "queued");
+          });
           state(entry, "queued");
+          runQueue();
         });
         entries.push(entry);
         queue.appendChild(element);
-        state(entry, entry.valid ? "queued" : "error", entry.valid ? "" : labels.invalid);
+        state(entry, stale || !entry.valid ? "error" : paused ? "paused" : "queued",
+          stale ? labels.context : entry.valid ? "" : labels.invalid);
       });
-      updateStart();
+      updateQueue();
+      runQueue();
     }
 
     picker.addEventListener("change", function () {
@@ -139,7 +156,14 @@
         if (name === "drop" && !dropzone.contains(event.target)) showMessage(labels.outside);
       });
     });
-    form.elements.account.addEventListener("change", updateStart);
+    form.addEventListener("change", function (event) {
+      if (event.target === picker || running || stale || paused) return;
+      var fields = snapshotFields();
+      entries.forEach(function (entry) {
+        if (entry.state === "queued") entry.fields = fields;
+      });
+      runQueue();
+    });
     form.addEventListener("invalid", function (event) {
       var panel = event.target.closest("details");
       if (panel) panel.open = true;
@@ -159,6 +183,10 @@
         throw new Error("Invalid upload destination");
       }
       result.url = target.pathname + target.search;
+      if (result.detected !== undefined && (!Array.isArray(result.detected) ||
+          result.detected.length > 20 || result.detected.some(function (line) {
+            return typeof line !== "string" || line.length > 2048;
+          }))) throw new Error("Invalid detection details");
       return result;
     }
 
@@ -194,6 +222,9 @@
             var plain = (xhr.getResponseHeader("Content-Type") || "").startsWith("text/plain");
             var reason = plain ? xhr.responseText.trim().slice(0, 1000) : labels.http.replace("%d", String(xhr.status));
             if (reason === labels.context || reason === labels.household) stale = true;
+            if (xhr.getResponseHeader("X-Import-Configure") === "1") {
+              form.querySelector("[data-table-options]").open = true;
+            }
             fail(reason || labels.response, xhr.status === 429 || stale);
             return;
           }
@@ -204,6 +235,10 @@
             return;
           }
           settled = true;
+          var detected = entry.element.querySelector("[data-upload-detected]");
+          var details = entry.element.querySelector("[data-upload-detection]");
+          detected.textContent = (entry.result.detected || []).join("\n");
+          details.hidden = !detected.textContent;
           state(entry, entry.result.status);
           resolve(false);
         });
@@ -224,7 +259,7 @@
       if (history.dataset.uploadGeneration !== form.elements.upload_generation.value) {
         stale = true;
         showMessage(labels.context);
-        updateStart();
+        updateQueue();
       }
       var pending = Array.from(history.querySelectorAll("[data-pending-upload-url]")).map(function (node) {
         return node.dataset.pendingUploadUrl;
@@ -281,14 +316,12 @@
       }
     }
 
-    form.addEventListener("submit", async function (event) {
-      event.preventDefault();
-      if (running || stale) return;
-      var batch = entries.filter(function (entry) { return entry.state === "queued"; });
-      if (!batch.length) { showMessage(labels.empty); return; }
+    async function runQueue() {
+      if (running || stale || paused || !entries.some(function (entry) { return entry.state === "queued"; })) return;
+      if (form.elements.account.disabled || !form.elements.account.value) { showMessage(labels.account); return; }
       if (!form.reportValidity()) return;
       showMessage("");
-      var fields = new FormData(form);
+      activeFields = snapshotFields();
       var controls = Array.from(form.querySelectorAll('select, input:not([type="file"]):not([type="hidden"])')).map(function (input) {
         var saved = { input: input, disabled: input.disabled };
         input.disabled = true;
@@ -296,19 +329,30 @@
       });
       running = true;
       runningHint.hidden = false;
-      updateStart();
+      updateQueue();
       try {
-        for (var entry of batch) {
-          if (entry.state !== "queued") continue;
-          if (await send(entry, fields)) break;
+        var entry;
+        while ((entry = entries.find(function (candidate) { return candidate.state === "queued"; }))) {
+          if (await send(entry, entry.fields)) {
+            paused = true;
+            entries.forEach(function (pending) {
+              if (pending.state === "queued") state(pending, stale ? "error" : "paused", stale ? labels.context : "");
+            });
+            break;
+          }
         }
       } finally {
         running = false;
         runningHint.hidden = true;
         controls.forEach(function (saved) { saved.input.disabled = saved.disabled; });
-        updateStart();
+        activeFields = null;
+        updateQueue();
         await refreshStatus();
       }
+    }
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      runQueue();
     });
     document.addEventListener("input", function (event) {
       var reviewForm = event.target.closest("#import-review .import-payment form");
@@ -321,11 +365,11 @@
     window.addEventListener("focus", refreshStatus);
     window.addEventListener("pageshow", refreshStatus);
     window.addEventListener("beforeunload", function (event) {
-      if (running || entries.some(function (entry) { return entry.state === "queued"; })) {
+      if (running || entries.some(function (entry) { return entry.state === "queued" || entry.state === "paused"; })) {
         event.preventDefault();
         event.returnValue = "";
       }
     });
-    updateStart();
+    updateQueue();
   });
 })();

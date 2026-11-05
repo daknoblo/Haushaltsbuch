@@ -12,11 +12,12 @@ import (
 )
 
 type uploadOutcome struct {
-	Status       string `json:"status"`
-	URL          string `json:"url"`
-	Digest       string `json:"digest"`
-	Transactions int    `json:"transactions"`
-	Accounts     int    `json:"accounts"`
+	Status       string   `json:"status"`
+	URL          string   `json:"url"`
+	Digest       string   `json:"digest"`
+	Transactions int      `json:"transactions"`
+	Accounts     int      `json:"accounts"`
+	Detected     []string `json:"detected,omitempty"`
 }
 
 var errUploadContext = errors.New("upload context changed")

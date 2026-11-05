@@ -8,6 +8,7 @@ templ statementTableOptionsForm() {
 			<label>
 				{ T(ctx, "import.decimal") }
 				<select class="input mt-1" name="table_decimal">
+					<option value="auto">{ T(ctx, "import.detectAuto") }</option>
 					<option value="comma">{ T(ctx, "import.decimalComma") }</option>
 					<option value="dot">{ T(ctx, "import.decimalDot") }</option>
 				</select>
@@ -15,6 +16,7 @@ templ statementTableOptionsForm() {
 			<label>
 				{ T(ctx, "import.dateOrder") }
 				<select class="input mt-1" name="table_date_order">
+					<option value="auto">{ T(ctx, "import.detectAuto") }</option>
 					<option value="dmy">{ T(ctx, "import.dateDMY") }</option>
 					<option value="mdy">{ T(ctx, "import.dateMDY") }</option>
 				</select>

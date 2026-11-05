@@ -90,7 +90,7 @@ func (o TableOptions) normalized() (TableOptions, error) {
 	if o.Encoding == "" {
 		o.Encoding = "auto"
 	}
-	if (o.Decimal != "comma" && o.Decimal != "dot") || (o.DateOrder != "dmy" && o.DateOrder != "mdy") ||
+	if (o.Decimal != "auto" && o.Decimal != "comma" && o.Decimal != "dot") || (o.DateOrder != "auto" && o.DateOrder != "dmy" && o.DateOrder != "mdy") ||
 		(o.Delimiter != "auto" && o.Delimiter != "comma" && o.Delimiter != "semicolon" && o.Delimiter != "tab") ||
 		(o.Encoding != "auto" && o.Encoding != "utf8" && o.Encoding != "windows1252") ||
 		o.HeaderRow < 0 || o.HeaderRow > 50 || utf8.RuneCountInString(o.Sheet) > 31 {
@@ -143,6 +143,16 @@ func findColumn(row tableRow, explicit string, aliases ...string) (int, error) {
 	return match, nil
 }
 
+var (
+	dateHeadings = []string{"Buchungstag", "Buchungsdatum", "Booking date", "Transaction date", "Date", "Datum"}
+	nameHeadings = []string{"Name", "Payee", "Counterparty", "Beneficiary", "Name Zahlungsbeteiligter", "Begünstigter/Zahlungspflichtiger",
+		"Zahlungsempfänger", "Empfänger", "Auftraggeber", "Empfänger/Auftraggeber", "Auftraggeber/Empfänger"}
+	amountHeadings    = []string{"Betrag", "Amount", "Umsatz", "Betrag EUR", "Betrag in EUR", "Amount EUR", "Umsatz EUR"}
+	debitHeadings     = []string{"Soll", "Belastung", "Debit", "Debit amount", "Ausgaben"}
+	creditHeadings    = []string{"Haben", "Gutschrift", "Credit", "Credit amount", "Einnahmen"}
+	referenceHeadings = []string{"Verwendungszweck", "Buchungstext", "Referenz", "Reference", "Purpose", "Description", "Beschreibung", "Details", "Zahlungsreferenz"}
+)
+
 func mapColumns(row tableRow, o TableOptions) (columns, error) {
 	c := columns{date: -1, amount: -1, debit: -1, credit: -1, name: -1, direction: -1, currency: -1, account: -1, accountName: -1}
 	fields := []struct {
@@ -150,9 +160,8 @@ func mapColumns(row tableRow, o TableOptions) (columns, error) {
 		explicit string
 		aliases  []string
 	}{
-		{&c.date, o.Date, []string{"Buchungstag", "Buchungsdatum", "Booking date", "Transaction date", "Date", "Datum"}},
-		{&c.name, o.Name, []string{"Name", "Payee", "Counterparty", "Beneficiary", "Name Zahlungsbeteiligter", "Begünstigter/Zahlungspflichtiger",
-			"Zahlungsempfänger", "Empfänger", "Auftraggeber", "Empfänger/Auftraggeber", "Auftraggeber/Empfänger"}},
+		{&c.date, o.Date, dateHeadings},
+		{&c.name, o.Name, nameHeadings},
 		{&c.direction, o.Direction, []string{"Soll/Haben", "S/H", "Debit/Credit", "Direction", "Richtung"}},
 		{&c.currency, o.Currency, []string{"Währung", "Currency", "Currency code", "Waehrung"}},
 		{&c.account, o.Account, []string{"Kontonummer", "Account number", "Own account", "Source account", "Eigene IBAN"}},
@@ -167,17 +176,17 @@ func mapColumns(row tableRow, o TableOptions) (columns, error) {
 	}
 	var err error
 	if o.Debit == "" && o.Credit == "" {
-		c.amount, err = findColumn(row, o.Amount, "Betrag", "Amount", "Umsatz", "Betrag EUR", "Betrag in EUR", "Amount EUR", "Umsatz EUR")
+		c.amount, err = findColumn(row, o.Amount, amountHeadings...)
 		if err != nil {
 			return c, err
 		}
 	}
 	if o.Amount == "" {
-		c.debit, err = findColumn(row, o.Debit, "Soll", "Belastung", "Debit", "Debit amount", "Ausgaben")
+		c.debit, err = findColumn(row, o.Debit, debitHeadings...)
 		if err != nil {
 			return c, err
 		}
-		c.credit, err = findColumn(row, o.Credit, "Haben", "Gutschrift", "Credit", "Credit amount", "Einnahmen")
+		c.credit, err = findColumn(row, o.Credit, creditHeadings...)
 		if err != nil {
 			return c, err
 		}
@@ -190,7 +199,7 @@ func mapColumns(row tableRow, o TableOptions) (columns, error) {
 		c.references = []int{index}
 	} else {
 		for i, cell := range row.cells {
-			for _, alias := range []string{"Verwendungszweck", "Buchungstext", "Referenz", "Reference", "Purpose", "Description", "Beschreibung", "Details", "Zahlungsreferenz"} {
+			for _, alias := range referenceHeadings {
 				if headerKey(cell.text) == headerKey(alias) {
 					c.references = append(c.references, i)
 					break
@@ -254,14 +263,7 @@ func parseAccounts(ctx context.Context, t table, o TableOptions) ([]SourceAccoun
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		empty := true
-		for _, cell := range row.cells {
-			if strings.TrimSpace(cell.text) != "" || cell.formula {
-				empty = false
-				break
-			}
-		}
-		if empty {
+		if emptyTableRow(row) {
 			continue
 		}
 		if count >= 1000 {

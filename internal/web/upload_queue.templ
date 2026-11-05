@@ -45,16 +45,16 @@ templ ImportUploader(nav Nav, vm ImportVM) {
 					<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "import.accountSetup") } <a class="underline" href="/settings#people">{ T(ctx, "import.openPeopleSettings") }</a></p>
 				}
 				@statementTableOptionsForm()
-				<noscript><p class="alert-info">{ T(ctx, "import.uploadNoJS") }</p></noscript>
+				<noscript>
+					<p class="alert-info">{ T(ctx, "import.uploadNoJS") }</p>
+					<button class="btn-primary" type="submit" disabled?={ len(vm.Ledger.Accounts)==0 }>{ T(ctx, "import.analyze") }</button>
+				</noscript>
 				<div data-upload-queue-area hidden>
 					<h3 class="mb-2 text-sm font-semibold">{ T(ctx, "import.uploadQueue") }</h3>
 					<ul class="grid gap-2" data-upload-queue aria-label={ T(ctx, "import.uploadQueue") }></ul>
 				</div>
 				<p class="alert-error" role="alert" data-upload-message hidden></p>
-				<div class="flex flex-wrap items-center gap-3">
-					<button class="btn-primary" type="submit" disabled?={ len(vm.Ledger.Accounts)==0 }>{ T(ctx, "import.analyze") }</button>
-					<span class="text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "import.uploadManual") }</span>
-				</div>
+				<p class="text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "import.uploadAutomatic") }</p>
 				<p class="alert-info" data-bank-progress role="status" hidden>{ T(ctx, "import.uploadRunning") }</p>
 				<p class="alert-error" data-upload-refresh-error role="alert" hidden>{ T(ctx, "import.uploadRefreshError") }</p>
 				<p class="alert-info" data-upload-review-deferred hidden>
@@ -65,6 +65,10 @@ templ ImportUploader(nav Nav, vm ImportVM) {
 					hidden
 					data-upload-labels
 					data-queued={ T(ctx, "import.uploadQueued") }
+					data-paused={ T(ctx, "import.uploadPaused") }
+					data-resume={ T(ctx, "import.uploadResume") }
+					data-retry={ T(ctx, "import.uploadRetry") }
+					data-account={ T(ctx, "import.noAccounts") }
 					data-uploading={ T(ctx, "import.uploadSending") }
 					data-processing={ T(ctx, "import.uploadProcessing") }
 					data-imported={ T(ctx, "import.uploadImported") }
@@ -93,6 +97,10 @@ templ ImportUploader(nav Nav, vm ImportVM) {
 						</div>
 						<progress class="mt-2 h-2 w-full accent-indigo-500" max="100" value="0" data-upload-progress hidden></progress>
 						<p class="mt-1 break-words text-sm text-rose-700 dark:text-rose-300" data-upload-error role="alert" hidden></p>
+						<details class="mt-2 text-xs text-slate-500 dark:text-slate-400" data-upload-detection hidden>
+							<summary class="cursor-pointer">{ T(ctx,"import.detected") }</summary>
+							<p class="mt-2 whitespace-pre-line break-words" data-upload-detected></p>
+						</details>
 						<div class="mt-2 flex flex-wrap gap-2" data-upload-actions hidden>
 							<a class="btn-ghost" data-upload-link target="_blank" rel="noopener" hidden></a>
 							<button class="btn-ghost" type="button" data-upload-retry hidden>{ T(ctx, "import.uploadRetry") }</button>

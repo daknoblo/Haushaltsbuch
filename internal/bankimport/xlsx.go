@@ -9,6 +9,7 @@ import (
 	"io"
 	"math"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -26,79 +27,99 @@ func XLSX(ctx context.Context, data []byte, options TableOptions) ([]store.BankT
 
 // XLSXAccounts preserves source-account boundaries for explicit destination mapping.
 func XLSXAccounts(ctx context.Context, data []byte, options TableOptions) ([]SourceAccount, error) {
+	result, err := XLSXTable(ctx, data, options)
+	return result.Accounts, err
+}
+
+// XLSXTable selects a unique statement worksheet and reports its column mapping.
+func XLSXTable(ctx context.Context, data []byte, options TableOptions) (TableResult, error) {
 	o, err := options.normalized()
 	if err != nil {
-		return nil, err
+		return TableResult{}, err
 	}
 	if err := validateWorkbook(ctx, data); err != nil {
-		return nil, err
+		return TableResult{}, err
 	}
 	workbook, err := excelize.OpenReader(bytes.NewReader(data), excelize.Options{
 		RawCellValue: true, UnzipSizeLimit: maxWorkbookBytes, UnzipXMLSizeLimit: maxWorkbookBytes,
 	})
 	if err != nil {
-		return nil, tableError("xlsx", 0)
+		return TableResult{}, tableError("xlsx", 0)
 	}
 	defer func() { _ = workbook.Close() }()
 	sheets := workbook.GetSheetList()
-	sheet := o.Sheet
-	if sheet == "" {
-		if len(sheets) != 1 {
-			return nil, ErrSheet
+	if o.Sheet != "" {
+		if !slices.Contains(sheets, o.Sheet) {
+			return TableResult{}, ErrSheet
 		}
-		sheet = sheets[0]
-	}
-	found := false
-	for _, name := range sheets {
-		if name == sheet {
-			found = true
-		}
-	}
-	if !found {
-		return nil, ErrSheet
+		sheets = []string{o.Sheet}
 	}
 	properties, err := workbook.GetWorkbookProps()
 	if err != nil {
-		return nil, tableError("xlsx", 0)
+		return TableResult{}, tableError("xlsx", 0)
 	}
-	out := table{date1904: properties.Date1904 != nil && *properties.Date1904}
+	var selected *table
+	for _, sheet := range sheets {
+		candidate, err := readWorksheet(ctx, workbook, sheet, properties.Date1904 != nil && *properties.Date1904)
+		if err != nil {
+			return TableResult{}, err
+		}
+		if len(sheets) > 1 {
+			if _, _, err := locateHeader(candidate, o); err != nil && !possibleStatement(candidate, o) {
+				continue
+			}
+		}
+		if selected != nil {
+			return TableResult{}, ErrSheet
+		}
+		selected = &candidate
+		o.Sheet = sheet
+	}
+	if selected == nil {
+		return TableResult{}, ErrSheet
+	}
+	return detectTable(ctx, *selected, o)
+}
+
+func readWorksheet(ctx context.Context, workbook *excelize.File, sheet string, date1904 bool) (table, error) {
+	out := table{date1904: date1904}
 	rows, err := workbook.Rows(sheet)
 	if err != nil {
-		return nil, tableError("xlsx", 0)
+		return table{}, tableError("xlsx", 0)
 	}
 	defer func() { _ = rows.Close() }()
 	size := 0
 	for number := 1; rows.Next(); number++ {
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return table{}, err
 		}
 		if number > maxTableRows {
-			return nil, tableError("limit", number)
+			return table{}, tableError("limit", number)
 		}
 		values, err := rows.Columns(excelize.Options{RawCellValue: true})
 		if err != nil {
-			return nil, tableError("xlsx", number)
+			return table{}, tableError("xlsx", number)
 		}
 		if len(values) > maxColumns {
-			return nil, tableError("limit", number)
+			return table{}, tableError("limit", number)
 		}
 		row := tableRow{number: number, cells: make([]tableCell, len(values))}
 		for col, value := range values {
 			size += len(value)
 			if len(value) > maxCellBytes || size > maxTableBytes {
-				return nil, tableError("limit", number)
+				return table{}, tableError("limit", number)
 			}
 			address, err := excelize.CoordinatesToCellName(col+1, number)
 			if err != nil {
-				return nil, tableError("xlsx", number)
+				return table{}, tableError("xlsx", number)
 			}
 			kind, err := workbook.GetCellType(sheet, address)
 			if err != nil {
-				return nil, tableError("xlsx", number)
+				return table{}, tableError("xlsx", number)
 			}
 			formula, err := workbook.GetCellFormula(sheet, address)
 			if err != nil {
-				return nil, tableError("xlsx", number)
+				return table{}, tableError("xlsx", number)
 			}
 			row.cells[col] = tableCell{text: strings.TrimSpace(value),
 				numeric: kind == excelize.CellTypeNumber || (kind == excelize.CellTypeUnset && value != ""), formula: formula != ""}
@@ -106,9 +127,9 @@ func XLSXAccounts(ctx context.Context, data []byte, options TableOptions) ([]Sou
 		out.rows = append(out.rows, row)
 	}
 	if rows.Error() != nil {
-		return nil, tableError("xlsx", 0)
+		return table{}, tableError("xlsx", 0)
 	}
-	return parseAccounts(ctx, out, o)
+	return out, nil
 }
 
 func excelDate(s string, date1904 bool) (string, error) {

@@ -23,16 +23,22 @@ func CSV(ctx context.Context, data []byte, options TableOptions) ([]store.BankTr
 
 // CSVAccounts preserves source-account boundaries for explicit destination mapping.
 func CSVAccounts(ctx context.Context, data []byte, options TableOptions) ([]SourceAccount, error) {
+	result, err := CSVTable(ctx, data, options)
+	return result.Accounts, err
+}
+
+// CSVTable detects delimiter, headings and requested automatic text formats.
+func CSVTable(ctx context.Context, data []byte, options TableOptions) (TableResult, error) {
 	o, err := options.normalized()
 	if err != nil {
-		return nil, err
+		return TableResult{}, err
 	}
 	if len(data) == 0 || len(data) > MaxFileBytes {
-		return nil, ErrFile
+		return TableResult{}, ErrFile
 	}
 	text, err := decodeCSV(data, o.Encoding)
 	if err != nil {
-		return nil, err
+		return TableResult{}, err
 	}
 	delimiters := []rune{';', ',', '\t'}
 	switch o.Delimiter {
@@ -46,11 +52,11 @@ func CSVAccounts(ctx context.Context, data []byte, options TableOptions) ([]Sour
 	if first, rest, found := strings.Cut(text, "\n"); found && strings.HasPrefix(strings.ToLower(first), "sep=") {
 		value := strings.TrimSuffix(first[4:], "\r")
 		if value != ";" && value != "," && value != "\t" {
-			return nil, tableError("csv", 1)
+			return TableResult{}, tableError("csv", 1)
 		}
 		declared := []rune(value)[0]
 		if o.Delimiter != "auto" && delimiters[0] != declared {
-			return nil, tableError("options", 1)
+			return TableResult{}, tableError("options", 1)
 		}
 		delimiters = []rune{declared}
 		text = rest
@@ -62,7 +68,7 @@ func CSVAccounts(ctx context.Context, data []byte, options TableOptions) ([]Sour
 		candidate, err := readCSV(ctx, text, delimiter)
 		if err != nil {
 			if ctx.Err() != nil {
-				return nil, ctx.Err()
+				return TableResult{}, ctx.Err()
 			}
 			parseErr = err
 			continue
@@ -71,26 +77,49 @@ func CSVAccounts(ctx context.Context, data []byte, options TableOptions) ([]Sour
 			continue
 		}
 		if chosen != nil {
-			return nil, tableError("mapping", 0)
+			return TableResult{}, tableError("mapping", 0)
 		}
 		chosen = &candidate
+		switch delimiter {
+		case ';':
+			o.Delimiter = "semicolon"
+		case ',':
+			o.Delimiter = "comma"
+		case '\t':
+			o.Delimiter = "tab"
+		}
 	}
 	if chosen == nil {
 		if len(delimiters) == 1 && parseErr != nil {
-			return nil, parseErr
+			return TableResult{}, parseErr
 		}
-		return nil, tableError("mapping", 0)
+		return TableResult{}, tableError("mapping", 0)
 	}
-	return parseAccounts(ctx, *chosen, o)
+	o.Encoding = csvEncoding(data, o.Encoding)
+	o.Sheet = ""
+	return detectTable(ctx, *chosen, o)
+}
+
+func csvEncoding(data []byte, encoding string) string {
+	if encoding != "auto" {
+		return encoding
+	}
+	if bytes.HasPrefix(data, []byte{0xff, 0xfe}) || bytes.HasPrefix(data, []byte{0xfe, 0xff}) {
+		return "utf16"
+	}
+	if !utf8.Valid(data) {
+		return "windows1252"
+	}
+	return "utf8"
 }
 
 func decodeCSV(data []byte, encoding string) (string, error) {
 	var decoded []byte
 	var err error
-	switch {
-	case encoding == "auto" && (bytes.HasPrefix(data, []byte{0xff, 0xfe}) || bytes.HasPrefix(data, []byte{0xfe, 0xff})):
+	switch csvEncoding(data, encoding) {
+	case "utf16":
 		decoded, _, err = transform.Bytes(textunicode.UTF16(textunicode.LittleEndian, textunicode.ExpectBOM).NewDecoder(), data)
-	case encoding == "windows1252" || (encoding == "auto" && !utf8.Valid(data)):
+	case "windows1252":
 		decoded, err = charmap.Windows1252.NewDecoder().Bytes(data)
 	default:
 		if !utf8.Valid(data) {

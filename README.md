@@ -139,10 +139,9 @@ _Not captured yet._
    unrelated to the Azure identity. Renaming a member does not change account
    IDs or statement history.
 3. In **Import & reconciliation**, select the **bank account shown on the
-   statement** (labelled with its member), upload a PDF, CSV or XLSX file and
-   start reading it. Multiple files can be dropped onto the upload area or
-   selected by clicking it; they are collected first and processed sequentially
-   only after **Read files** is clicked. Only PDF analysis sends extracted text to Azure, without an
+   statement** (labelled with its member), then drop or select PDF, CSV or XLSX
+   files. Uploads start immediately and run sequentially, without a start button.
+   Additional files join the running queue automatically. Only PDF analysis sends extracted text to Azure, without an
    additional confirmation checkbox. CSV/XLSX are parsed locally. Original files
    are not retained, and document text and model responses are not logged. PDFs
    use the saved model, never a model supplied by the upload form. Missing AI
@@ -186,10 +185,14 @@ names, retaining its filters, allocation badges and monthly totals.
 
 The upload queue shows each filename, actual transfer progress, server
 processing, success, required account mapping or an explicit error. The bank
-account and CSV/Excel options are fixed for the files in a started run. Files
-added during a run wait for the next manual start. Failed files can be requeued;
-there are no automatic retries that could repeat a paid PDF analysis.
-Rate limits and network failures pause the queue. An interrupted connection is
+account and CSV/Excel options are captured for each selected file; controls are
+locked during processing. Each CSV/XLSX file detects its own formats and columns,
+and its expandable result shows the effective detection. Ambiguous formats or
+headings stop that file without saving rows and open the correction options.
+Correct the options and retry that file explicitly; its original file remains
+available in browser memory. Failed files are never retried automatically.
+Rate limits and network failures pause the remaining queue until explicitly
+resumed, so a paid PDF analysis is never repeated automatically. An interrupted connection is
 reported as an uncertain result: check saved history before retrying.
 
 **Uploaded files** is visible directly below the upload area and survives page
@@ -199,7 +202,7 @@ management. The five newest files are shown directly; older files remain
 available in an expandable list. Original file contents are still not retained.
 Open or edited review forms are not replaced by background status refreshes.
 Unstarted selections are browser-memory only; navigating away can discard them.
-Without JavaScript, single-file uploads still work, while requests containing
+Without JavaScript, a fallback button still supports single-file uploads, while requests containing
 multiple files are explicitly rejected rather than silently importing only one.
 
 The overview shows plan and actual side by side. Overview, dashboard, charts,
@@ -284,7 +287,7 @@ migration 0009 adds defaults without modifying imported payment history.
 
 ### CSV and Excel formats
 
-The collapsed **CSV/Excel options and column mapping** section permits
+The collapsed **Correct automatic detection (if needed)** section permits
 bank-specific adjustments. Normally, headings are found in the first 50 rows:
 
 | Meaning | Examples of recognized headings |
@@ -333,17 +336,22 @@ requires explicit mapping; source-account links are not silently remembered.
   Separator and encoding can be set explicitly; an initial `sep=;`-style
   directive is supported. Header-row numbers start after that directive.
 - **XLSX:** numeric cells are read directly, including Excel date serials and
-  the 1900/1904 date systems. With multiple sheets, explicitly select a worksheet.
+  the 1900/1904 date systems. A unique sheet with recognizable statement headings
+  is selected automatically, even if other sheets contain summaries. Multiple
+  possible statement sheets require explicit selection; an invalid statement
+  sheet is never silently ignored in favor of another one.
   One sheet is imported per file; because duplicate-file protection applies to
   the entire workbook, export sheets as separate files to import more than one
   sheet into the same bank account. Legacy `.xls`, encrypted workbooks, macros
   and formulas are not supported. Export formulas as values first.
-- **Numbers:** text defaults to German notation (`1.234,56`); choose English
-  (`1,234.56`) when needed. Numeric Excel amounts are independent of this
+- **Numbers:** German (`1.234,56`) or English (`1,234.56`) notation is inferred
+  from all transaction rows, unless explicitly overridden. Numeric Excel amounts are independent of this
   setting. Cents are parsed exactly without floating-point rounding; fractional
   cents and conflicting debit/credit indicators are rejected.
-- **Dates:** full-year ISO dates always work; other text defaults to day/month/year.
-  Month/day/year is an explicit option. Two-digit years are not guessed.
+- **Dates:** full-year ISO dates always work. Day/month/year or month/day/year
+  is inferred from the complete file. If both yield different valid dates,
+  explicit selection is required; future-date rejection is not used to guess
+  the format. Two-digit years and mixed formats are not guessed.
 - **Currency:** without a currency column, amounts are assumed to be EUR.
   If the column exists, every transaction must explicitly contain EUR.
 - **Validation:** blank rows are ignored, but invalid transaction rows, totals
@@ -353,7 +361,7 @@ requires explicit mapping; source-account links are not silently remembered.
   for import. This supports C24 exports whose header includes `Bargeldabhebung`
   but whose transaction rows omit that unused final field. Missing mapped
   columns and additional columns remain errors. Such C24 exports work with the
-  default automatic separator detection and German number format.
+  default automatic separator, column and number/date-format detection.
 
 Tables are limited to 64 columns, 50 preamble/header rows, 2 MiB of cell text,
 and 16 KiB per cell. XLSX ZIP content is bounded to 32 MiB and 256 entries,

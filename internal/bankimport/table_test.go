@@ -193,8 +193,8 @@ func TestXLSXDatesNumericAmountsAndSheets(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	if _, err := XLSX(t.Context(), multiple, TableOptions{}); !errors.Is(err, ErrSheet) {
-		t.Fatalf("ambiguous worksheet: %v", err)
+	if got, err := XLSX(t.Context(), multiple, TableOptions{}); err != nil || len(got) != 2 {
+		t.Fatalf("unique statement worksheet not detected: %v", err)
 	}
 	if got, err := XLSX(t.Context(), multiple, TableOptions{Sheet: "Sheet1"}); err != nil || len(got) != 2 {
 		t.Fatalf("selected worksheet: %+v %v", got, err)
