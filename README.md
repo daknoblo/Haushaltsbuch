@@ -322,6 +322,9 @@ errors rather than grounds for silently merging rows.
 If multiple source accounts are detected, choose a distinct bank account of the
 active household for each one directly in Import. The preview shows the source label, only the
 last four characters of its number, and the number of transactions. No
+account row relies on color alone: alternating tinted backgrounds and accent
+borders separate the groups, while names and numbered destination labels remain
+visible. Selection fields have stronger boundaries in both themes. No
 destination is silently assigned. Unique exact name matches are preselected as
 suggestions; the left selection can disambiguate a matching destination when the
 source name itself is unique. Every mapping still requires confirmation. Add

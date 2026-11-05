@@ -94,6 +94,18 @@
   .upload-queue-row, .upload-history-row {
     @apply min-w-0 rounded-lg border border-slate-200 p-3 dark:border-slate-700;
   }
+  .import-account-row {
+    @apply grid min-w-0 items-center gap-3 rounded-lg border border-l-4 border-slate-300 border-l-indigo-500 bg-slate-50 p-3 md:grid-cols-2 dark:border-slate-600 dark:border-l-indigo-400 dark:bg-slate-800/80;
+  }
+  .import-account-row-alt {
+    @apply border-indigo-200 border-l-sky-600 bg-indigo-50 dark:border-indigo-700 dark:border-l-sky-400 dark:bg-indigo-950/70;
+  }
+  .import-account-row .input {
+    @apply border-slate-500 bg-white dark:border-slate-500 dark:bg-slate-950;
+  }
+  .import-account-row .input:focus {
+    @apply border-indigo-500 dark:border-indigo-400;
+  }
   .upload-queue-row[data-upload-state="imported"] .upload-state-label {
     @apply text-emerald-700 dark:text-emerald-300;
   }

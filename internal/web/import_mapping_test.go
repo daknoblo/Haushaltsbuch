@@ -54,6 +54,9 @@ func TestImportAccountMappingWorkflow(t *testing.T) {
 	if strings.Contains(body, "SYNTHETIC0001") || strings.Contains(body, "SYNTHETIC0002") {
 		t.Fatal("full source number exposed")
 	}
+	if strings.Count(body, `class="import-account-row`) != 2 || strings.Count(body, `import-account-row-alt`) != 1 {
+		t.Fatal("source accounts do not alternate their visual grouping")
+	}
 	if !strings.Contains(get(t, h, "/imports").Body.String(), "synthetic-multi.csv") {
 		t.Fatal("pending mapping not resumable")
 	}
