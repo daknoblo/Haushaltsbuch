@@ -60,7 +60,7 @@ func (s *Server) handleBackupRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.store.Import(r.Context(), snap); err != nil {
+	if err := s.importPreviews.reset(func() error { return s.store.Import(r.Context(), snap) }); err != nil {
 		if errors.Is(err, store.ErrBadSnapshot) {
 			s.clientError(w, r, http.StatusBadRequest, "error.backupUnreadable")
 			return
@@ -75,7 +75,7 @@ func (s *Server) handleDataReset(w http.ResponseWriter, r *http.Request) {
 	if !s.parseForm(w, r) {
 		return
 	}
-	if err := s.store.Reset(r.Context()); err != nil {
+	if err := s.importPreviews.reset(func() error { return s.store.Reset(r.Context()) }); err != nil {
 		s.serverError(w, r, err)
 		return
 	}
@@ -90,7 +90,7 @@ func (s *Server) handleBookingsReset(w http.ResponseWriter, r *http.Request) {
 	if !s.parseForm(w, r) {
 		return
 	}
-	if err := s.store.ResetBookings(r.Context(), active); err != nil {
+	if err := s.importPreviews.reset(func() error { return s.store.ResetBookings(r.Context(), active) }); err != nil {
 		s.serverError(w, r, err)
 		return
 	}

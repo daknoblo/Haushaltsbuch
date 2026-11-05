@@ -38,6 +38,12 @@ Daraus folgt für den Betrieb:
   verschlüsselte Arbeitsmappen und alte XLS-Dateien werden nicht unterstützt.
   ZIP-, Tabellen- und Zellgrößen sind begrenzt. Ungültige Zeilen brechen den
   gesamten Import ab; externe Verknüpfungen werden nicht geladen.
+- Exporte mit mehreren eigenen Konten benötigen eine ausdrückliche Zuordnung.
+  Vor der Bestätigung liegen höchstens vier begrenzte Vorschauen im
+  Arbeitsspeicher; sie sind 15 Minuten abrufbar und werden nicht mitgesichert.
+  Quellkontonummern werden nicht vollständig in der Vorschau angezeigt.
+  Bestätigung und Datenersetzung sind synchronisiert, damit alte Vorschauen
+  keine wiederverwendeten IDs aus einer Wiederherstellung adressieren können.
 
 ## Eine Lücke melden
 

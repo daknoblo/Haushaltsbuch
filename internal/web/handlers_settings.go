@@ -77,7 +77,7 @@ func (s *Server) handleHouseholdDelete(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	if err := s.store.DeleteHousehold(ctx, id); err != nil {
+	if err := s.importPreviews.reset(func() error { return s.store.DeleteHousehold(ctx, id) }); err != nil {
 		s.writeStoreError(w, r, err)
 		return
 	}

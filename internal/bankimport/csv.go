@@ -18,6 +18,11 @@ import (
 
 // CSV reads a bounded bank statement locally, preserving repeated transactions.
 func CSV(ctx context.Context, data []byte, options TableOptions) ([]store.BankTransaction, error) {
+	return singleAccount(CSVAccounts(ctx, data, options))
+}
+
+// CSVAccounts preserves source-account boundaries for explicit destination mapping.
+func CSVAccounts(ctx context.Context, data []byte, options TableOptions) ([]SourceAccount, error) {
 	o, err := options.normalized()
 	if err != nil {
 		return nil, err
@@ -76,7 +81,7 @@ func CSV(ctx context.Context, data []byte, options TableOptions) ([]store.BankTr
 		}
 		return nil, tableError("mapping", 0)
 	}
-	return parseTable(ctx, *chosen, o)
+	return parseAccounts(ctx, *chosen, o)
 }
 
 func decodeCSV(data []byte, encoding string) (string, error) {

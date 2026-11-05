@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/bankimport"
 	"github.com/daknoblo/Haushaltsbuch/internal/calc"
@@ -32,12 +33,13 @@ func (s *Server) SetBankImporter(importer BankImporter) { s.bankAI = importer }
 
 // ImportVM combines persisted review state with global AI readiness.
 type ImportVM struct {
-	Ledger       store.BankLedger
-	Data         calc.Data
-	Rows         []ImportRow
-	AIEnabled    bool
-	AIConfigured bool
-	Closed       bool
+	Ledger          store.BankLedger
+	Data            calc.Data
+	Rows            []ImportRow
+	AIEnabled       bool
+	AIConfigured    bool
+	Closed          bool
+	PendingMappings []ImportMappingLink
 }
 
 // ImportRow adds non-binding duplicate, transfer and plan hints to a payment.
@@ -102,6 +104,7 @@ func (s *Server) handleImports(w http.ResponseWriter, r *http.Request) {
 		}
 		vm.Closed = slices.Contains(vm.Ledger.ClosedMonths, nav.Month)
 		vm.Rows = importRows(r.Context(), vm.Ledger, vm.Data, nav.Month)
+		vm.PendingMappings = s.importPreviews.list(nav.ActiveHousehold.ID)
 	}
 	s.render(w, r, ImportsPage(nav, vm))
 }
@@ -220,6 +223,7 @@ func (s *Server) handleBankImportDiscard(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
+	generation := s.importPreviews.epoch()
 	select {
 	case s.importGate <- struct{}{}:
 		defer func() { <-s.importGate }()
@@ -258,6 +262,11 @@ func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer func() { _ = file.Close() }()
+	filename := filepath.Base(header.Filename)
+	if utf8.RuneCountInString(filename) > 255 {
+		s.bankError(w, r, bankimport.ErrFile)
+		return
+	}
 	content, err := io.ReadAll(io.LimitReader(file, bankimport.MaxFileBytes+1))
 	if err != nil || len(content) > bankimport.MaxFileBytes {
 		s.bankError(w, r, bankimport.ErrFile)
@@ -265,31 +274,57 @@ func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	hash := sha256.Sum256(content)
 	digest := hex.EncodeToString(hash[:])
-	exists, err := s.store.HasBankImport(ctx, hh, accountID, digest)
+	if strings.EqualFold(filepath.Ext(filename), ".pdf") {
+		exists, err := s.store.HasBankImport(ctx, hh, accountID, digest)
+		if err != nil {
+			s.bankError(w, r, err)
+			return
+		}
+		if exists {
+			s.bankError(w, r, store.ErrDuplicateImport)
+			return
+		}
+	}
+	sources, err := s.extractStatement(ctx, r, filename, content)
 	if err != nil {
 		s.bankError(w, r, err)
 		return
 	}
-	if exists {
-		s.bankError(w, r, store.ErrDuplicateImport)
+	if len(sources) == 0 {
+		s.bankError(w, r, bankimport.ErrResult)
 		return
 	}
-	payments, err := s.extractStatement(ctx, r, header.Filename, content)
-	if err != nil {
-		s.bankError(w, r, err)
-		return
+	for _, source := range sources {
+		if len(source.Payments) == 0 {
+			s.bankError(w, r, bankimport.ErrResult)
+			return
+		}
 	}
 	data, err := s.loadHouseholdData(ctx, hh)
 	if err != nil {
 		s.bankError(w, r, err)
 		return
 	}
-	for i := range payments {
-		suggestPlan(&payments[i], data)
+	for _, source := range sources {
+		for i := range source.Payments {
+			suggestPlan(&source.Payments[i], data)
+		}
 	}
-	err = s.store.CreateBankImport(ctx, hh, store.BankImport{
-		AccountID: accountID, Digest: digest, Filename: filepath.Base(header.Filename),
-	}, payments)
+	if len(sources) > 1 {
+		token, err := s.importPreviews.put(generation, pendingImport{household: hh, digest: digest, filename: filename, sources: sources})
+		if err != nil {
+			s.bankError(w, r, err)
+			return
+		}
+		http.Redirect(w, r, importMappingURL(token), http.StatusSeeOther)
+		return
+	}
+	payments := sources[0].Payments
+	err = s.importPreviews.current(generation, func() error {
+		return s.store.CreateBankImport(ctx, hh, store.BankImport{
+			AccountID: accountID, Digest: digest, Filename: filename,
+		}, payments)
+	})
 	if err != nil {
 		s.bankError(w, r, err)
 		return
@@ -483,6 +518,12 @@ func (s *Server) bankError(w http.ResponseWriter, r *http.Request, err error) {
 		key = "import.sheetError"
 	case errors.Is(err, bankimport.ErrConfiguration):
 		status, key = http.StatusServiceUnavailable, "import.configureModel"
+	case errors.Is(err, errImportPreview):
+		status, key = http.StatusConflict, "import.previewExpired"
+	case errors.Is(err, errImportPreviewFull):
+		status, key = http.StatusTooManyRequests, "import.previewFull"
+	case errors.Is(err, errImportMapping), errors.Is(err, bankimport.ErrAccountMapping):
+		key = "import.mappingTargets"
 	case errors.Is(err, bankimport.ErrNoText):
 		key = "import.noText"
 	case errors.Is(err, bankimport.ErrResult):

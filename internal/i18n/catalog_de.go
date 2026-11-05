@@ -13,6 +13,23 @@ var germanMonths = monthNames{
 
 // german is the default catalog. Keys are grouped by the page they appear on.
 var german = Catalog{ // #nosec G101 -- translated UI text and environment-variable names, never credential values.
+	"import.mappingTitle":              "Quellkonten zuordnen",
+	"import.mappingHint":               "Die Datei enthält mehrere eigene Konten. Wähle für jedes Quellkonto ein anderes Bankkonto dieses Haushalts. Es wurden noch keine Buchungen angelegt. Fehlende Zielkonten kannst du in den Einstellungen ergänzen und diese Liste danach neu laden.",
+	"import.mappingDestination":        "Zielkonto für Quellkonto %d",
+	"import.multiAccountHint":          "Enthält eine CSV-/Excel-Datei mehrere eigene Konten, folgt vor dem Speichern eine separate Zuordnung je Quellkonto. Die Auswahl oben gilt für Dateien mit nur einem Konto und für PDFs.",
+	"import.confirmMapping":            "Zuordnung bestätigen und alle Buchungen zur Prüfung einlesen",
+	"import.cancelMapping":             "Zuordnung verwerfen",
+	"import.refreshAccounts":           "Zielkonten neu laden",
+	"import.sourceOrdinal":             "Quellkonto %d",
+	"import.sourceSuffix":              "Kontonummer endet auf %s",
+	"import.mappingLifetime":           "Die Zuordnung ist 15 Minuten verfügbar und wird nur vorübergehend im Arbeitsspeicher gehalten. Ein Neustart, Zurücksetzen oder Wiederherstellen der Daten verwirft sie. Nach der Zuordnung bleiben die Buchungen ungeprüft.",
+	"import.pendingMappings":           "Ausstehende Kontozuordnungen",
+	"import.previewExpired":            "Diese Kontozuordnung ist abgelaufen oder nicht mehr verfügbar. Bitte die Datei erneut hochladen.",
+	"import.previewFull":               "Es sind bereits vier Kontozuordnungen offen. Bitte im Import-Tab eine davon abschließen oder verwerfen.",
+	"import.mappingTargets":            "Bitte jedem Quellkonto ein eigenes, unterschiedliches Zielkonto zuordnen. Fehlende Bankkonten können in den Einstellungen ergänzt werden.",
+	"import.sourceAccountError":        "Die Spalte für das eigene Quellkonto enthält keine eindeutige Kontoangabe. Bitte Kontonummer/Kontoname und die Spaltenzuordnung prüfen; die IBAN der Gegenpartei ist kein Quellkonto.",
+	"import.sourceColumn":              "Eigene Kontonummer / Quellkonto",
+	"import.sourceNameColumn":          "Name des eigenen Quellkontos",
 	"import.localFormats":              "CSV und Excel werden lokal ohne KI eingelesen. Für PDFs ist eine KI-Konfiguration erforderlich.",
 	"import.tableOptions":              "CSV-/Excel-Optionen und Spaltenzuordnung",
 	"import.tableOptionsHint":          "Überschriften werden automatisch erkannt. Standard: deutsche Zahlen und Tag/Monat/Jahr; ISO-Daten funktionieren immer. Excel-Zahlen und echte Excel-Datumszellen werden direkt gelesen. Ohne Währungsspalte gelten Beträge als EUR. Bei mehreren Arbeitsblättern den Namen angeben.",

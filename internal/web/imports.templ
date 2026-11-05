@@ -12,6 +12,16 @@ templ ImportsPage(nav Nav, vm ImportVM) {
 		if nav.ActiveHousehold.ID == 0 {
 			@noHousehold()
 		} else {
+			if len(vm.PendingMappings)>0 {
+				<section class="card mb-3">
+					<h2 class="mb-2 font-semibold">{ T(ctx, "import.pendingMappings") }</h2>
+					<div class="flex flex-wrap gap-2">
+						for _, mapping := range vm.PendingMappings {
+							<a class="btn-ghost" href={ templ.SafeURL(mapping.URL) }>{ mapping.Filename }</a>
+						}
+					</div>
+				</section>
+			}
 			<section class="card-tight">
 				<div class="card-body">
 					<h2 class="mb-3 font-semibold">{ T(ctx, "import.upload") }</h2>
@@ -35,6 +45,7 @@ templ ImportsPage(nav Nav, vm ImportVM) {
 							</label>
 							<label class="min-w-0">{ T(ctx, "import.file") }<input class="input mt-1 w-full min-w-0" type="file" name="statement" accept=".pdf,.csv,.xlsx,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required/></label>
 						</div>
+						<p class="text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "import.multiAccountHint") }</p>
 						if len(vm.Ledger.Accounts) == 0 {
 							<p class="text-sm text-slate-500 dark:text-slate-400">
 								{ T(ctx, "import.accountSetup") }

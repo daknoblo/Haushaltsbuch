@@ -1,0 +1,53 @@
+package web
+
+import "strconv"
+
+templ ImportMappingPage(nav Nav, vm ImportMappingVM) {
+	@Layout(nav) {
+		@pageHeading(T(ctx, "import.mappingTitle"), vm.Filename)
+		<section class="card grid gap-4">
+			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "import.mappingHint") }</p>
+			<div class="flex flex-wrap gap-2">
+				<a class="btn-ghost" href="/settings#bank-accounts" target="_blank" rel="noopener">{ T(ctx, "import.manageBankAccounts") }</a>
+				<a class="btn-ghost" href={ templ.SafeURL(importMappingURL(vm.Token)) }>{ T(ctx, "import.refreshAccounts") }</a>
+			</div>
+			<form method="post" action="/imports/mapping" class="grid gap-3">
+				@importHouseholdField(nav)
+				<input type="hidden" name="preview" value={ vm.Token }/>
+				for i, source := range vm.Sources {
+					<div class="grid min-w-0 items-center gap-3 rounded-lg border border-slate-200 p-3 md:grid-cols-2 dark:border-slate-800" data-source-account>
+						<div class="min-w-0">
+							<strong class="block break-words">
+								if source.Name != "" {
+									{ source.Name }
+								} else {
+									{ Tf(ctx, "import.sourceOrdinal", i+1) }
+								}
+							</strong>
+							if source.Suffix != "" {
+								<span class="text-sm text-slate-500 dark:text-slate-400">{ Tf(ctx, "import.sourceSuffix", source.Suffix) }</span>
+							}
+							<p class="text-sm">{ UsageLabel(ctx, len(source.Payments)) }</p>
+						</div>
+						<label class="min-w-0">
+							{ Tf(ctx, "import.mappingDestination", i+1) }
+							<select class="input mt-1 w-full" name={ "target_" + strconv.Itoa(i) } required>
+								<option value="" selected>{ T(ctx, "import.choose") }</option>
+								for _, account := range vm.Accounts {
+									<option value={ strconv.FormatInt(account.ID, 10) }>{ BankAccountLabel(ctx,account,vm.Members) }</option>
+								}
+							</select>
+						</label>
+					</div>
+				}
+				<button class="btn-primary justify-self-start" type="submit">{ T(ctx, "import.confirmMapping") }</button>
+			</form>
+			<form method="post" action="/imports/mapping/cancel">
+				@importHouseholdField(nav)
+				<input type="hidden" name="preview" value={ vm.Token }/>
+				<button class="btn-ghost" type="submit">{ T(ctx, "import.cancelMapping") }</button>
+			</form>
+			<p class="text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "import.mappingLifetime") }</p>
+		</section>
+	}
+}

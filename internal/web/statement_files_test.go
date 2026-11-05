@@ -2,6 +2,7 @@ package web
 
 import (
 	"bytes"
+	"encoding/csv"
 	"errors"
 	"mime/multipart"
 	"net/http"
@@ -251,6 +252,45 @@ func TestCrossFormatDuplicateProtection(t *testing.T) {
 		return
 	}
 	t.Fatal("matching XLSX transaction not found")
+}
+
+func TestC24OmittedTrailingColumnOverHTTP(t *testing.T) {
+	srv, handler, household := newTestServer(t)
+	accounts, err := srv.store.ListBankAccounts(t.Context(), household.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var data bytes.Buffer
+	data.WriteString("\xef\xbb\xbf")
+	writer := csv.NewWriter(&data)
+	header := strings.Split("Transaktionstyp,Buchungsdatum,Karteneinsatz,Betrag,Zahlungsempfänger,IBAN,BIC,Verwendungszweck,Beschreibung,Kontonummer,Kontoname,Kategorie,Unterkategorie,Bargeldabhebung", ",")
+	for _, record := range [][]string{
+		header,
+		{"Transfer", "15.01.2020", "", "-12,34", "Synthetic recipient", "", "", "Synthetic reference", "Synthetic description", "test-account", "Demo account", "Example", "Example detail"},
+	} {
+		if err := writer.Write(record); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		t.Fatal(err)
+	}
+	response := uploadStatement(t, handler, household.ID, accounts[0].ID, "synthetic-c24.csv", data.Bytes(), nil)
+	if response.Code != http.StatusSeeOther {
+		t.Fatalf("C24 upload: %d %s", response.Code, response.Body)
+	}
+	ledger, err := srv.store.BankLedger(t.Context(), household.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ledger.Transactions) != 1 || ledger.Transactions[0].AmountCents != 1234 ||
+		ledger.Transactions[0].Decision != "pending" || ledger.Transactions[0].Direction != store.DirExpense {
+		t.Fatal("C24 upload did not create an intact review candidate")
+	}
+	if response := uploadStatement(t, handler, household.ID, accounts[0].ID, "renamed-c24.csv", data.Bytes(), nil); response.Code != http.StatusConflict {
+		t.Fatalf("C24 file duplicate not rejected: %d", response.Code)
+	}
 }
 
 func TestStructuredUploadUIIsAvailableWithoutAI(t *testing.T) {

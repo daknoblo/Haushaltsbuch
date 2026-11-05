@@ -21,6 +21,11 @@ const maxWorkbookBytes = 32 << 20
 
 // XLSX reads cell values without evaluating formulas or following external links.
 func XLSX(ctx context.Context, data []byte, options TableOptions) ([]store.BankTransaction, error) {
+	return singleAccount(XLSXAccounts(ctx, data, options))
+}
+
+// XLSXAccounts preserves source-account boundaries for explicit destination mapping.
+func XLSXAccounts(ctx context.Context, data []byte, options TableOptions) ([]SourceAccount, error) {
 	o, err := options.normalized()
 	if err != nil {
 		return nil, err
@@ -103,7 +108,7 @@ func XLSX(ctx context.Context, data []byte, options TableOptions) ([]store.BankT
 	if rows.Error() != nil {
 		return nil, tableError("xlsx", 0)
 	}
-	return parseTable(ctx, out, o)
+	return parseAccounts(ctx, out, o)
 }
 
 func excelDate(s string, date1904 bool) (string, error) {

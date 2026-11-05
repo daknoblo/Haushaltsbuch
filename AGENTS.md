@@ -119,6 +119,10 @@ owns strict column mapping, cent-exact parsing and bounded spreadsheet decoding.
 Invalid rows fail the whole import; never silently skip rows, guess ambiguous
 columns or evaluate spreadsheet formulas. PDF-only configuration guards must
 not block CSV/XLSX uploads.
+Structured exports with multiple own accounts require explicit, distinct
+destination mappings before persistence. Counterparty IBANs are not source
+accounts. Mapping previews are bounded, household-scoped and in-memory only;
+confirmation is atomic and serialized with data resets/restores.
 Backup format 3 includes the non-secret model selection and default-account
 markers; formats 1 and 2 still restore, with missing account defaults backfilled
 only after all original IDs have been restored.

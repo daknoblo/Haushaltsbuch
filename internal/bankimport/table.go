@@ -33,6 +33,7 @@ type TableOptions struct {
 	Sheet                                                             string
 	HeaderRow                                                         int
 	Date, Amount, Debit, Credit, Name, Reference, Direction, Currency string
+	Account, AccountName                                              string
 }
 
 // TableError identifies a bad row without reflecting private cell contents.
@@ -70,6 +71,7 @@ type table struct {
 
 type columns struct {
 	date, amount, debit, credit, name, direction, currency int
+	account, accountName                                   int
 	references                                             []int
 }
 
@@ -94,7 +96,7 @@ func (o TableOptions) normalized() (TableOptions, error) {
 		o.HeaderRow < 0 || o.HeaderRow > 50 || utf8.RuneCountInString(o.Sheet) > 31 {
 		return o, tableError("options", 0)
 	}
-	for _, name := range []string{o.Date, o.Amount, o.Debit, o.Credit, o.Name, o.Reference, o.Direction, o.Currency} {
+	for _, name := range []string{o.Date, o.Amount, o.Debit, o.Credit, o.Name, o.Reference, o.Direction, o.Currency, o.Account, o.AccountName} {
 		if len(name) > 256 {
 			return o, tableError("options", 0)
 		}
@@ -142,7 +144,7 @@ func findColumn(row tableRow, explicit string, aliases ...string) (int, error) {
 }
 
 func mapColumns(row tableRow, o TableOptions) (columns, error) {
-	c := columns{date: -1, amount: -1, debit: -1, credit: -1, name: -1, direction: -1, currency: -1}
+	c := columns{date: -1, amount: -1, debit: -1, credit: -1, name: -1, direction: -1, currency: -1, account: -1, accountName: -1}
 	fields := []struct {
 		target   *int
 		explicit string
@@ -153,6 +155,8 @@ func mapColumns(row tableRow, o TableOptions) (columns, error) {
 			"Zahlungsempfänger", "Empfänger", "Auftraggeber", "Empfänger/Auftraggeber", "Auftraggeber/Empfänger"}},
 		{&c.direction, o.Direction, []string{"Soll/Haben", "S/H", "Debit/Credit", "Direction", "Richtung"}},
 		{&c.currency, o.Currency, []string{"Währung", "Currency", "Currency code", "Waehrung"}},
+		{&c.account, o.Account, []string{"Kontonummer", "Account number", "Own account", "Source account", "Eigene IBAN"}},
+		{&c.accountName, o.AccountName, []string{"Kontoname", "Account name", "Own account name", "Source account name"}},
 	}
 	for _, field := range fields {
 		index, err := findColumn(row, field.explicit, field.aliases...)
@@ -201,7 +205,7 @@ func mapColumns(row tableRow, o TableOptions) (columns, error) {
 		return c, tableError("mapping", row.number)
 	}
 	used := make(map[int]bool)
-	for _, index := range []int{c.date, c.amount, c.debit, c.credit, c.name, c.direction, c.currency} {
+	for _, index := range []int{c.date, c.amount, c.debit, c.credit, c.name, c.direction, c.currency, c.account, c.accountName} {
 		if index < 0 {
 			continue
 		}
@@ -232,12 +236,20 @@ func locateHeader(t table, o TableOptions) (int, columns, error) {
 	return 0, columns{}, tableError("mapping", 0)
 }
 
-func parseTable(ctx context.Context, t table, o TableOptions) ([]store.BankTransaction, error) {
+func parseAccounts(ctx context.Context, t table, o TableOptions) ([]SourceAccount, error) {
 	header, c, err := locateHeader(t, o)
 	if err != nil {
 		return nil, err
 	}
-	var out []store.BankTransaction
+	// Some exports omit unused trailing fields. Every mapped column must still
+	// have a cell, even when its value is optional or explicitly mapped.
+	minimumWidth := max(c.date, c.amount, c.debit, c.credit, c.name, c.direction, c.currency, c.account, c.accountName) + 1
+	for _, index := range c.references {
+		minimumWidth = max(minimumWidth, index+1)
+	}
+	var out []SourceAccount
+	byAccount := make(map[[32]byte]int)
+	count := 0
 	for _, row := range t.rows[header+1:] {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -252,18 +264,29 @@ func parseTable(ctx context.Context, t table, o TableOptions) ([]store.BankTrans
 		if empty {
 			continue
 		}
-		if len(out) >= 1000 {
+		if count >= 1000 {
 			return nil, tableError("limit", row.number)
 		}
 		if len(row.cells) > len(t.rows[header].cells) ||
-			(t.strictWidth && len(row.cells) != len(t.rows[header].cells)) {
+			(t.strictWidth && len(row.cells) < minimumWidth) {
 			return nil, tableError("row", row.number)
 		}
 		p, err := parseTableRow(row, c, o, t.date1904)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, p)
+		key, account, err := accountForRow(row, c)
+		if err != nil {
+			return nil, err
+		}
+		index, exists := byAccount[key]
+		if !exists {
+			index = len(out)
+			byAccount[key] = index
+			out = append(out, account)
+		}
+		out[index].Payments = append(out[index].Payments, p)
+		count++
 	}
 	if len(out) == 0 {
 		return nil, tableError("empty", 0)
@@ -278,7 +301,7 @@ func parseTableRow(row tableRow, c columns, o TableOptions, date1904 bool) (stor
 		}
 		return row.cells[index]
 	}
-	for _, index := range append([]int{c.date, c.amount, c.debit, c.credit, c.name, c.direction, c.currency}, c.references...) {
+	for _, index := range append([]int{c.date, c.amount, c.debit, c.credit, c.name, c.direction, c.currency, c.account, c.accountName}, c.references...) {
 		if cell(index).formula {
 			return store.BankTransaction{}, tableError("formula", row.number)
 		}
@@ -308,7 +331,7 @@ func parseTableRow(row tableRow, c columns, o TableOptions, date1904 bool) (stor
 		name = string(runes[:min(120, len(runes))])
 	}
 	p := store.BankTransaction{
-		BookedOn: date, Direction: direction, AmountCents: amount, Name: name, Reference: reference,
+		BookedOn: date, Direction: direction, AmountCents: amount, Name: strings.Clone(name), Reference: strings.Clone(reference),
 		Decision: "pending", CostNature: store.CostVariable, BudgetClass: store.ClassNeed, Settle: true,
 	}
 	if err := store.ValidateBankTransaction(p); err != nil {

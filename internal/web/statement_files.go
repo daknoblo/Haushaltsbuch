@@ -8,10 +8,9 @@ import (
 	"strings"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/bankimport"
-	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
 
-func (s *Server) extractStatement(ctx context.Context, r *http.Request, filename string, content []byte) ([]store.BankTransaction, error) {
+func (s *Server) extractStatement(ctx context.Context, r *http.Request, filename string, content []byte) ([]bankimport.SourceAccount, error) {
 	switch strings.ToLower(filepath.Ext(filename)) {
 	case ".pdf":
 		if s.bankAI == nil {
@@ -28,16 +27,20 @@ func (s *Server) extractStatement(ctx context.Context, r *http.Request, filename
 		if err != nil {
 			return nil, err
 		}
-		return s.bankAI.Extract(ctx, deployment, text)
+		payments, err := s.bankAI.Extract(ctx, deployment, text)
+		if err != nil {
+			return nil, err
+		}
+		return []bankimport.SourceAccount{{Payments: payments}}, nil
 	case ".csv", ".xlsx":
 		options, err := statementTableOptions(r)
 		if err != nil {
 			return nil, err
 		}
 		if strings.EqualFold(filepath.Ext(filename), ".csv") {
-			return bankimport.CSV(ctx, content, options)
+			return bankimport.CSVAccounts(ctx, content, options)
 		}
-		return bankimport.XLSX(ctx, content, options)
+		return bankimport.XLSXAccounts(ctx, content, options)
 	default:
 		return nil, bankimport.ErrFile
 	}
@@ -51,6 +54,7 @@ func statementTableOptions(r *http.Request) (bankimport.TableOptions, error) {
 		Date:  r.FormValue("column_date"), Amount: r.FormValue("column_amount"), Name: r.FormValue("column_name"),
 		Reference: r.FormValue("column_reference"), Debit: r.FormValue("column_debit"), Credit: r.FormValue("column_credit"),
 		Direction: r.FormValue("column_direction"), Currency: r.FormValue("column_currency"),
+		Account: r.FormValue("column_account"), AccountName: r.FormValue("column_account_name"),
 	}
 	if value := r.FormValue("table_header"); value != "" {
 		number, err := strconv.Atoi(value)
@@ -82,6 +86,8 @@ func tableErrorKey(kind string) string {
 		return "import.tableEmptyError"
 	case "options":
 		return "import.tableOptionsError"
+	case "account":
+		return "import.sourceAccountError"
 	default:
 		return "import.tableReadError"
 	}

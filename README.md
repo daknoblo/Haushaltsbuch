@@ -147,6 +147,8 @@ _Not captured yet._
    setup blocks only PDF analysis and links to Settings. Model discovery occurs
    in Settings and during PDF analysis, not when opening the import page.
    The bank account and PDF controls sit side by side on wider screens.
+   When a CSV/XLSX file contains multiple own accounts, an explicit mapping
+   step replaces the single destination selection before anything is persisted.
 4. Compare the suggestions with the original statement. Correct dates, positive
    EUR amounts, income/expense direction, categories and allocations. A unique
    name match suggests a plan and highlights amount deviations, but never edits
@@ -240,6 +242,8 @@ bank-specific adjustments. Normally, headings are found in the first 50 rows:
 | Reference | `Verwendungszweck`, `Buchungstext`, `Reference`, `Description` |
 | Direction (optional) | `Soll/Haben`, `S/H`, `Direction`; values such as `S`/`H`, `debit`/`credit` |
 | Currency (optional) | `Währung`, `Currency`; only `EUR` or `€` is accepted |
+| Own source account (optional) | `Kontonummer`, `Account number`, `Source account`, `Eigene IBAN` |
+| Own account label (optional) | `Kontoname`, `Account name`, `Source account name` |
 
 Headers are case-insensitive. Ambiguous headings require an explicit mapping,
 not a guessed column. `Wertstellung` is never automatically substituted for the
@@ -247,6 +251,28 @@ booking date. Use the exact heading text to override a mapping or specify the
 header row. Without a counterparty column, the reference supplies a short
 display name while the full reference is retained. Multiple recognized reference
 columns are joined in source order.
+
+**Multiple accounts in one export:** own account numbers group the rows;
+account names are used only when there is no own-account-number column.
+A generic `IBAN` column is never treated as the source account because bank
+exports commonly use it for the counterparty. Missing source identifiers are
+errors rather than grounds for silently merging rows.
+
+If multiple source accounts are detected, choose a distinct bank account of the
+active household for each one. The preview shows the source label, only the
+last four characters of its number, and the number of transactions. No
+destination is guessed. Add missing bank accounts in Settings (opens in a new
+tab), then reload the destination list. Confirmation creates all groups in
+one database transaction: a duplicate file, foreign/missing destination or
+closed month rolls back every group. Payments remain pending manual review.
+
+Mappings can be resumed from Import or explicitly discarded. At most four are
+held temporarily in memory, accessible for 15 minutes; expired entries are
+removed on subsequent preview access. Restarting the process, restoring or
+resetting data, or deleting a household invalidates outstanding mappings.
+Unconfirmed mappings are not included in backups and original files are not
+retained. Upload again if a preview expires. Each new multi-account upload
+requires explicit mapping; source-account links are not silently remembered.
 
 - **CSV:** automatic semicolon, comma or tab detection; quoted fields, embedded
   newlines, UTF-8 (with or without BOM), UTF-16 with BOM and Windows-1252.
@@ -269,6 +295,11 @@ columns are joined in source order.
 - **Validation:** blank rows are ignored, but invalid transaction rows, totals
   and footers fail the entire file. Errors identify the affected row without
   reflecting cell contents. Nothing counts as an actual payment until reviewed.
+  CSV rows may omit trailing columns only when none of those columns is mapped
+  for import. This supports C24 exports whose header includes `Bargeldabhebung`
+  but whose transaction rows omit that unused final field. Missing mapped
+  columns and additional columns remain errors. Such C24 exports work with the
+  default automatic separator detection and German number format.
 
 Tables are limited to 64 columns, 50 preamble/header rows, 2 MiB of cell text,
 and 16 KiB per cell. XLSX ZIP content is bounded to 32 MiB and 256 entries,

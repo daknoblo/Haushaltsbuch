@@ -13,6 +13,23 @@ var englishMonths = monthNames{
 
 // english mirrors the German catalog key by key.
 var english = Catalog{
+	"import.mappingTitle":              "Map source accounts",
+	"import.mappingHint":               "This file contains multiple own accounts. Choose a different bank account in this household for each source. No transactions have been created yet. Add missing destinations in Settings, then reload this list.",
+	"import.mappingDestination":        "Destination for source account %d",
+	"import.multiAccountHint":          "CSV/Excel files containing multiple own accounts open a separate mapping step before saving. The account selected above applies to single-account files and PDFs.",
+	"import.confirmMapping":            "Confirm mapping and read all transactions for review",
+	"import.cancelMapping":             "Discard mapping",
+	"import.refreshAccounts":           "Reload destination accounts",
+	"import.sourceOrdinal":             "Source account %d",
+	"import.sourceSuffix":              "Account number ends in %s",
+	"import.mappingLifetime":           "The mapping is available for 15 minutes and held temporarily in memory only. Restarting, resetting or restoring data discards it. Transactions still require review after mapping.",
+	"import.pendingMappings":           "Pending account mappings",
+	"import.previewExpired":            "This account mapping has expired or is no longer available. Please upload the file again.",
+	"import.previewFull":               "Four account mappings are already open. Complete or discard one in the Import tab first.",
+	"import.mappingTargets":            "Assign a distinct destination account to each source account. Add missing bank accounts in Settings.",
+	"import.sourceAccountError":        "The own source-account column has no unambiguous account identifier. Check the account number/name and column mapping; the counterparty IBAN is not the source account.",
+	"import.sourceColumn":              "Own account number / source account",
+	"import.sourceNameColumn":          "Own source-account name",
 	"import.localFormats":              "CSV and Excel are read locally without AI. PDFs require AI configuration.",
 	"import.tableOptions":              "CSV/Excel options and column mapping",
 	"import.tableOptionsHint":          "Headers are detected automatically. Default: German numbers and day/month/year; ISO dates always work. Numeric Excel amounts and dates are read directly. Without a currency column, amounts are treated as EUR. Specify a sheet name for multi-sheet workbooks.",

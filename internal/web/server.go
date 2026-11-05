@@ -20,12 +20,13 @@ import (
 
 // Server holds the dependencies shared by all handlers.
 type Server struct {
-	store      *store.Store
-	logger     *slog.Logger
-	limiter    *rateLimiter
-	api        *api.Server
-	bankAI     BankImporter
-	importGate chan struct{}
+	store          *store.Store
+	logger         *slog.Logger
+	limiter        *rateLimiter
+	api            *api.Server
+	bankAI         BankImporter
+	importGate     chan struct{}
+	importPreviews importPreviews
 }
 
 // New creates a Server. An empty apiToken leaves the machine-facing API off.
@@ -67,6 +68,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /imports/accounts/{id}/delete", s.handleBankAccountDelete)
 	mux.HandleFunc("POST /imports/batches/{id}/delete", s.handleBankImportDiscard)
 	mux.HandleFunc("POST /imports/upload", s.handleBankUpload)
+	mux.HandleFunc("GET /imports/mapping", s.handleImportMapping)
+	mux.HandleFunc("POST /imports/mapping", s.handleImportMappingConfirm)
+	mux.HandleFunc("POST /imports/mapping/cancel", s.handleImportMappingCancel)
 	mux.HandleFunc("POST /imports/transactions/{id}", s.handleBankReview)
 	mux.HandleFunc("POST /imports/month", s.handleBankMonth)
 	mux.HandleFunc("POST /imports/transactions/{id}/plan", s.handleBankPlan)
