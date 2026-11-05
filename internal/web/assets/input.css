@@ -35,7 +35,7 @@
     @apply p-5;
   }
   .settings-overview {
-    @apply grid min-w-0 items-start gap-3 lg:grid-cols-3;
+    @apply grid min-w-0 items-stretch gap-3 lg:grid-cols-3;
   }
   .settings-overview .card-head {
     @apply gap-2 px-3 py-2;

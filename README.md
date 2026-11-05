@@ -167,8 +167,9 @@ _Not captured yet._
    Pending rows block closure. Reopen it before making corrections or importing
    another statement for that month. Current and future months stay open.
 
-Settings group households, members and bank accounts into three compact desktop
-tiles, stacking them on smaller screens. **Configure the Azure connection**
+Settings group households, members and bank accounts into three equally sized
+desktop tiles, leaving empty space below shorter content. They stack naturally
+on smaller screens. **Configure the Azure connection**
 always shows each of the four environment variables without an expandable
 menu, on its own row: green **Set** or
 red **Not set**. Only presence is displayed, never a variable's value; this is

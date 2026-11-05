@@ -87,6 +87,24 @@ func TestImportEnvironmentStatusAlwaysVisible(t *testing.T) {
 	}
 }
 
+func TestBankAccountSettingsHasNoHelpDisclosure(t *testing.T) {
+	var rendered bytes.Buffer
+	if err := bankAccountSettings(1,
+		[]store.Member{{ID: 1, Name: "Synthetic member"}},
+		[]store.BankAccount{{ID: 1, MemberID: 1, Name: "Synthetic account", Default: true}},
+	).Render(t.Context(), &rendered); err != nil {
+		t.Fatal(err)
+	}
+	body := rendered.String()
+	if strings.Contains(body, "<details") || strings.Contains(body, "<summary") {
+		t.Fatal("bank-account help disclosure remains")
+	}
+	if !strings.Contains(body, "Synthetic member") || !strings.Contains(body, "Synthetic account") ||
+		!strings.Contains(body, `action="/settings/bank-accounts"`) {
+		t.Fatal("bank-account controls must remain available")
+	}
+}
+
 // compactUIFixture is deliberately synthetic and runs only against t.TempDir.
 func compactUIFixture(t *testing.T) (*Server, http.Handler, store.Household) {
 	t.Helper()
