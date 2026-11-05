@@ -115,6 +115,29 @@ func TestImportModelSettingsAreGlobalAndValidated(t *testing.T) {
 	}
 }
 
+func TestBankAccountFieldsShareOneRowLayout(t *testing.T) {
+	srv, handler, household := newTestServer(t)
+	members, err := srv.store.ListMembers(t.Context(), household.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.store.CreateBankAccount(t.Context(), household.ID, store.BankAccount{MemberID: members[0].ID, Name: "Additional synthetic account"}); err != nil {
+		t.Fatal(err)
+	}
+	accounts, err := srv.store.ListBankAccounts(t.Context(), household.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := get(t, handler, "/settings/bank-accounts").Body.String()
+	rows := len(accounts) + len(members)
+	if strings.Count(body, `class="bank-account-row`) != rows || strings.Count(body, `class="bank-account-actions"`) != rows {
+		t.Fatal("default, additional and new accounts do not share the same field/action columns")
+	}
+	if strings.Count(body, `data-settings-save`) != len(accounts) || strings.Count(body, `hx-swap="none"`) != len(accounts) {
+		t.Fatal("account autosave behavior changed")
+	}
+}
+
 func TestMemberChangesRefreshBankAccountSettings(t *testing.T) {
 	srv, handler, hh := newTestServer(t)
 	ctx := t.Context()

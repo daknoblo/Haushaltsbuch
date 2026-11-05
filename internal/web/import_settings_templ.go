@@ -466,14 +466,14 @@ func bankAccountSettings(householdID int64, members []store.Member, accounts []s
 			}
 		}
 		for _, m := range members {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<fieldset class=\"mb-3 grid gap-1.5 last:mb-0\" data-member-bank-accounts=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<fieldset class=\"mb-3 grid min-w-0 gap-1.5 last:mb-0\" data-member-bank-accounts=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var26 string
 			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.FormatInt(m.ID, 10))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 76, Col: 105}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 76, Col: 113}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
 			if templ_7745c5c3_Err != nil {
@@ -498,14 +498,14 @@ func bankAccountSettings(householdID int64, members []store.Member, accounts []s
 			}
 			for _, a := range accounts {
 				if a.MemberID == m.ID {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<div class=\"flex flex-wrap items-center gap-2\"><form class=\"min-w-0 flex-1\" hx-post=\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<div class=\"bank-account-row\"><form class=\"min-w-0\" hx-post=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var28 string
 					templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.ResolveAttributeValue("/settings/bank-accounts/" + strconv.FormatInt(a.ID, 10))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 81, Col: 103}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 81, Col: 96}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var28)
 					if templ_7745c5c3_Err != nil {
@@ -563,7 +563,7 @@ func bankAccountSettings(householdID int64, members []store.Member, accounts []s
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "\" hidden></p></form>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "\" hidden></p></form><div class=\"bank-account-actions\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -575,7 +575,7 @@ func bankAccountSettings(householdID int64, members []store.Member, accounts []s
 						var templ_7745c5c3_Var33 string
 						templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "settings.defaultAccount"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 87, Col: 100}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 88, Col: 101}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 						if templ_7745c5c3_Err != nil {
@@ -593,7 +593,7 @@ func bankAccountSettings(householdID int64, members []store.Member, accounts []s
 						var templ_7745c5c3_Var34 templ.SafeURL
 						templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinURLErrs("/settings/bank-accounts/" + strconv.FormatInt(a.ID, 10) + "/default")
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 89, Col: 107}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 90, Col: 108}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 						if templ_7745c5c3_Err != nil {
@@ -606,7 +606,7 @@ func bankAccountSettings(householdID int64, members []store.Member, accounts []s
 						var templ_7745c5c3_Var35 string
 						templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.FormatInt(householdID, 10))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 90, Col: 90}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 91, Col: 91}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var35)
 						if templ_7745c5c3_Err != nil {
@@ -619,7 +619,7 @@ func bankAccountSettings(householdID int64, members []store.Member, accounts []s
 						var templ_7745c5c3_Var36 string
 						templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.ResolveAttributeValue(T(ctx, "settings.makeDefaultAccount"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 91, Col: 95}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 92, Col: 96}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var36)
 						if templ_7745c5c3_Err != nil {
@@ -632,7 +632,7 @@ func bankAccountSettings(householdID int64, members []store.Member, accounts []s
 						var templ_7745c5c3_Var37 string
 						templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "settings.defaultAccount"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 91, Col: 133}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 92, Col: 134}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 						if templ_7745c5c3_Err != nil {
@@ -645,7 +645,7 @@ func bankAccountSettings(householdID int64, members []store.Member, accounts []s
 						var templ_7745c5c3_Var38 templ.SafeURL
 						templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinURLErrs("/settings/bank-accounts/" + strconv.FormatInt(a.ID, 10) + "/delete")
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 93, Col: 106}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 94, Col: 107}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 						if templ_7745c5c3_Err != nil {
@@ -658,7 +658,7 @@ func bankAccountSettings(householdID int64, members []store.Member, accounts []s
 						var templ_7745c5c3_Var39 string
 						templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.FormatInt(householdID, 10))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 94, Col: 90}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 95, Col: 91}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var39)
 						if templ_7745c5c3_Err != nil {
@@ -671,7 +671,7 @@ func bankAccountSettings(householdID int64, members []store.Member, accounts []s
 						var templ_7745c5c3_Var40 string
 						templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.ResolveAttributeValue(T(ctx, "import.deleteUnusedAccount"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 95, Col: 114}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 96, Col: 115}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var40)
 						if templ_7745c5c3_Err != nil {
@@ -682,20 +682,20 @@ func bankAccountSettings(householdID int64, members []store.Member, accounts []s
 							return templ_7745c5c3_Err
 						}
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "</div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "</div></div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "<form method=\"post\" action=\"/settings/bank-accounts\" class=\"mt-2 flex flex-wrap gap-2\"><input type=\"hidden\" name=\"household\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "<form method=\"post\" action=\"/settings/bank-accounts\" class=\"bank-account-row mt-2\"><input type=\"hidden\" name=\"household\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var41 string
 			templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.FormatInt(householdID, 10))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 102, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 104, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var41)
 			if templ_7745c5c3_Err != nil {
@@ -708,20 +708,20 @@ func bankAccountSettings(householdID int64, members []store.Member, accounts []s
 			var templ_7745c5c3_Var42 string
 			templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.FormatInt(m.ID, 10))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 103, Col: 76}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 105, Col: 76}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var42)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "\"> <input class=\"input min-w-0 flex-1\" name=\"name\" maxlength=\"120\" aria-label=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "\"> <input class=\"input min-w-0\" name=\"name\" maxlength=\"120\" aria-label=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var43 string
 			templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.ResolveAttributeValue(Tf(ctx, "settings.newAccountFor", m.Name))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 104, Col: 124}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 106, Col: 117}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var43)
 			if templ_7745c5c3_Err != nil {
@@ -734,20 +734,20 @@ func bankAccountSettings(householdID int64, members []store.Member, accounts []s
 			var templ_7745c5c3_Var44 string
 			templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.ResolveAttributeValue(T(ctx, "import.accountExample"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 104, Col: 172}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 106, Col: 165}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var44)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "\" required> <button class=\"btn-primary shrink-0\" type=\"submit\" aria-label=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "\" required><div class=\"bank-account-actions\"><button class=\"btn-primary\" type=\"submit\" aria-label=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var45 string
 			templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.ResolveAttributeValue(T(ctx, "settings.addBankAccount"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 105, Col: 103}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 108, Col: 95}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var45)
 			if templ_7745c5c3_Err != nil {
@@ -760,13 +760,13 @@ func bankAccountSettings(householdID int64, members []store.Member, accounts []s
 			var templ_7745c5c3_Var46 string
 			templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "action.add"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 105, Col: 128}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/import_settings.templ`, Line: 108, Col: 120}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "</button></form></fieldset>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "</button></div></form></fieldset>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

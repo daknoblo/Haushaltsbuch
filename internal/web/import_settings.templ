@@ -73,36 +73,40 @@ templ bankAccountSettings(householdID int64, members []store.Member, accounts []
 				<a class="btn-ghost mt-3" href="#people">{ T(ctx, "import.openPeopleSettings") }</a>
 			}
 			for _, m := range members {
-				<fieldset class="mb-3 grid gap-1.5 last:mb-0" data-member-bank-accounts={ strconv.FormatInt(m.ID, 10) }>
+				<fieldset class="mb-3 grid min-w-0 gap-1.5 last:mb-0" data-member-bank-accounts={ strconv.FormatInt(m.ID, 10) }>
 					<legend class="mb-1 text-sm font-semibold">{ m.Name }</legend>
 					for _, a := range accounts {
 						if a.MemberID == m.ID {
-							<div class="flex flex-wrap items-center gap-2">
-								<form class="min-w-0 flex-1" hx-post={ "/settings/bank-accounts/" + strconv.FormatInt(a.ID, 10) } hx-trigger="change, keyup changed delay:600ms" hx-swap="none" hx-sync="this:queue last" data-settings-save>
+							<div class="bank-account-row">
+								<form class="min-w-0" hx-post={ "/settings/bank-accounts/" + strconv.FormatInt(a.ID, 10) } hx-trigger="change, keyup changed delay:600ms" hx-swap="none" hx-sync="this:queue last" data-settings-save>
 									<input type="hidden" name="household" value={ strconv.FormatInt(householdID, 10) }/>
 									<input class="input w-full" name="name" value={ a.Name } maxlength="120" aria-label={ Tf(ctx, "settings.accountFor", m.Name) } required/>
 									<p class="alert-error mt-2" role="alert" data-settings-error data-fallback={ T(ctx, "settings.saveError") } hidden></p>
 								</form>
-								if a.Default {
-									<span class="badge badge-ok shrink-0 whitespace-nowrap">{ T(ctx, "settings.defaultAccount") }</span>
-								} else {
-									<form method="post" action={ "/settings/bank-accounts/" + strconv.FormatInt(a.ID, 10) + "/default" }>
-										<input type="hidden" name="household" value={ strconv.FormatInt(householdID, 10) }/>
-										<button type="submit" class="btn-ghost" title={ T(ctx, "settings.makeDefaultAccount") }>{ T(ctx, "settings.defaultAccount") }</button>
-									</form>
-									<form method="post" action={ "/settings/bank-accounts/" + strconv.FormatInt(a.ID, 10) + "/delete" }>
-										<input type="hidden" name="household" value={ strconv.FormatInt(householdID, 10) }/>
-										<button type="submit" class="btn-icon btn-icon-danger" aria-label={ T(ctx, "import.deleteUnusedAccount") }>✕</button>
-									</form>
-								}
+								<div class="bank-account-actions">
+									if a.Default {
+										<span class="badge badge-ok shrink-0 whitespace-nowrap">{ T(ctx, "settings.defaultAccount") }</span>
+									} else {
+										<form method="post" action={ "/settings/bank-accounts/" + strconv.FormatInt(a.ID, 10) + "/default" }>
+											<input type="hidden" name="household" value={ strconv.FormatInt(householdID, 10) }/>
+											<button type="submit" class="btn-ghost" title={ T(ctx, "settings.makeDefaultAccount") }>{ T(ctx, "settings.defaultAccount") }</button>
+										</form>
+										<form method="post" action={ "/settings/bank-accounts/" + strconv.FormatInt(a.ID, 10) + "/delete" }>
+											<input type="hidden" name="household" value={ strconv.FormatInt(householdID, 10) }/>
+											<button type="submit" class="btn-icon btn-icon-danger" aria-label={ T(ctx, "import.deleteUnusedAccount") }>✕</button>
+										</form>
+									}
+								</div>
 							</div>
 						}
 					}
-					<form method="post" action="/settings/bank-accounts" class="mt-2 flex flex-wrap gap-2">
+					<form method="post" action="/settings/bank-accounts" class="bank-account-row mt-2">
 						<input type="hidden" name="household" value={ strconv.FormatInt(householdID, 10) }/>
 						<input type="hidden" name="member" value={ strconv.FormatInt(m.ID, 10) }/>
-						<input class="input min-w-0 flex-1" name="name" maxlength="120" aria-label={ Tf(ctx, "settings.newAccountFor", m.Name) } placeholder={ T(ctx, "import.accountExample") } required/>
-						<button class="btn-primary shrink-0" type="submit" aria-label={ T(ctx, "settings.addBankAccount") }>{ T(ctx, "action.add") }</button>
+						<input class="input min-w-0" name="name" maxlength="120" aria-label={ Tf(ctx, "settings.newAccountFor", m.Name) } placeholder={ T(ctx, "import.accountExample") } required/>
+						<div class="bank-account-actions">
+							<button class="btn-primary" type="submit" aria-label={ T(ctx, "settings.addBankAccount") }>{ T(ctx, "action.add") }</button>
+						</div>
 					</form>
 				</fieldset>
 			}

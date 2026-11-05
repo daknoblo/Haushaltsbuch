@@ -170,7 +170,9 @@ _Not captured yet._
 
 Settings group households, members and bank accounts into three equally sized
 desktop tiles, leaving empty space below shorter content. They stack naturally
-on smaller screens. **Configure the Azure connection**
+on smaller screens. Bank-account name fields use the same width for default,
+additional and new accounts, with a shared reserved column for their actions.
+**Configure the Azure connection**
 always shows each of the four environment variables without an expandable
 menu, on its own row: green **Set** or
 red **Not set**. Only presence is displayed, never a variable's value; this is
