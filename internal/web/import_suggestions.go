@@ -233,7 +233,7 @@ func describeImport(ctx context.Context, row *ImportRow, data calc.Data) {
 		}
 	}
 	row.AllocationLabel = strings.Join(parts, " · ")
-	row.CanQuick = row.Payment.Decision == "pending" && !row.Closed && !row.Duplicate && row.TransferCandidate == "" && row.Payment.TransferAccountID == 0 &&
+	row.CanQuick = row.Payment.Decision == "pending" && !row.Closed && !row.Duplicate && row.TransferCandidate == "" && row.SimilarCandidate == "" && row.Payment.TransferAccountID == 0 &&
 		row.Category != "" && len(row.Payment.Splits) > 0 && row.AllocationLabel != "" && row.Suggestion != "conflict"
 	if row.AllocationLabel == "" && row.Payment.Decision == "pending" {
 		row.AllocationLabel = T(ctx, "import.allocationMissing")

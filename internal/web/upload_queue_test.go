@@ -101,7 +101,7 @@ func TestImportMonthURLRemainsLocal(t *testing.T) {
 	}
 }
 
-func TestUploadQueueOutcomesAndPersistentHistory(t *testing.T) {
+func TestUploadQueueOutcomesAndBookingBasedReconciliation(t *testing.T) {
 	srv, h, hh := newTestServer(t)
 	ctx := t.Context()
 	accounts, err := srv.store.ListBankAccounts(ctx, hh.ID)
@@ -119,29 +119,40 @@ func TestUploadQueueOutcomesAndPersistentHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	hash := sha256.Sum256(data)
-	if result.Status != "imported" || result.Transactions != 2 || result.Accounts != 1 ||
+	if result.Status != "imported" || result.Transactions != 2 || result.Accounts != 1 || result.Added != 2 || result.Existing != 0 ||
 		result.URL != "/imports?m=2020-01" || result.Digest != hex.EncodeToString(hash[:]) {
 		t.Fatalf("unexpected outcome: %+v", result)
 	}
 	historyURL := "/imports/status?part=history&m=2020-01&household=" + strconv.FormatInt(hh.ID, 10)
 	history := get(t, h, historyURL)
 	if history.Code != http.StatusOK || !strings.Contains(history.Body.String(), `id="import-upload-history"`) ||
-		!strings.Contains(history.Body.String(), "queue.csv") || !strings.Contains(history.Body.String(), `data-uploaded-transactions="2"`) {
-		t.Fatal("persisted file missing from status fragment")
+		strings.Contains(history.Body.String(), "queue.csv") {
+		t.Fatal("completed file persisted as an upload card")
 	}
 	if strings.Contains(history.Body.String(), `data-bank-upload`) {
 		t.Fatal("status update would replace active file queue")
 	}
 	page := get(t, h, "/imports?m=2020-01").Body.String()
-	if !strings.Contains(page, "queue.csv") || !strings.Contains(page, `data-uploaded-digest="`+result.Digest+`"`) {
-		t.Fatal("file history lost after reload")
+	if strings.Contains(page, `data-uploaded-digest=`) {
+		t.Fatal("persistent file archive remains")
 	}
 	review := get(t, h, "/imports/status?part=review&m=2020-01&household="+strconv.FormatInt(hh.ID, 10))
 	if review.Code != http.StatusOK || !strings.Contains(review.Body.String(), `id="import-review"`) || !strings.Contains(review.Body.String(), "Synthetic rent") {
 		t.Fatal("review fragment missing imported transactions")
 	}
-	if duplicate := queueUpload(t, h, hh.ID, accounts[0].ID, "duplicate.csv", data, nil); duplicate.Code != http.StatusConflict {
-		t.Fatalf("duplicate returned success: %d", duplicate.Code)
+	duplicate := queueUpload(t, h, hh.ID, accounts[0].ID, "duplicate.csv", data, nil)
+	if duplicate.Code != http.StatusCreated {
+		t.Fatalf("repeat check failed: %d", duplicate.Code)
+	}
+	if err := json.Unmarshal(duplicate.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Added != 0 || result.Existing != 2 {
+		t.Fatalf("repeat was not reconciled: %+v", result)
+	}
+	ledger, err := srv.store.BankLedger(ctx, hh.ID)
+	if err != nil || len(ledger.Transactions) != 2 || len(ledger.Imports) != 1 {
+		t.Fatal("repeated file created redundant records")
 	}
 	if bad := queueUpload(t, h, hh.ID, accounts[0].ID, "bad.csv", []byte("not a valid statement"), nil); bad.Code != http.StatusBadRequest {
 		t.Fatalf("invalid upload returned success: %d", bad.Code)
@@ -184,9 +195,8 @@ func TestQueuedMappingOutcomeAndHistoryResolution(t *testing.T) {
 		t.Fatalf("confirm mapping: %d", saved.Code)
 	}
 	after := get(t, h, "/imports").Body.String()
-	if strings.Contains(after, `data-pending-upload-url=`) || strings.Count(after, `data-uploaded-digest=`) != 1 ||
-		!strings.Contains(after, `data-uploaded-accounts="2"`) {
-		t.Fatal("mapped file history did not resolve/group the source file")
+	if strings.Contains(after, `data-pending-upload-url=`) || strings.Contains(after, `data-uploaded-digest=`) {
+		t.Fatal("completed mapping remained a persistent file card")
 	}
 }
 
@@ -252,23 +262,7 @@ func TestUploadQueueScopeAndGeneration(t *testing.T) {
 	}
 }
 
-func TestUploadedFileReviewLinkTargetsPendingMonth(t *testing.T) {
-	ledger := store.BankLedger{
-		Imports:  []store.BankImport{{ID: 1, AccountID: 1, Digest: "synthetic", Filename: "year.csv"}},
-		Accounts: []store.BankAccount{{ID: 1, MemberID: 1, Name: "Example"}},
-		Transactions: []store.BankTransaction{
-			{ImportID: 1, BookedOn: "2020-01-01", Decision: "accepted"},
-			{ImportID: 1, BookedOn: "2020-02-01", Decision: "pending"},
-			{ImportID: 1, BookedOn: "2020-03-01", Decision: "pending"},
-		},
-	}
-	files := uploadedFiles(t.Context(), ledger, []store.Member{{ID: 1, Name: "Example member"}})
-	if len(files) != 1 || files[0].ReviewURL != "/imports?m=2020-02" || files[0].Pending != 2 {
-		t.Fatal("review link does not target the first unfinished month")
-	}
-}
-
-func TestUploadedFilesGroupsAndOrdersHistory(t *testing.T) {
+func TestCompletedFilesAreNotListedOrDeletedWithTheirBookings(t *testing.T) {
 	srv, h, hh := newTestServer(t)
 	accounts, _ := srv.store.ListBankAccounts(t.Context(), hh.ID)
 	for i := 1; i <= 6; i++ {
@@ -280,20 +274,22 @@ func TestUploadedFilesGroupsAndOrdersHistory(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	vm, err := srv.buildImportVM(t.Context(), hh.ID, "2020-01")
+	body := get(t, h, "/imports").Body.String()
+	if strings.Contains(body, `data-uploaded-digest=`) || strings.Contains(body, "file-1.csv") || strings.Contains(body, "Weitere Dateien (") {
+		t.Fatal("completed files still appear as stored upload cards")
+	}
+	before, err := srv.store.BankLedger(t.Context(), hh.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(vm.Uploads) != 6 || vm.Uploads[0].Filename != "file-6.csv" || vm.Uploads[5].Filename != "file-1.csv" {
-		t.Fatal("history is not newest first")
+	response := post(t, h, "/imports/batches/"+strconv.FormatInt(before.Imports[0].ID, 10)+"/delete",
+		url.Values{"household": {strconv.FormatInt(hh.ID, 10)}})
+	if response.Code != http.StatusGone {
+		t.Fatal("legacy file deletion can still erase bookings")
 	}
-	body := get(t, h, "/imports").Body.String()
-	if strings.Count(body, `data-uploaded-digest=`) != 6 || !strings.Contains(body, "Weitere Dateien (1)") {
-		t.Fatal("older uploaded files are missing")
-	}
-	older := strings.Index(body, "Weitere Dateien (1)")
-	if strings.Index(body, "file-1.csv") < older {
-		t.Fatal("oldest file was not placed in older history")
+	after, err := srv.store.BankLedger(t.Context(), hh.ID)
+	if err != nil || len(after.Transactions) != len(before.Transactions) {
+		t.Fatal("file-display action deleted bookings")
 	}
 	if strings.Contains(body, `href="/settings#bank-accounts"`) {
 		t.Fatal("bank-account configuration link remains in upload page")

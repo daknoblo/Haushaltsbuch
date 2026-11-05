@@ -58,6 +58,7 @@ type BankTransaction struct {
 	Name              string
 	Reference         string
 	Fingerprint       string
+	SourceFingerprint string `json:",omitempty"`
 	Decision          string
 	CategoryID        int64
 	PlanID            int64
@@ -124,8 +125,8 @@ func (s *Store) DeleteBankAccount(ctx context.Context, householdID, id int64) er
 	})
 }
 
-// DiscardBankImport allows re-analysis only after undoing accepted rows and
-// reopening every affected month. The document digest is released atomically.
+// DiscardBankImport is a destructive maintenance primitive, not file removal.
+// The UI does not expose it; actual history and closed months remain protected.
 func (s *Store) DiscardBankImport(ctx context.Context, householdID, id int64) error {
 	return s.withTx(ctx, func(tx *Store) error {
 		l, err := tx.BankLedger(ctx, householdID)
@@ -176,11 +177,11 @@ func (s *Store) readBankLedger(ctx context.Context, householdID int64, l *BankLe
 		}},
 		{`SELECT id, import_id, booked_on, direction, amount_cents, name, reference, fingerprint,
 			decision, COALESCE(category_id,0), COALESCE(plan_id,0), COALESCE(transfer_account_id,0),
-			cost_nature, budget_class, settle FROM bank_transactions WHERE household_id = ? ORDER BY booked_on, id`, func(r *sql.Rows) error {
+			cost_nature, budget_class, settle, source_fingerprint FROM bank_transactions WHERE household_id = ? ORDER BY booked_on, id`, func(r *sql.Rows) error {
 			var b BankTransaction
 			if err := r.Scan(&b.ID, &b.ImportID, &b.BookedOn, &b.Direction, &b.AmountCents, &b.Name,
 				&b.Reference, &b.Fingerprint, &b.Decision, &b.CategoryID, &b.PlanID, &b.TransferAccountID,
-				&b.CostNature, &b.BudgetClass, &b.Settle); err != nil {
+				&b.CostNature, &b.BudgetClass, &b.Settle, &b.SourceFingerprint); err != nil {
 				return err
 			}
 			l.Transactions = append(l.Transactions, b)
@@ -288,7 +289,7 @@ func (s *Store) ensureOpenMonth(ctx context.Context, householdID int64, month st
 	return nil
 }
 
-// HasBankImport avoids paying for repeated analysis of an already stored file.
+// HasBankImport finds existing provenance, not a reason to skip reconciliation.
 func (s *Store) HasBankImport(ctx context.Context, householdID, accountID int64, digest string) (bool, error) {
 	var count int
 	err := s.q.QueryRowContext(ctx, `SELECT COUNT(*) FROM bank_imports
@@ -297,6 +298,7 @@ func (s *Store) HasBankImport(ctx context.Context, householdID, accountID int64,
 }
 
 // CreateBankImport persists all suggestions atomically, initially unapproved.
+// User uploads use ReconcileBankImports instead of this strict creation primitive.
 func (s *Store) CreateBankImport(ctx context.Context, householdID int64, batch BankImport, payments []BankTransaction) error {
 	digest, err := hex.DecodeString(batch.Digest)
 	if err != nil || len(digest) != sha256.Size || len(payments) == 0 || len(payments) > 1000 ||
@@ -324,6 +326,7 @@ func (s *Store) CreateBankImport(ctx context.Context, householdID int64, batch B
 		for _, b := range payments {
 			b.ID, b.ImportID, b.Decision = 0, batchID, "pending"
 			b.Splits, b.TagIDs = nil, nil
+			b.SourceFingerprint = BankSourceFingerprint(b)
 			if err := ValidateBankTransaction(b); err != nil {
 				return err
 			}
@@ -351,14 +354,14 @@ func optionalID(id int64) any {
 func (s *Store) insertBankTransaction(ctx context.Context, householdID int64, b BankTransaction) error {
 	res, err := s.q.ExecContext(ctx, `INSERT INTO bank_transactions
 		(id, household_id, import_id, booked_on, direction, amount_cents, name, reference, fingerprint,
-		decision, category_id, plan_id, transfer_account_id, cost_nature, budget_class, settle)
+		decision, category_id, plan_id, transfer_account_id, cost_nature, budget_class, settle, source_fingerprint)
 		VALUES (?, ?, (SELECT id FROM bank_imports WHERE id = ? AND household_id = ?),
 		?, ?, ?, ?, ?, ?, ?, `+categoryRef+`,
 		(SELECT id FROM bookings WHERE id = ? AND household_id = ?),
-		(SELECT id FROM bank_accounts WHERE id = ? AND household_id = ?), ?, ?, ?)`,
+		(SELECT id FROM bank_accounts WHERE id = ? AND household_id = ?), ?, ?, ?, ?)`,
 		optionalID(b.ID), householdID, b.ImportID, householdID, b.BookedOn, b.Direction, b.AmountCents,
 		b.Name, b.Reference, PaymentFingerprint(b), b.Decision, b.CategoryID, householdID,
-		b.PlanID, householdID, b.TransferAccountID, householdID, b.CostNature, b.BudgetClass, b.Settle)
+		b.PlanID, householdID, b.TransferAccountID, householdID, b.CostNature, b.BudgetClass, b.Settle, b.SourceFingerprint)
 	if err != nil {
 		return err
 	}
@@ -471,8 +474,10 @@ func (s *Store) ReviewBankTransaction(ctx context.Context, householdID int64, b 
 	return s.withTx(ctx, func(tx *Store) error {
 		var previousDate, previousDecision string
 		var importID int64
-		err := tx.q.QueryRowContext(ctx, `SELECT booked_on, decision, import_id FROM bank_transactions
-			WHERE id = ? AND household_id = ?`, b.ID, householdID).Scan(&previousDate, &previousDecision, &importID)
+		var original BankTransaction
+		err := tx.q.QueryRowContext(ctx, `SELECT booked_on, decision, import_id, direction, amount_cents, name, reference, source_fingerprint FROM bank_transactions
+			WHERE id = ? AND household_id = ?`, b.ID, householdID).Scan(&previousDate, &previousDecision, &importID,
+			&original.Direction, &original.AmountCents, &original.Name, &original.Reference, &original.SourceFingerprint)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
 		}
@@ -483,6 +488,10 @@ func (s *Store) ReviewBankTransaction(ctx context.Context, householdID int64, b 
 			return ErrInvalid
 		}
 		b.ImportID = importID
+		original.BookedOn = previousDate
+		if original.SourceFingerprint == "" {
+			original.SourceFingerprint = BankSourceFingerprint(original)
+		}
 		for _, month := range []string{previousDate[:7], b.BookedOn[:7]} {
 			if err := tx.ensureOpenMonth(ctx, householdID, month); err != nil {
 				return err
@@ -509,10 +518,10 @@ func (s *Store) ReviewBankTransaction(ctx context.Context, householdID int64, b 
 			decision = ?, category_id = `+categoryRef+`,
 			plan_id = (SELECT id FROM bookings WHERE id = ? AND household_id = ?),
 			transfer_account_id = (SELECT id FROM bank_accounts WHERE id = ? AND household_id = ?),
-			cost_nature = ?, budget_class = ?, settle = ? WHERE id = ? AND household_id = ?`,
+			cost_nature = ?, budget_class = ?, settle = ?, source_fingerprint = ? WHERE id = ? AND household_id = ?`,
 			b.BookedOn, b.Direction, b.AmountCents, b.Name, b.Reference, PaymentFingerprint(b), b.Decision,
 			b.CategoryID, householdID, b.PlanID, householdID, b.TransferAccountID, householdID,
-			b.CostNature, b.BudgetClass, b.Settle, b.ID, householdID)); err != nil {
+			b.CostNature, b.BudgetClass, b.Settle, original.SourceFingerprint, b.ID, householdID)); err != nil {
 			return err
 		}
 		return tx.replaceBankAllocation(ctx, householdID, b.ID, b)

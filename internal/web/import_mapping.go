@@ -264,14 +264,17 @@ func (s *Server) handleImportMappingConfirm(w http.ResponseWriter, r *http.Reque
 				Payments: source.Payments,
 			})
 		}
-		if err := s.store.CreateBankImports(r.Context(), household, batches); err != nil {
+		comparison, err := s.store.ReconcileBankImports(r.Context(), household, batches)
+		if err != nil {
 			return err
 		}
 		outcome.Digest, outcome.Accounts = item.digest, len(item.sources)
+		outcome.Added, outcome.Existing = comparison.Added, comparison.Existing
+		outcome.Preserved = comparison.Preserved
 		for _, source := range item.sources {
 			outcome.Transactions += len(source.Payments)
 		}
-		outcome.URL = importMonthURL(item.sources[0].Payments[0].BookedOn[:7])
+		outcome.URL = importMonthURL(comparison.ReviewMonth)
 		return nil
 	})
 	if err != nil {

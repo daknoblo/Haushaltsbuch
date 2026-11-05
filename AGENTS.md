@@ -47,8 +47,13 @@ document wins over this file unless a deviation is listed below.
 - **BankAccount / BankImport / BankTransaction** – statement provenance and
   reviewed actual payments, kept separate from plans. Accepted allocations are
   integer-cent snapshots. Transfers between own accounts never count as income
-  or expenses. Exact files are deduplicated per account; identical payments
-  require explicit confirmation rather than silently dropping repeated rows.
+  or expenses. Every upload is reconciled against current payments per account,
+  including pending, accepted, ignored and transfer decisions. Matching is
+  count-aware: an existing payment satisfies at most one incoming occurrence.
+  Preserve `source_fingerprint` across review edits so reimports do not recreate
+  corrected payments. Files and completed file cards are not retained; internal
+  import rows carry only the provenance needed by the payments.
+  Use `store.ReconcileBankImports` for uploads, not strict batch creation.
   Each member has exactly one default bank account and may have additional
   accounts. Member creation and default-account creation are atomic; upgrades
   and old backup restores reuse existing accounts without changing their IDs.
@@ -123,8 +128,8 @@ Structured exports with multiple own accounts require explicit, distinct
 destination mappings before persistence. Counterparty IBANs are not source
 accounts. Mapping previews are bounded, household-scoped and in-memory only;
 confirmation is atomic and serialized with data resets/restores.
-Backup format 3 includes the non-secret model selection and default-account
-markers; formats 1 and 2 still restore, with missing account defaults backfilled
+Backup format 4 also preserves original payment fingerprints; formats 1–3 still
+restore. Missing account defaults are backfilled
 only after all original IDs have been restored.
 Text is sent only when the user starts analysis; there is no separate consent
 checkbox. Never log document text,

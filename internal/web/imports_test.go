@@ -108,8 +108,8 @@ func TestPDFImportReviewAndHybridHTTP(t *testing.T) {
 	if w := upload(account); w.Code != http.StatusSeeOther {
 		t.Fatalf("upload without consent checkbox: %d %s", w.Code, w.Body)
 	}
-	if w := upload(account); w.Code != http.StatusConflict || mock.calls != 1 {
-		t.Fatalf("duplicate file: %d calls %d", w.Code, mock.calls)
+	if w := upload(account); w.Code != http.StatusSeeOther || mock.calls != 2 {
+		t.Fatalf("repeated file was not rechecked: %d calls %d", w.Code, mock.calls)
 	}
 	ledger, _ = srv.store.BankLedger(ctx, hh.ID)
 	p := ledger.Transactions[0]

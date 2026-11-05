@@ -9,7 +9,7 @@ import (
 // SnapshotVersion is the layout of a backup file. It is written into every
 // snapshot so a future change can tell an old file apart instead of importing
 // it into the wrong shape.
-const SnapshotVersion = 3
+const SnapshotVersion = 4
 
 // Snapshot is a household book in full: everything the application stores, in
 // one structure that survives a round trip through a file.

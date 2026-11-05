@@ -97,6 +97,8 @@
   .upload-queue-row, .upload-history-row {
     @apply min-w-0 rounded-lg border border-slate-200 p-3 dark:border-slate-700;
   }
+  .upload-file-header { @apply flex min-w-0 flex-wrap items-center gap-2; }
+  .upload-file-title { @apply min-w-0 flex-1 break-all text-sm font-semibold; }
   .import-account-row {
     @apply grid min-w-0 items-center gap-3 rounded-lg border border-l-4 border-slate-300 border-l-indigo-500 bg-slate-50 p-3 md:grid-cols-2 dark:border-slate-600 dark:border-l-indigo-400 dark:bg-slate-800/80;
   }

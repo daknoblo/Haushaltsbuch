@@ -110,13 +110,15 @@ func TestImportAccountMappingWorkflow(t *testing.T) {
 	}
 	token, _ = mappingPreview(t, srv, h, hh.ID)
 	form.Set("preview", token)
-	if w := post(t, h, "/imports/mapping", form); w.Code != http.StatusConflict {
-		t.Fatalf("duplicate file groups: %d", w.Code)
+	if w := post(t, h, "/imports/mapping", form); w.Code != http.StatusSeeOther {
+		t.Fatalf("repeated file groups were not rechecked: %d", w.Code)
 	}
 	ledger, _ = srv.store.BankLedger(t.Context(), hh.ID)
 	if len(ledger.Imports) != 2 {
 		t.Fatal("repeat upload duplicated records")
 	}
+	token, _ = mappingPreview(t, srv, h, hh.ID)
+	form.Set("preview", token)
 	if w := post(t, h, "/imports/mapping/cancel", form); w.Code != http.StatusSeeOther {
 		t.Fatalf("cancel: %d", w.Code)
 	}

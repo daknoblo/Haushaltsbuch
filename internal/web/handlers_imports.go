@@ -41,7 +41,6 @@ type ImportVM struct {
 	Closed           bool
 	PendingMappings  []ImportMappingVM
 	MappingMessage   string
-	Uploads          []UploadedFile
 	UploadGeneration uint64
 	PendingMonths    []ImportMonth
 }
@@ -70,6 +69,7 @@ type ImportRow struct {
 	Tags              []store.Tag
 	Closed            bool
 	CanQuick          bool
+	SimilarCandidate  string
 	original          store.BankTransaction
 }
 
@@ -146,7 +146,6 @@ func (s *Server) buildImportVM(ctx context.Context, household int64, month strin
 			mapping.Accounts, mapping.Members = vm.Ledger.Accounts, vm.Data.Members
 			mapping.Selected = mappingSuggestions(*mapping)
 		}
-		vm.Uploads = uploadedFiles(ctx, vm.Ledger, vm.Data.Members)
 	}
 	return vm, nil
 }
@@ -180,15 +179,20 @@ func importRows(ctx context.Context, l store.BankLedger, data calc.Data, month s
 			row.PlanAmount = calc.AmountFor(plan, data.Overrides[plan.ID], month)
 		}
 		for _, other := range l.Transactions {
-			if other.ID == p.ID || other.Decision == "ignored" {
+			if other.ID == p.ID {
 				continue
 			}
 			otherAccount := batches[other.ImportID].AccountID
-			if otherAccount == batch.AccountID && other.Fingerprint == p.Fingerprint {
+			if otherAccount == batch.AccountID && other.Decision != "ignored" && other.Fingerprint == p.Fingerprint {
 				row.Duplicate = true
 			}
+			if otherAccount == batch.AccountID && other.BookedOn == p.BookedOn && other.Direction == p.Direction &&
+				store.BankSourceFingerprint(other) != store.BankSourceFingerprint(p) &&
+				(other.AmountCents == p.AmountCents || (matchText(other.Name) == matchText(p.Name) && strings.TrimSpace(p.Reference) != "" && matchText(other.Reference) == matchText(p.Reference))) {
+				row.SimilarCandidate = FormatDate(other.BookedOn) + " · " + other.Name + " · " + FormatEUR(other.AmountCents)
+			}
 			if otherAccount != batch.AccountID && p.AmountCents == other.AmountCents &&
-				p.Direction != other.Direction && nearbyBankDates(p.BookedOn, other.BookedOn) {
+				other.Decision != "ignored" && p.Direction != other.Direction && nearbyBankDates(p.BookedOn, other.BookedOn) {
 				row.TransferCandidate = accounts[otherAccount]
 			}
 		}
@@ -266,15 +270,10 @@ func (s *Server) handleBankImportDiscard(w http.ResponseWriter, r *http.Request)
 	if !s.parseForm(w, r) {
 		return
 	}
-	hh, ok := s.importHousehold(w, r)
-	if !ok {
+	if _, ok := s.importHousehold(w, r); !ok {
 		return
 	}
-	if err := s.store.DiscardBankImport(r.Context(), hh, parseID(r.PathValue("id"))); err != nil {
-		s.bankError(w, r, err)
-		return
-	}
-	http.Redirect(w, r, "/imports", http.StatusSeeOther)
+	s.importPageError(w, r, errFilesNotStored)
 }
 
 func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
@@ -340,17 +339,6 @@ func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	hash := sha256.Sum256(content)
 	digest := hex.EncodeToString(hash[:])
-	if strings.EqualFold(filepath.Ext(filename), ".pdf") {
-		exists, err := s.store.HasBankImport(ctx, hh, accountID, digest)
-		if err != nil {
-			s.bankError(w, r, err)
-			return
-		}
-		if exists {
-			s.bankError(w, r, store.ErrDuplicateImport)
-			return
-		}
-	}
 	extracted, err := s.extractStatement(ctx, r, filename, content)
 	if err != nil {
 		var tableErr *bankimport.TableError
@@ -399,10 +387,13 @@ func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	payments := sources[0].Payments
+	var comparison store.BankReconciliation
 	err = s.importPreviews.current(generation, func() error {
-		return s.store.CreateBankImport(ctx, hh, store.BankImport{
+		var err error
+		comparison, err = s.store.ReconcileBankImports(ctx, hh, []store.BankImportBatch{{Import: store.BankImport{
 			AccountID: accountID, Digest: digest, Filename: filename,
-		}, payments)
+		}, Payments: payments}})
+		return err
 	})
 	if err != nil {
 		if errors.Is(err, errImportPreview) {
@@ -411,7 +402,7 @@ func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
 		s.bankError(w, r, err)
 		return
 	}
-	s.uploadResult(w, r, uploadOutcome{Status: "imported", URL: importMonthURL(payments[0].BookedOn[:7]), Digest: digest, Transactions: len(payments), Accounts: 1, Detected: detected})
+	s.uploadResult(w, r, uploadOutcome{Status: "imported", URL: importMonthURL(comparison.ReviewMonth), Digest: digest, Transactions: len(payments), Accounts: 1, Detected: detected, Added: comparison.Added, Existing: comparison.Existing, Preserved: comparison.Preserved})
 }
 
 func suggestPlan(p *store.BankTransaction, data calc.Data) {
@@ -632,6 +623,8 @@ func bankErrorStatus(err error) (int, i18n.Key) {
 		status, key = http.StatusConflict, "import.uploadContextChanged"
 	case errors.Is(err, errReviewChanged):
 		status, key = http.StatusConflict, "import.reviewChanged"
+	case errors.Is(err, errFilesNotStored):
+		status, key = http.StatusGone, "import.filesNotStored"
 	case errors.Is(err, bankimport.ErrNoText):
 		key = "import.noText"
 	case errors.Is(err, bankimport.ErrResult):

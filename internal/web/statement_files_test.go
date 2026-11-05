@@ -3,7 +3,7 @@ package web
 import (
 	"bytes"
 	"encoding/csv"
-	"errors"
+	"encoding/json"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -131,8 +131,8 @@ func TestStructuredStatementUploadsDoNotNeedOrCallAI(t *testing.T) {
 				if err != nil || len(bookings) != 0 {
 					t.Fatal("upload created plans")
 				}
-				if w := uploadStatement(t, h, hh.ID, accounts[0].ID, "renamed."+kind, data, nil); w.Code != http.StatusConflict {
-					t.Fatalf("duplicate file: %d", w.Code)
+				if w := uploadStatement(t, h, hh.ID, accounts[0].ID, "renamed."+kind, data, nil); w.Code != http.StatusSeeOther {
+					t.Fatalf("repeated file was not rechecked: %d", w.Code)
 				}
 				body := get(t, h, "/imports?m=2020-01").Body.String()
 				if !strings.Contains(body, "Synthetic rent") || !strings.Contains(body, `value="accepted"`) {
@@ -240,24 +240,24 @@ func TestCrossFormatDuplicateProtection(t *testing.T) {
 	if err := srv.store.ReviewBankTransaction(ctx, hh.ID, first, false); err != nil {
 		t.Fatal(err)
 	}
-	if w := uploadStatement(t, h, hh.ID, account.ID, "statement.xlsx", syntheticXLSX(t), nil); w.Code != http.StatusSeeOther {
-		t.Fatal(w.Body.String())
+	response := queueUpload(t, h, hh.ID, account.ID, "statement.xlsx", syntheticXLSX(t), nil)
+	if response.Code != http.StatusCreated {
+		t.Fatal(response.Body.String())
+	}
+	var result uploadOutcome
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Added != 0 || result.Existing != 2 {
+		t.Fatalf("cross-format comparison: %+v", result)
 	}
 	ledger, err = srv.store.BankLedger(ctx, hh.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, p := range ledger.Transactions {
-		if p.ImportID == first.ImportID || p.Name != first.Name {
-			continue
-		}
-		p.CategoryID, p.Decision, p.Splits = first.CategoryID, "accepted", first.Splits
-		if err := srv.store.ReviewBankTransaction(ctx, hh.ID, p, false); !errors.Is(err, store.ErrDuplicatePayment) {
-			t.Fatalf("cross-format duplicate accepted: %v", err)
-		}
-		return
+	if len(ledger.Transactions) != 2 || len(ledger.Imports) != 1 || ledger.Transactions[0].Decision != "accepted" {
+		t.Fatal("cross-format upload duplicated or changed existing payments")
 	}
-	t.Fatal("matching XLSX transaction not found")
 }
 
 func TestC24OmittedTrailingColumnOverHTTP(t *testing.T) {
@@ -294,8 +294,12 @@ func TestC24OmittedTrailingColumnOverHTTP(t *testing.T) {
 		ledger.Transactions[0].Decision != "pending" || ledger.Transactions[0].Direction != store.DirExpense {
 		t.Fatal("C24 upload did not create an intact review candidate")
 	}
-	if response := uploadStatement(t, handler, household.ID, accounts[0].ID, "renamed-c24.csv", data.Bytes(), nil); response.Code != http.StatusConflict {
-		t.Fatalf("C24 file duplicate not rejected: %d", response.Code)
+	if response := uploadStatement(t, handler, household.ID, accounts[0].ID, "renamed-c24.csv", data.Bytes(), nil); response.Code != http.StatusSeeOther {
+		t.Fatalf("C24 repeat check failed: %d", response.Code)
+	}
+	ledger, err = srv.store.BankLedger(t.Context(), household.ID)
+	if err != nil || len(ledger.Transactions) != 1 {
+		t.Fatal("C24 repeat created another payment")
 	}
 }
 

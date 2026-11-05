@@ -2,6 +2,8 @@ package calc
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
@@ -152,6 +154,10 @@ func checkSource(ctx context.Context, out *PlausibilityResult, s store.Household
 			check(categories[p.CategoryID] == p.Direction, "reference", p.Name)
 		}
 		check(p.Fingerprint == store.PaymentFingerprint(p), "fingerprint", p.Name)
+		if p.SourceFingerprint != "" {
+			key, err := hex.DecodeString(p.SourceFingerprint)
+			check(err == nil && len(key) == sha256.Size, "fingerprint", p.Name)
+		}
 		if len(p.BookedOn) >= 7 && closed[p.BookedOn[:7]] {
 			check(p.Decision != "pending", "closedPending", p.Name)
 		}

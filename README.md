@@ -204,8 +204,8 @@ unchanged. Editing detail fields disables the row shortcut until those changes
 are submitted through the detailed form.
 
 State counts summarize the selected month. Duplicate and possible transfer
-indicators remain visible when collapsed. Account/file details are also visible
-in uploaded-file history without another disclosure. The generic AI warning
+indicators remain visible when collapsed. Original source names remain available
+in booking details as provenance, not as stored files. The generic AI warning
 banner has been removed; manual review and month-completeness confirmation are
 unchanged. The planned booking list also shows category names under booking
 names, retaining its filters, allocation badges and monthly totals.
@@ -220,13 +220,16 @@ Correct the options and retry that file explicitly; its original file remains
 available in browser memory. Failed files are never retried automatically.
 Rate limits and network failures pause the remaining queue until explicitly
 resumed, so a paid PDF analysis is never repeated automatically. An interrupted connection is
-reported as an uncertain result: check saved history before retrying.
+reported as an uncertain result: check the current bookings before retrying.
 
-**Uploaded files** is visible directly below the upload area and survives page
-reloads. It groups a file's imports across mapped accounts, shows remaining
-review counts and provides links to transactions and per-account import
-management. The five newest files are shown directly; older files remain
-available in an expandable list. Original file contents are still not retained.
+Upload and mapping cards use the same filename typography and spacing.
+**Files being processed** contains only unfinished account mappings. Completed
+uploads are not a permanent file archive: the browser releases the uploaded file
+reference on completion, and only the current page shows a compact result
+(`new` / `already present`). Reopening Import shows the bookings, not old file
+cards. Removing a temporary result does not delete payments. Original file
+contents are never retained by the server; minimal account/source provenance
+remains attached to the stored payments.
 Open or edited review forms are not replaced by background status refreshes.
 Unstarted selections are browser-memory only; navigating away can discard them.
 Without JavaScript, a fallback button still supports single-file uploads, while requests containing
@@ -284,15 +287,34 @@ only that the checked values agree: it does not prove complete statements,
 correct real-world inputs or visual PDF correctness. Run again after edits.
 At most 100 findings are displayed; the summary counts all findings.
 
-Identical file bytes are rejected per account, before any paid AI request.
-To re-analyze a file, undo any accepted decisions, reopen its affected months
-and discard that import from the history first. Unused non-default accounts can
+Every uploaded row is compared with the current ledger of its destination
+account, regardless of filename, file digest or file format. Pending, accepted,
+ignored and transfer decisions all count as existing records and are left
+unchanged. Only unmatched occurrences are added for review. Repeated identical
+rows are counted: one stored payment matches at most one incoming row, so extra
+occurrences are not silently lost. Matching uses date, direction, integer cents
+and normalized name/reference, plus an immutable original fingerprint that
+keeps later corrections from reappearing on the next import. Matched records
+whose original identity matches but whose current fields differ are counted as
+preserved corrections in the result. Legacy records
+without that fingerprint use their currently stored fields; original values
+changed before this feature cannot be reconstructed.
+
+Similar but different entries are flagged for inspection rather than overwriting
+existing payments or enabling direct acceptance. An unchanged closed month can
+be checked again without reopening it; adding a new payment to a closed month
+still rejects the entire upload. PDF reuploads perform fresh analysis and may
+incur another AI request, because file hashes no longer bypass row-level checks.
+There are still no automatic retries.
+
+Unused non-default accounts can
 be removed in Settings; select another default before deleting a default
 account. Accounts with import history or internal-transfer references remain
 protected. Deleting a member also removes their unused accounts, but is refused
 when their bank history or actual payment allocations still need the member.
-Overlapping statements are checked by date, direction, amount and normalized
-payee/reference; an identical genuine payment needs explicit confirmation.
+Additional identical payments still require explicit duplicate confirmation
+when accepted. Partial exports without stable bank transaction IDs cannot prove
+whether otherwise identical occurrences represent the same real-world payment.
 These checks do **not** prove statement completeness: AI extraction can omit or
 misread rows. Always compare totals and rows with the original. When the AI
 provides opening/closing balances, their difference must match the transactions.
@@ -303,14 +325,15 @@ or automatic bank access. Processing runs one at a time, is time-bounded and
 rejects partial, truncated or malformed input without persisting a partial import.
 Bank account names, default-account markers, import digests, review decisions,
 allocations, month closures and the non-secret global model selection are
-included in backup format 3. Formats 1 and 2 remain readable; missing accounts
+included in backup format 4, together with original payment fingerprints.
+Formats 1–3 remain readable; missing accounts
 and defaults are filled in without changing existing IDs. Older backups do not
 contain a model selection, so select one in Settings after restoring them.
 Resetting bookings also clears statements, actual payments and month closures,
 but keeps the account setup and model selection. A full reset clears the model
 selection and creates default accounts for the newly seeded members. Versions
-before this change cannot read format 3 backups. Back up before upgrading;
-migration 0009 adds defaults without modifying imported payment history.
+before this change cannot read format 4 backups. Back up before upgrading;
+migration 0010 adds fingerprint tracking without changing existing payment data.
 
 ### CSV and Excel formats
 
@@ -355,9 +378,10 @@ missing bank accounts in Settings (opens in a new tab), then refresh the
 destination list. Background updates retain existing form nodes and choices.
 Confirmation and cancellation stay on the Import page; errors appear inline.
 Without JavaScript, validation errors render the normal Import page with the
-submitted choices. Confirmation creates all groups in
-one database transaction: a duplicate file, foreign/missing destination or
-closed month rolls back every group. Payments remain pending manual review.
+submitted choices. Confirmation compares every group and inserts only new rows
+in one database transaction: a foreign/missing destination or a new payment in
+a closed month rolls back every group. Existing decisions remain unchanged;
+new payments remain pending manual review.
 
 Mappings remain directly visible whenever Import is reopened and can be
 explicitly discarded there. Legacy mapping URLs return to Import; missing or
@@ -379,9 +403,9 @@ requires explicit mapping; source-account links are not silently remembered.
   is selected automatically, even if other sheets contain summaries. Multiple
   possible statement sheets require explicit selection; an invalid statement
   sheet is never silently ignored in favor of another one.
-  One sheet is imported per file; because duplicate-file protection applies to
-  the entire workbook, export sheets as separate files to import more than one
-  sheet into the same bank account. Legacy `.xls`, encrypted workbooks, macros
+  One sheet is processed per upload. The same workbook may be uploaded again
+  with another explicitly selected sheet; payment-level reconciliation prevents
+  duplicate entries. Legacy `.xls`, encrypted workbooks, macros
   and formulas are not supported. Export formulas as values first.
 - **Numbers:** German (`1.234,56`) or English (`1,234.56`) notation is inferred
   from all transaction rows, unless explicitly overridden. Numeric Excel amounts are independent of this

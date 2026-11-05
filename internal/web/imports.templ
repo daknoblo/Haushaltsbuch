@@ -101,6 +101,9 @@ templ importPayment(nav Nav, vm ImportVM, row ImportRow) {
 					if row.TransferCandidate != "" {
 						<span class="badge badge-info whitespace-nowrap" title={ row.TransferCandidate }>{ T(ctx, "import.transferShort") }</span>
 					}
+					if row.SimilarCandidate!="" {
+						<span class="badge badge-warn whitespace-nowrap" title={ row.SimilarCandidate }>{ T(ctx,"import.similarPayment") }</span>
+					}
 				</span>
 				<span class={ "import-amount tnum", templ.KV("text-emerald-700 dark:text-emerald-400", row.Payment.Direction == store.DirIncome), templ.KV("text-rose-700 dark:text-rose-400", row.Payment.Direction == store.DirExpense) }>
 					<span class="sr-only">{ DirectionLabel(ctx, row.Payment.Direction) }</span>
@@ -152,6 +155,9 @@ templ importPayment(nav Nav, vm ImportVM, row ImportRow) {
 				}
 				if row.TransferCandidate != "" {
 					<p class="alert-info mb-3">{ T(ctx, "import.transferHint") } { row.TransferCandidate }</p>
+				}
+				if row.SimilarCandidate!="" {
+					<p class="alert-info mb-3">{ T(ctx,"import.similarHint") } { row.SimilarCandidate }</p>
 				}
 				if row.PlanName != "" {
 					<p class="alert-info mb-3">

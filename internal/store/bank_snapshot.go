@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strings"
 )
 
 func (s *Store) importBankLedger(ctx context.Context, householdID int64, l BankLedger) error {
@@ -35,6 +36,13 @@ func (s *Store) importBankLedger(ctx context.Context, householdID int64, l BankL
 		}
 		if err := ValidateBankTransaction(b); err != nil {
 			return fmt.Errorf("%w: %w", ErrBadSnapshot, err)
+		}
+		if b.SourceFingerprint != "" {
+			key, err := hex.DecodeString(b.SourceFingerprint)
+			if err != nil || len(key) != sha256.Size {
+				return ErrBadSnapshot
+			}
+			b.SourceFingerprint = strings.ToLower(b.SourceFingerprint)
 		}
 		if err := s.validateBankReferences(ctx, householdID, b); err != nil {
 			return err

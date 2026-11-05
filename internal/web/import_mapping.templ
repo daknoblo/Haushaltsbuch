@@ -4,8 +4,8 @@ import "strconv"
 
 templ ImportMappingCard(nav Nav, vm ImportMappingVM) {
 	<article class="upload-history-row grid gap-3 scroll-mt-4" id={ vm.ID() } data-import-mapping data-pending-upload-url={ vm.URL() } tabindex="-1">
-		<div class="flex flex-wrap items-center gap-2">
-			<strong class="min-w-0 flex-1 break-all">{ vm.Filename }</strong>
+		<div class="upload-file-header">
+			<strong class="upload-file-title">{ vm.Filename }</strong>
 			<span class="badge badge-warn">{ Tf(ctx,"import.mappingCount",len(vm.Sources)) }</span>
 		</div>
 		<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "import.mappingHint") }</p>

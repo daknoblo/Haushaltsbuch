@@ -219,7 +219,7 @@ func TestBankDefaultsAndGlobalModelBackup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if snap.Version != 3 || snap.AIDeployment != "saved-model" {
+	if snap.Version != SnapshotVersion || snap.AIDeployment != "saved-model" {
 		t.Fatal("model not backed up")
 	}
 	if err := s.Import(ctx, snap); err != nil {

@@ -55,6 +55,7 @@ templ ImportUploader(nav Nav, vm ImportVM) {
 				</div>
 				<p class="alert-error" role="alert" data-upload-message hidden></p>
 				<p class="text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "import.uploadAutomatic") }</p>
+				<p class="text-xs text-slate-500 dark:text-slate-400">{ T(ctx,"import.transientFiles") }</p>
 				<p class="alert-info" data-bank-progress role="status" hidden>{ T(ctx, "import.uploadRunning") }</p>
 				<p class="alert-error" data-upload-refresh-error role="alert" hidden>{ T(ctx, "import.uploadRefreshError") }</p>
 				<p class="alert-info" data-upload-review-deferred hidden>
@@ -73,6 +74,9 @@ templ ImportUploader(nav Nav, vm ImportVM) {
 					data-processing={ T(ctx, "import.uploadProcessing") }
 					data-imported={ T(ctx, "import.uploadImported") }
 					data-imported-one={ T(ctx, "import.uploadImportedOne") }
+					data-compared={ T(ctx, "import.uploadCompared") }
+					data-preserved={ T(ctx, "import.uploadPreserved") }
+					data-closed={ T(ctx, "import.uploadClosed") }
 					data-mapping={ T(ctx, "import.uploadMapping") }
 					data-error={ T(ctx, "import.uploadFailed") }
 					data-network={ T(ctx, "import.uploadNetwork") }
@@ -93,8 +97,8 @@ templ ImportUploader(nav Nav, vm ImportVM) {
 				></div>
 				<template data-upload-item>
 					<li class="upload-queue-row" data-upload-state="queued">
-						<div class="flex min-w-0 flex-wrap items-start gap-2">
-							<strong class="min-w-0 flex-1 break-all text-sm" data-upload-name></strong>
+						<div class="upload-file-header">
+							<strong class="upload-file-title" data-upload-name></strong>
 							<span class="upload-state-label text-xs font-medium" data-upload-state-label role="status" aria-live="polite"></span>
 							<button class="btn-icon btn-icon-danger" type="button" data-upload-remove aria-label={ T(ctx, "import.uploadRemove") }>✕</button>
 						</div>
@@ -116,64 +120,12 @@ templ ImportUploader(nav Nav, vm ImportVM) {
 }
 
 templ ImportUploadHistory(nav Nav, vm ImportVM) {
-	<section class="card mt-3" id="import-upload-history" data-upload-generation={ strconv.FormatUint(vm.UploadGeneration, 10) }>
-		<h2 class="mb-3 font-semibold">{ T(ctx, "import.uploadHistory") }</h2>
-		<p class="text-sm text-slate-500 dark:text-slate-400" data-history-empty hidden?={ len(vm.PendingMappings)>0 || len(vm.Uploads)>0 }>{ T(ctx, "import.uploadHistoryEmpty") }</p>
+	<section class="card mt-3" id="import-upload-history" data-upload-generation={ strconv.FormatUint(vm.UploadGeneration, 10) } hidden?={ len(vm.PendingMappings)==0 }>
+		<h2 class="mb-3 font-semibold">{ T(ctx, "import.pendingFiles") }</h2>
 		<div class="grid gap-2" data-mapping-list>
 			for _, mapping := range vm.PendingMappings {
 				@ImportMappingCard(nav, mapping)
 			}
 		</div>
-		<div class="mt-2 grid gap-2" data-uploaded-files hidden?={ len(vm.Uploads)==0 }>
-			for _, file := range vm.Uploads[:min(5,len(vm.Uploads))] {
-				@uploadedFileRow(nav, file)
-			}
-			if len(vm.Uploads)>5 {
-				<details class="mt-3">
-					<summary class="cursor-pointer text-sm">{ Tf(ctx,"import.uploadHistoryOlder",len(vm.Uploads)-5) }</summary>
-					<div class="mt-2 grid gap-2">
-						for _, file := range vm.Uploads[5:] {
-							@uploadedFileRow(nav, file)
-						}
-					</div>
-				</details>
-			}
-		</div>
 	</section>
-}
-
-templ uploadedFileRow(nav Nav, file UploadedFile) {
-	<article
-		class="upload-history-row"
-		data-uploaded-digest={ file.Digest }
-		data-uploaded-transactions={ strconv.Itoa(file.Transactions) }
-		data-uploaded-accounts={ strconv.Itoa(len(file.Batches)) }
-		data-uploaded-url={ file.ReviewURL }
-	>
-		<div class="flex flex-wrap items-center gap-2">
-			<strong class="min-w-0 flex-1 break-all text-sm">{ file.Filename }</strong>
-			if file.Pending>0 {
-				<span class="badge badge-warn whitespace-nowrap">{ Tf(ctx,"import.uploadPending",file.Pending) }</span>
-			} else {
-				<span class="badge badge-ok whitespace-nowrap">{ T(ctx,"import.uploadReviewed") }</span>
-			}
-			if file.ReviewURL!="" {
-				<a class="btn-ghost" href={ templ.SafeURL(file.ReviewURL) } data-review-month-link>{ T(ctx,"import.uploadReviewLink") }</a>
-			}
-		</div>
-		<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{ FormatStamp(file.CreatedAt) } · { UsageLabel(ctx,file.Transactions) }</p>
-		<div class="mt-2 text-xs">
-			<div class="grid gap-2">
-				for _, batch := range file.Batches {
-					<div class="flex flex-wrap items-center gap-2">
-						<span class="min-w-0 flex-1 break-words">{ batch.Account } · { batch.Import.Filename }</span>
-						<form method="post" action={ "/imports/batches/" + strconv.FormatInt(batch.Import.ID, 10) + "/delete" }>
-							@importHouseholdField(nav)
-							<button type="submit" class="btn-ghost">{ T(ctx,"import.discardBatch") }</button>
-						</form>
-					</div>
-				}
-			</div>
-		</div>
-	</article>
 }

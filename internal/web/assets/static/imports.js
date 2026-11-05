@@ -52,9 +52,11 @@
       entry.element.dataset.uploadState = value;
       var text = labels[value] || labels.error;
       if (value === "imported") {
-        text = entry.result.transactions === 1 ? labels.importedOne :
-          labels.imported.replace("%d", String(entry.result.transactions));
+        text = labels.compared.replace("%d", String(entry.result.added)).replace("%d", String(entry.result.existing));
+        if (entry.result.preserved) text += " · " + labels.preserved.replace("%d", String(entry.result.preserved));
+        entry.file = null;
       }
+      if (value === "closed") entry.file = null;
       if (value === "uploading") text = labels.uploading.replace("%d", "0");
       entry.status.textContent = text;
       entry.error.textContent = error || "";
@@ -63,7 +65,7 @@
       if (value === "uploading") entry.progress.value = 0;
       if (value === "processing") entry.progress.removeAttribute("value");
       entry.remove.disabled = value === "uploading" || value === "processing";
-      entry.retry.hidden = !["error", "paused"].includes(value) || !entry.valid;
+      entry.retry.hidden = !["error", "paused"].includes(value) || !entry.valid || !entry.file;
       entry.retry.textContent = value === "paused" ? labels.resume : labels.retry;
       entry.link.hidden = value !== "imported" && value !== "mapping";
       if (!entry.link.hidden) {
@@ -80,9 +82,15 @@
       showMessage("");
       Array.from(files).forEach(function (file) {
         var key = [file.name, file.size, file.lastModified].join("\u0000");
-        if (entries.some(function (entry) { return entry.key === key; })) {
+        var previous = entries.find(function (entry) { return entry.key === key; });
+        if (previous && ["queued", "uploading", "processing", "mapping", "paused"].includes(previous.state)) {
           showMessage(labels.duplicate);
           return;
+        }
+        if (previous) {
+          previous.file = null;
+          previous.element.remove();
+          entries = entries.filter(function (entry) { return entry !== previous; });
         }
         var element = template.content.firstElementChild.cloneNode(true);
         var entry = {
@@ -101,12 +109,13 @@
         entry.remove.addEventListener("click", function () {
           if (entry.state === "uploading" || entry.state === "processing") return;
           entry.state = "removed";
+          entry.file = null;
           entries = entries.filter(function (candidate) { return candidate !== entry; });
           element.remove();
           updateQueue();
         });
         entry.retry.addEventListener("click", function () {
-          if (running || stale || !form.reportValidity()) return;
+          if (running || stale || !entry.file || !form.reportValidity()) return;
           entry.fields = snapshotFields();
           entry.result = null;
           entry.element.querySelector("[data-upload-detection]").hidden = true;
@@ -191,6 +200,11 @@
         throw new Error("Invalid upload destination");
       }
       result.url = target.pathname + target.search + target.hash;
+      if (result.status === "imported" && (!Number.isInteger(result.added) || !Number.isInteger(result.existing) ||
+          !Number.isInteger(result.preserved) || result.preserved < 0 || result.preserved > result.existing ||
+          result.added < 0 || result.existing < 0 || result.added + result.existing !== result.transactions)) {
+        throw new Error("Invalid reconciliation counts");
+      }
       if (result.detected !== undefined && (!Array.isArray(result.detected) ||
           result.detected.length > 20 || result.detected.some(function (line) {
             return typeof line !== "string" || line.length > 2048;
@@ -274,17 +288,7 @@
       });
       entries.forEach(function (entry) {
         if (entry.state !== "mapping" || pending.includes(entry.result.url)) return;
-        var file = Array.from(history.querySelectorAll("[data-uploaded-digest]")).find(function (node) {
-          return node.dataset.uploadedDigest === entry.result.digest &&
-            Number(node.dataset.uploadedTransactions) === entry.result.transactions &&
-            Number(node.dataset.uploadedAccounts) === entry.result.accounts;
-        });
-        if (file && file.dataset.uploadedUrl) {
-          entry.result.url = file.dataset.uploadedUrl;
-          state(entry, "imported");
-        } else {
-          state(entry, "error", labels.mappingClosed);
-        }
+        state(entry, "closed");
       });
     }
 
@@ -324,8 +328,7 @@
               });
             }
         });
-        current.querySelector("[data-uploaded-files]").replaceWith(replacement.querySelector("[data-uploaded-files]"));
-        current.querySelector("[data-history-empty]").hidden = replacement.querySelector("[data-history-empty]").hidden;
+        current.hidden = replacement.hidden;
         current.dataset.uploadGeneration = replacement.dataset.uploadGeneration;
         return true;
       }
@@ -517,7 +520,7 @@
         entries.forEach(function (entry) {
           if (entry.state !== "mapping" || entry.result.url !== pendingURL) return;
           if (result) { entry.result = result; state(entry, "imported"); }
-          else state(entry, "error", labels.mappingClosed);
+          else state(entry, "closed");
         });
         card.remove();
         if (result) await showImported(result.url, false);
