@@ -519,6 +519,25 @@ func (s *Store) ReviewBankTransaction(ctx context.Context, householdID int64, b 
 	})
 }
 
+// ReviewBankSuggestion evaluates a proposed acceptance and writes it against
+// one snapshot. The callback must be read-only and must not perform network I/O.
+func (s *Store) ReviewBankSuggestion(ctx context.Context, householdID int64, prepare func(HouseholdSnapshot) (BankTransaction, error)) error {
+	return s.withTx(ctx, func(tx *Store) error {
+		snapshot, err := tx.readHousehold(ctx, householdID)
+		if err != nil {
+			return err
+		}
+		payment, err := prepare(snapshot)
+		if err != nil {
+			return err
+		}
+		if payment.Decision != "accepted" {
+			return ErrInvalid
+		}
+		return tx.ReviewBankTransaction(ctx, householdID, payment, false)
+	})
+}
+
 // SetMonthReconciled closes only past months without pending review decisions.
 func (s *Store) SetMonthReconciled(ctx context.Context, householdID int64, month string, closed bool) error {
 	if _, err := time.Parse("2006-01", month); err != nil {

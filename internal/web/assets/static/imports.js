@@ -22,6 +22,8 @@
     var refreshAgain = false;
     var uploadRevision = 0;
     var historyRevision = 0;
+    var reviewRevision = 0;
+    var followedUpload = false;
     var stale = false;
     var dragDepth = 0;
     picker.required = false;
@@ -35,6 +37,7 @@
       queueArea.hidden = entries.length === 0;
       entries.forEach(function (entry) { entry.retry.disabled = running || stale; });
       if (stale) document.querySelectorAll("[data-import-mapping] select, [data-import-mapping] button").forEach(function (input) { input.disabled = true; });
+      if (stale) document.querySelectorAll("[data-bank-quick]").forEach(function (input) { input.disabled = true; });
     }
 
     function snapshotFields() {
@@ -285,8 +288,8 @@
       });
     }
 
-    async function refreshPart(url, id) {
-      var revision = id === "import-upload-history" ? ++historyRevision : 0;
+    async function refreshPart(url, id, discardEdits) {
+      var revision = id === "import-upload-history" ? ++historyRevision : ++reviewRevision;
       var response = await fetch(url, { credentials: "same-origin", cache: "no-store", redirect: "error" });
       if (!response.ok) throw new Error("Import status request failed");
       var parsed = new DOMParser().parseFromString(await response.text(), "text/html");
@@ -326,12 +329,70 @@
         current.dataset.uploadGeneration = replacement.dataset.uploadGeneration;
         return true;
       }
-      if (id === "import-review" && current.querySelector(".import-payment[open], [data-import-dirty]")) {
-        reviewDeferred.hidden = false;
-        return false;
+      if (id === "import-review") {
+        if (revision !== reviewRevision) return false;
+        if (current.dataset.reviewMonth !== replacement.dataset.reviewMonth) {
+          if (!discardEdits && reviewEditing()) { reviewDeferred.hidden = false; return false; }
+        } else {
+          var list = current.querySelector("[data-bank-rows]");
+          var rows = Array.from(replacement.querySelectorAll("[data-bank-row]"));
+          Array.from(list.querySelectorAll("[data-bank-row]")).forEach(function (row) {
+            if (!rows.some(function (fresh) { return fresh.id === row.id; })) row.remove();
+          });
+          rows.forEach(function (fresh, index) {
+            var old = document.getElementById(fresh.id);
+            if (old && list.contains(old)) {
+              if (!old.querySelector(".import-payment[open], [data-import-dirty]") && !old.hasAttribute("data-review-busy")) old.replaceWith(fresh);
+            } else {
+              var next = rows.slice(index + 1).map(function (row) { return document.getElementById(row.id); }).find(function (node) { return node && list.contains(node); });
+              list.insertBefore(fresh, next || null);
+            }
+          });
+          var empty = list.querySelector("[data-review-empty]");
+          if (empty) empty.remove();
+          if (!rows.length) list.appendChild(replacement.querySelector("[data-review-empty]"));
+          ["data-review-toolbar", "data-review-counts", "data-review-months"].forEach(function (selector) {
+            current.querySelector("[" + selector + "]").replaceWith(replacement.querySelector("[" + selector + "]"));
+          });
+          return true;
+        }
       }
       current.replaceWith(replacement);
       return true;
+    }
+
+    function reviewEditing() {
+      return document.querySelector("#import-review [data-import-dirty], #import-review [data-review-busy]");
+    }
+
+    async function showImported(url, interactive) {
+      var destination = new URL(url, location.origin);
+      var month = destination.searchParams.get("m");
+      if (destination.origin !== location.origin || destination.pathname !== "/imports" || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month || "")) {
+        throw new Error("Invalid review month");
+      }
+      var current = document.getElementById("import-review");
+      var discard = false;
+      if (current.dataset.reviewMonth !== month && reviewEditing()) {
+        if (!interactive || !window.confirm(labels.discardEdits)) {
+          reviewDeferred.hidden = false;
+          reviewDeferred.querySelector("a").href = destination.pathname + destination.search;
+          return;
+        }
+        discard = true;
+      }
+      var target = new URL(form.dataset.reviewUrl, location.origin);
+      target.searchParams.set("m", month);
+      if (!await refreshPart(target.pathname + target.search, "import-review", discard)) return;
+      form.dataset.reviewUrl = target.pathname + target.search;
+      var historyTarget = new URL(form.dataset.historyUrl, location.origin);
+      historyTarget.searchParams.set("m", month);
+      form.dataset.historyUrl = historyTarget.pathname + historyTarget.search;
+      reviewDeferred.hidden = true;
+      window.history.replaceState(null, "", destination.pathname + destination.search + "#import-review");
+      current = document.getElementById("import-review");
+      current.scrollIntoView({ block: "start" });
+      if (!reviewEditing()) current.focus({ preventScroll: true });
     }
 
     async function refreshHistory() {
@@ -348,9 +409,7 @@
       try {
         await refreshHistory();
         if (running || revision !== uploadRevision) { refreshAgain = true; return; }
-        var editing = document.querySelector("#import-review .import-payment[open], #import-review [data-import-dirty]");
-        reviewDeferred.hidden = !editing;
-        if (!editing) await refreshPart(form.dataset.reviewUrl, "import-review");
+        await refreshPart(form.dataset.reviewUrl, "import-review");
       } catch {
         refreshError.hidden = false;
       } finally {
@@ -371,6 +430,7 @@
         return saved;
       });
       running = true;
+      followedUpload = false;
       runningHint.hidden = false;
       updateQueue();
       try {
@@ -379,6 +439,10 @@
           var stop = await send(entry, entry.fields);
           try {
             await refreshHistory();
+            if (entry.state === "imported" && !followedUpload) {
+              followedUpload = true;
+              await showImported(entry.result.url, false);
+            }
           } catch {
             refreshError.hidden = false;
           }
@@ -456,6 +520,7 @@
           else state(entry, "error", labels.mappingClosed);
         });
         card.remove();
+        if (result) await showImported(result.url, false);
       } catch {
         mappingError(card, labels.network);
       } finally {
@@ -471,6 +536,12 @@
       var link = event.target.closest("a");
       if (!link) return;
       var refresh = link.hasAttribute("data-refresh-mapping");
+      if (link.hasAttribute("data-review-month-link") || link.closest("[data-upload-review-deferred]") ||
+          (link.hasAttribute("data-upload-link") && !new URL(link.href, location.origin).hash)) {
+        event.preventDefault();
+        try { await showImported(link.href, true); } catch { refreshError.hidden = false; }
+        return;
+      }
       if (!refresh && !link.hasAttribute("data-upload-link")) return;
       var hash = new URL(link.href, location.origin).hash;
       if (!refresh && !(link.hasAttribute("data-upload-link") && hash.startsWith("#import-mapping-"))) return;
@@ -487,21 +558,108 @@
     });
     document.addEventListener("input", function (event) {
       var reviewForm = event.target.closest("#import-review .import-payment form");
-      if (reviewForm) reviewForm.dataset.importDirty = "true";
+      if (reviewForm) markReviewDirty(reviewForm);
     });
     document.addEventListener("change", function (event) {
       var reviewForm = event.target.closest("#import-review .import-payment form");
-      if (reviewForm) reviewForm.dataset.importDirty = "true";
+      if (reviewForm) markReviewDirty(reviewForm);
       var mapping = event.target.closest("[data-import-mapping]");
       if (mapping) mapping.dataset.importDirty = "true";
     });
     window.addEventListener("focus", refreshStatus);
     window.addEventListener("pageshow", refreshStatus);
     window.addEventListener("beforeunload", function (event) {
-      if (running || document.querySelector("[data-mapping-busy], [data-import-mapping][data-import-dirty]") ||
+      if (running || reviewEditing() || document.querySelector("[data-mapping-busy], [data-import-mapping][data-import-dirty]") ||
           entries.some(function (entry) { return entry.state === "queued" || entry.state === "paused"; })) {
         event.preventDefault();
         event.returnValue = "";
+      }
+    });
+
+    function markReviewDirty(reviewForm) {
+      reviewForm.dataset.importDirty = "true";
+      var button = reviewForm.closest("[data-bank-row]").querySelector("[data-bank-quick]");
+      if (button) { button.disabled = true; button.title = labels.reviewChanged; }
+    }
+
+    document.addEventListener("submit", async function (event) {
+      var reviewForm = event.target;
+      if (reviewForm.hasAttribute("data-import-month-form")) {
+        event.preventDefault();
+        var target = new URL("/imports", location.origin);
+        target.searchParams.set("m", new FormData(reviewForm).get("m"));
+        try { await showImported(target.href, true); } catch { refreshError.hidden = false; }
+        return;
+      }
+      if (!reviewForm.hasAttribute("data-bank-review-form")) {
+        if (reviewForm.closest("[data-bank-row]")) reviewForm.removeAttribute("data-import-dirty");
+        return;
+      }
+      if (!event.submitter || !event.submitter.hasAttribute("data-bank-quick")) {
+        reviewForm.removeAttribute("data-import-dirty");
+        return;
+      }
+      event.preventDefault();
+      var row = reviewForm.closest("[data-bank-row]");
+      if (row.hasAttribute("data-review-busy")) return;
+      var wasOpen = row.querySelector(".import-payment").open;
+      var errorText = "";
+      if (stale || reviewForm.hasAttribute("data-import-dirty")) {
+        errorText = stale ? labels.context : labels.reviewChanged;
+      } else {
+        var body = new URLSearchParams(new FormData(reviewForm));
+        body.set("quick", "yes");
+        var target = new URL(reviewForm.action, location.origin);
+        if (target.origin !== location.origin || target.pathname !== "/imports/transactions/" + row.dataset.bankRow) {
+          errorText = labels.response;
+        } else {
+          row.setAttribute("data-review-busy", "");
+          row.setAttribute("aria-busy", "true");
+          var controls = Array.from(row.querySelectorAll("button, input, select, textarea")).map(function (input) {
+            var saved = { input: input, disabled: input.disabled };
+            input.disabled = true;
+            return saved;
+          });
+          try {
+            var response = await fetch(target.pathname, {
+              method: "POST", body: body, credentials: "same-origin", redirect: "error",
+              headers: { Accept: "application/json" }
+            });
+            if (!response.ok) {
+              errorText = (response.headers.get("Content-Type") || "").startsWith("text/plain") ?
+                (await response.text()).trim().slice(0, 1000) : labels.http.replace("%d", String(response.status));
+              if (errorText === labels.context || errorText === labels.household) stale = true;
+            } else {
+              var result = await response.json();
+              if (result.id !== row.dataset.bankRow || typeof result.html !== "string") throw new Error("Invalid review response");
+              var parsed = new DOMParser().parseFromString(result.html, "text/html");
+              var replacement = parsed.getElementById(row.id);
+              if (!replacement || replacement.dataset.bankRow !== row.dataset.bankRow) throw new Error("Missing reviewed row");
+              row.replaceWith(replacement);
+            }
+          } catch {
+            errorText = labels.network;
+          } finally {
+            row.removeAttribute("data-review-busy");
+            row.removeAttribute("aria-busy");
+            controls.forEach(function (saved) { saved.input.disabled = stale || saved.disabled; });
+          }
+          if (errorText) row.querySelector(".import-payment").open = false;
+          try {
+            await refreshHistory();
+            await refreshPart(form.dataset.reviewUrl, "import-review");
+          } catch { refreshError.hidden = false; }
+        }
+      }
+      if (errorText) {
+        var current = document.getElementById(row.id);
+        if (current) {
+          current.querySelector(".import-payment").open = wasOpen;
+          var error = current.querySelector("[data-payment-error]");
+          error.textContent = errorText;
+          error.hidden = false;
+          error.scrollIntoView({ block: "nearest" });
+        } else showMessage(errorText);
       }
     });
     updateQueue();

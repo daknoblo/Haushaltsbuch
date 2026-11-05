@@ -24,31 +24,33 @@ templ ImportsPage(nav Nav, vm ImportVM) {
 }
 
 templ ImportReview(nav Nav, vm ImportVM) {
-	<div id="import-review">
-		<section class="card mt-4">
-			<div class="flex flex-wrap items-center gap-3">
-				<h2 class="font-semibold">{ nav.CurrentMonthLabel(ctx) }</h2>
-				<form method="get" action="/imports" class="flex gap-2">
-					<input type="month" class="input" name="m" value={ nav.Month } aria-label={ T(ctx, "pdf.month") } required/>
-					<button class="btn-ghost" type="submit">{ T(ctx, "import.show") }</button>
+	<div id="import-review" data-review-month={ nav.Month } tabindex="-1">
+		<div data-review-toolbar>
+			<section class="card mt-4">
+				<div class="flex flex-wrap items-center gap-3">
+					<h2 class="font-semibold">{ nav.CurrentMonthLabel(ctx) }</h2>
+					<form method="get" action="/imports" class="flex gap-2" data-import-month-form>
+						<input type="month" class="input" name="m" value={ nav.Month } aria-label={ T(ctx, "pdf.month") } required/>
+						<button class="btn-ghost" type="submit">{ T(ctx, "import.show") }</button>
+					</form>
+					<a class="btn-ghost" href={ templ.SafeURL("/?m=" + nav.Month) }>{ T(ctx, "basis.comparison") }</a>
+				</div>
+				<p class="my-3 text-sm">{ T(ctx, "import.closeHint") }</p>
+				<form method="post" action="/imports/month" class="flex flex-wrap items-center gap-3">
+					@importHouseholdField(nav)
+					<input type="hidden" name="month" value={ nav.Month }/>
+					if vm.Closed {
+						<span class="badge badge-ok">{ T(ctx, "import.closed") }</span>
+						<button class="btn-ghost" type="submit" name="closed" value="no">{ T(ctx, "import.reopenMonth") }</button>
+					} else {
+						<label class="flex items-start gap-2"><input type="checkbox" name="complete" value="yes" required/>{ T(ctx, "import.complete") }</label>
+						<button class="btn-primary" type="submit" name="closed" value="yes">{ T(ctx, "import.closeMonth") }</button>
+					}
 				</form>
-				<a class="btn-ghost" href={ templ.SafeURL("/?m=" + nav.Month) }>{ T(ctx, "basis.comparison") }</a>
-			</div>
-			<p class="my-3 text-sm">{ T(ctx, "import.closeHint") }</p>
-			<form method="post" action="/imports/month" class="flex flex-wrap items-center gap-3">
-				@importHouseholdField(nav)
-				<input type="hidden" name="month" value={ nav.Month }/>
-				if vm.Closed {
-					<span class="badge badge-ok">{ T(ctx, "import.closed") }</span>
-					<button class="btn-ghost" type="submit" name="closed" value="no">{ T(ctx, "import.reopenMonth") }</button>
-				} else {
-					<label class="flex items-start gap-2"><input type="checkbox" name="complete" value="yes" required/>{ T(ctx, "import.complete") }</label>
-					<button class="btn-primary" type="submit" name="closed" value="yes">{ T(ctx, "import.closeMonth") }</button>
-				}
-			</form>
-		</section>
+			</section>
+		</div>
 		<div class="mt-4 grid gap-2">
-			<div class="flex flex-wrap items-center gap-2">
+			<div class="flex flex-wrap items-center gap-2" data-review-counts>
 				<h2 class="mr-auto font-semibold">{ T(ctx, "import.paymentOverview") }</h2>
 				for _, decision := range []string{"pending", "accepted", "transfer", "ignored"} {
 					<span class={ "badge whitespace-nowrap", ImportDecisionBadge(decision) }>
@@ -56,23 +58,23 @@ templ ImportReview(nav Nav, vm ImportVM) {
 					</span>
 				}
 			</div>
-			if len(vm.Rows) == 0 {
-				<p class="alert-info">{ T(ctx, "import.empty") }</p>
-			}
-			for _, row := range vm.Rows {
-				@importPayment(nav, vm, row)
-			}
-		</div>
-		<details class="card mt-4">
-			<summary class="cursor-pointer font-semibold">{ T(ctx, "import.otherMonths") }</summary>
-			<div class="mt-3 flex flex-wrap gap-2">
-				for _, payment := range vm.Ledger.Transactions {
-					if payment.Decision == "pending" && payment.BookedOn[:7] != nav.Month {
-						<a class="btn-ghost" href={ templ.SafeURL("/imports?m=" + payment.BookedOn[:7]) }>{ payment.BookedOn } · { payment.Name }</a>
-					}
+			<div class="grid gap-2" data-bank-rows>
+				if len(vm.Rows) == 0 {
+					<p class="alert-info" data-review-empty>{ T(ctx, "import.empty") }</p>
+				}
+				for _, row := range vm.Rows {
+					@importPayment(nav, vm, row)
 				}
 			</div>
-		</details>
+		</div>
+		<section class="card mt-4" data-review-months hidden?={ len(vm.PendingMonths)==0 }>
+			<h2 class="font-semibold">{ T(ctx, "import.otherMonths") }</h2>
+			<div class="mt-3 flex flex-wrap gap-2">
+				for _, month := range vm.PendingMonths {
+					<a class="btn-ghost" href={ templ.SafeURL(importMonthURL(month.Month)) } data-review-month-link>{ MonthLabel(ctx,month.Month) } · { UsageLabel(ctx,month.Count) }</a>
+				}
+			</div>
+		</section>
 	</div>
 }
 
@@ -81,155 +83,202 @@ templ importHouseholdField(nav Nav) {
 }
 
 templ importPayment(nav Nav, vm ImportVM, row ImportRow) {
-	<details class="import-payment" data-bank-payment={ strconv.FormatInt(row.Payment.ID, 10) }>
-		<summary class="import-payment-summary">
-			<span class="import-expand" aria-hidden="true">›</span>
-			<span class="import-date tnum">{ FormatDate(row.Payment.BookedOn) }</span>
-			<span class="import-description">
-				<strong class="block truncate" title={ row.Payment.Name }>{ row.Payment.Name }</strong>
-				<span class="block truncate text-xs text-slate-500 dark:text-slate-400" title={ row.Account }>{ row.Account }</span>
-			</span>
-			<span class="import-state">
-				<span class={ "badge whitespace-nowrap", ImportDecisionBadge(row.Payment.Decision) }>{ ImportDecisionLabel(ctx, row.Payment.Decision) }</span>
-				if row.Duplicate {
-					<span class="badge badge-warn whitespace-nowrap" title={ T(ctx, "import.duplicateHint") }>{ T(ctx, "import.duplicateShort") }</span>
-				}
-				if row.TransferCandidate != "" {
-					<span class="badge badge-info whitespace-nowrap" title={ row.TransferCandidate }>{ T(ctx, "import.transferShort") }</span>
-				}
-			</span>
-			<span class={ "import-amount tnum", templ.KV("text-emerald-700 dark:text-emerald-400", row.Payment.Direction == store.DirIncome), templ.KV("text-rose-700 dark:text-rose-400", row.Payment.Direction == store.DirExpense) }>
-				<span class="sr-only">{ DirectionLabel(ctx, row.Payment.Direction) }</span>
-				{ row.SignedAmount() }
-			</span>
-		</summary>
-		<div class="import-payment-body">
-			<p class="mb-3 text-xs text-slate-500 dark:text-slate-400">{ row.Source }</p>
-			if row.Duplicate {
-				<p class="alert-error mb-3">{ T(ctx, "import.duplicateHint") }</p>
-			}
-			if row.TransferCandidate != "" {
-				<p class="alert-info mb-3">{ T(ctx, "import.transferHint") } { row.TransferCandidate }</p>
-			}
-			if row.PlanName != "" {
-				<p class="alert-info mb-3">
-					{ T(ctx, "import.match") } { row.PlanName } · { FormatEUR(row.PlanAmount) }
-					if row.PlanAmount != row.Payment.AmountCents {
-						<span>· { T(ctx, "import.deviation") }</span>
+	<article id={ row.ID() } data-bank-row={ strconv.FormatInt(row.Payment.ID, 10) }>
+		<p class="alert-error mb-2" data-payment-error role="alert" hidden></p>
+		<details class="import-payment" data-bank-payment={ strconv.FormatInt(row.Payment.ID, 10) }>
+			<summary class="import-payment-summary">
+				<span class="import-expand" aria-hidden="true">›</span>
+				<span class="import-date tnum">{ FormatDate(row.Payment.BookedOn) }</span>
+				<span class="import-description">
+					<strong class="block truncate" title={ row.Payment.Name }>{ row.Payment.Name }</strong>
+					<span class="block truncate text-xs text-slate-500 dark:text-slate-400" title={ row.Account }>{ row.Account }</span>
+				</span>
+				<span class="import-state">
+					<span class={ "badge whitespace-nowrap", ImportDecisionBadge(row.Payment.Decision) }>{ ImportDecisionLabel(ctx, row.Payment.Decision) }</span>
+					if row.Duplicate {
+						<span class="badge badge-warn whitespace-nowrap" title={ T(ctx, "import.duplicateHint") }>{ T(ctx, "import.duplicateShort") }</span>
 					}
-				</p>
-			}
-			if row.Payment.Decision == "pending" && !vm.Closed {
-				<form method="post" action={ row.URL() } class="grid gap-3">
-					@importHouseholdField(nav)
-					<div class="grid gap-3 md:grid-cols-4">
-						<label>{ T(ctx, "import.date") }<input class="input w-full" name="date" type="date" value={ row.Payment.BookedOn } required/></label>
-						<label>{ T(ctx, "import.amount") }<input class="input w-full" name="amount" inputmode="decimal" value={ FormatCents(row.Payment.AmountCents) } required/></label>
-						<label>
-							{ T(ctx, "settings.kind") }
-							<select class="input w-full" name="direction">
-								for _, o := range DirectionOptions(ctx) {
-									<option value={ o.Value } selected?={ o.Value == string(row.Payment.Direction) }>{ o.Label }</option>
-								}
-							</select>
-						</label>
-						<label>{ T(ctx, "settings.name") }<input class="input w-full" name="name" value={ row.Payment.Name } maxlength="120" required/></label>
-					</div>
-					<label>{ T(ctx, "import.reference") }<textarea class="input w-full" name="reference" maxlength="2000">{ row.Payment.Reference }</textarea></label>
-					<div class="grid gap-3 md:grid-cols-3">
-						<label>
-							{ T(ctx, "import.category") }
-							<select class="input w-full" name="category">
-								<option value="0">{ T(ctx, "import.choose") }</option>
-								for _, c := range vm.Data.Categories {
-									<option value={ strconv.FormatInt(c.ID, 10) } selected?={ c.ID == row.Payment.CategoryID }>{ c.Name } · { DirectionLabel(ctx, c.Classification) }</option>
-								}
-							</select>
-						</label>
-						<label>
-							{ T(ctx, "import.plan") }
-							<select class="input w-full" name="plan">
-								<option value="0">{ T(ctx, "import.noPlan") }</option>
-								for _, b := range vm.Data.Bookings {
-									<option value={ strconv.FormatInt(b.ID, 10) } selected?={ b.ID == row.Payment.PlanID }>{ b.Name }</option>
-								}
-							</select>
-						</label>
-						<label>
-							{ T(ctx, "import.allocation") }
-							<select class="input w-full" name="allocation">
-								<option value="owner" selected?={ row.Payment.PlanID == 0 }>{ T(ctx, "import.allocateOwner") }</option>
-								<option value="plan" selected?={ row.Payment.PlanID != 0 }>{ T(ctx, "import.allocatePlan") }</option>
-							</select>
-						</label>
-						<label>
-							{ T(ctx, "overview.costNature") }
-							<select class="input w-full" name="nature">
-								for _, key := range []string{"fix", "variable"} {
-									<option value={ key } selected?={ key == string(row.Payment.CostNature) }>{ CostNatureLabel(ctx, store.CostNature(key)) }</option>
-								}
-							</select>
-						</label>
-						<label>
-							{ T(ctx, "overview.budgetClasses") }
-							<select class="input w-full" name="class">
-								for _, key := range []string{"need", "want", "saving"} {
-									<option value={ key } selected?={ key == string(row.Payment.BudgetClass) }>{ BudgetClassLabel(ctx, store.BudgetClass(key)) }</option>
-								}
-							</select>
-						</label>
-						<label>
-							{ T(ctx, "import.transferAccount") }
-							<select class="input w-full" name="transfer_account">
-								<option value="0">{ T(ctx, "import.choose") }</option>
-								for _, a := range vm.Ledger.Accounts {
-									if a.ID != row.AccountID {
-										<option value={ strconv.FormatInt(a.ID, 10) } selected?={ a.ID == row.Payment.TransferAccountID }>{ BankAccountLabel(ctx, a, vm.Data.Members) }</option>
-									}
-								}
-							</select>
-						</label>
-					</div>
-					<label class="flex gap-2"><input type="checkbox" name="settle" value="yes" checked?={ row.Payment.Settle }/>{ T(ctx, "import.settle") }</label>
-					<label class="flex gap-2"><input type="checkbox" name="allow_duplicate" value="yes"/>{ T(ctx, "import.allowDuplicate") }</label>
-					<div class="flex flex-wrap gap-2">
-						<button class="btn-primary" type="submit" name="decision" value="accepted">{ T(ctx, "import.accept") }</button>
-						<button class="btn-ghost" type="submit" name="decision" value="pending">{ T(ctx, "import.keepDraft") }</button>
-						<button class="btn-ghost" type="submit" name="decision" value="transfer" disabled?={ len(vm.Ledger.Accounts) < 2 }>{ T(ctx, "import.markTransfer") }</button>
-						<button class="btn-ghost" type="submit" name="decision" value="ignored">{ T(ctx, "import.ignore") }</button>
-					</div>
-				</form>
-			} else {
-				<p class="text-sm">{ row.Payment.Reference }</p>
-				for _, sp := range row.Payment.Splits {
-					for _, m := range vm.Data.Members {
-						if m.ID == sp.MemberID {
-							<p class="text-sm">{ m.Name }: { FormatEUR(sp.Cents) }</p>
+					if row.TransferCandidate != "" {
+						<span class="badge badge-info whitespace-nowrap" title={ row.TransferCandidate }>{ T(ctx, "import.transferShort") }</span>
+					}
+				</span>
+				<span class={ "import-amount tnum", templ.KV("text-emerald-700 dark:text-emerald-400", row.Payment.Direction == store.DirIncome), templ.KV("text-rose-700 dark:text-rose-400", row.Payment.Direction == store.DirExpense) }>
+					<span class="sr-only">{ DirectionLabel(ctx, row.Payment.Direction) }</span>
+					{ row.SignedAmount() }
+				</span>
+				<span class="import-actions">
+					if row.Payment.Decision=="pending" && !row.Closed {
+						if row.CanQuick {
+							<button class="btn-primary sm:px-3 sm:py-1.5 sm:text-xs" type="submit" form={ row.FormID() } name="quick" value="yes" aria-label={ Tf(ctx, "import.quickAcceptFor", row.Payment.Name) } data-bank-quick>{ T(ctx, "import.quickAccept") }</button>
+						} else {
+							<span class="badge badge-warn">{ T(ctx,"import.detailsNeeded") }</span>
 						}
 					}
+				</span>
+				<span class="import-labels">
+					if row.Category!="" {
+						<span class="badge badge-info">{ row.Category }</span>
+					} else {
+						<span class="badge badge-warn">{ T(ctx,"import.categoryMissing") }</span>
+					}
+					if row.Payment.Direction==store.DirExpense {
+						<span class="badge badge-muted">{ CostNatureLabel(ctx,row.Payment.CostNature) }</span>
+						<span class="badge badge-muted">{ BudgetClassLabel(ctx,row.Payment.BudgetClass) }</span>
+						if !row.Payment.Settle {
+							<span class="badge badge-muted">{ T(ctx,"import.noSettlement") }</span>
+						}
+					}
+					if row.AllocationLabel!="" {
+						<span class="badge badge-muted max-w-full whitespace-normal text-left">{ row.AllocationLabel }</span>
+					}
+					if row.PlanName!="" {
+						<span class="badge badge-muted max-w-full whitespace-normal text-left">{ Tf(ctx,"import.planLabel",row.PlanName) }</span>
+						if row.PlanAmount!=row.Payment.AmountCents {
+							<span class="badge badge-warn">{ T(ctx,"import.deviation") }</span>
+						}
+					}
+					for _, tag:=range row.Tags {
+						<span class="badge badge-muted">{ tag.Name }</span>
+					}
+					if row.Suggestion!="" {
+						<span class="text-xs text-slate-500 dark:text-slate-400">{ ImportSuggestionLabel(ctx,row.Suggestion) }</span>
+					}
+				</span>
+			</summary>
+			<div class="import-payment-body">
+				<p class="mb-3 text-xs text-slate-500 dark:text-slate-400">{ row.Source }</p>
+				if row.Duplicate {
+					<p class="alert-error mb-3">{ T(ctx, "import.duplicateHint") }</p>
 				}
-				if !vm.Closed {
-					<form method="post" action={ row.URL() } class="mt-3">
+				if row.TransferCandidate != "" {
+					<p class="alert-info mb-3">{ T(ctx, "import.transferHint") } { row.TransferCandidate }</p>
+				}
+				if row.PlanName != "" {
+					<p class="alert-info mb-3">
+						{ T(ctx, "import.match") } { row.PlanName } · { FormatEUR(row.PlanAmount) }
+						if row.PlanAmount != row.Payment.AmountCents {
+							<span>· { T(ctx, "import.deviation") }</span>
+						}
+					</p>
+				}
+				if row.Payment.Decision == "pending" && !row.Closed {
+					<form id={ row.FormID() } method="post" action={ row.URL() } class="grid gap-3" data-bank-review-form>
 						@importHouseholdField(nav)
-						<button class="btn-ghost" type="submit" name="decision" value="pending">{ T(ctx, "import.reopenPayment") }</button>
+						<input type="hidden" name="review_token" value={ row.ReviewToken() }/>
+						<input type="hidden" name="upload_generation" value={ strconv.FormatUint(vm.UploadGeneration, 10) }/>
+						<input type="hidden" name="history_id" value={ strconv.FormatInt(row.HistoryID, 10) }/>
+						<div class="grid gap-3 md:grid-cols-4">
+							<label>{ T(ctx, "import.date") }<input class="input w-full" name="date" type="date" value={ row.Payment.BookedOn } required/></label>
+							<label>{ T(ctx, "import.amount") }<input class="input w-full" name="amount" inputmode="decimal" value={ FormatCents(row.Payment.AmountCents) } required/></label>
+							<label>
+								{ T(ctx, "settings.kind") }
+								<select class="input w-full" name="direction">
+									for _, o := range DirectionOptions(ctx) {
+										<option value={ o.Value } selected?={ o.Value == string(row.Payment.Direction) }>{ o.Label }</option>
+									}
+								</select>
+							</label>
+							<label>{ T(ctx, "settings.name") }<input class="input w-full" name="name" value={ row.Payment.Name } maxlength="120" required/></label>
+						</div>
+						<label>{ T(ctx, "import.reference") }<textarea class="input w-full" name="reference" maxlength="2000">{ row.Payment.Reference }</textarea></label>
+						<div class="grid gap-3 md:grid-cols-3">
+							<label>
+								{ T(ctx, "import.category") }
+								<select class="input w-full" name="category">
+									<option value="0">{ T(ctx, "import.choose") }</option>
+									for _, c := range vm.Data.Categories {
+										<option value={ strconv.FormatInt(c.ID, 10) } selected?={ c.ID == row.Payment.CategoryID }>{ c.Name } · { DirectionLabel(ctx, c.Classification) }</option>
+									}
+								</select>
+							</label>
+							<label>
+								{ T(ctx, "import.plan") }
+								<select class="input w-full" name="plan">
+									<option value="0">{ T(ctx, "import.noPlan") }</option>
+									for _, b := range vm.Data.Bookings {
+										<option value={ strconv.FormatInt(b.ID, 10) } selected?={ b.ID == row.Payment.PlanID }>{ b.Name }</option>
+									}
+								</select>
+							</label>
+							<label>
+								{ T(ctx, "import.allocation") }
+								<select class="input w-full" name="allocation">
+									<option value="owner" selected?={ row.Allocation == "owner" }>{ T(ctx, "import.allocateOwner") }</option>
+									<option value="plan" selected?={ row.Allocation == "plan" }>{ T(ctx, "import.allocatePlan") }</option>
+									if row.HistoryID!=0 {
+										<option value="history" selected?={ row.Allocation=="history" }>{ T(ctx,"import.allocateHistory") }</option>
+									}
+								</select>
+							</label>
+							<label>
+								{ T(ctx, "overview.costNature") }
+								<select class="input w-full" name="nature">
+									for _, key := range []string{"fix", "variable"} {
+										<option value={ key } selected?={ key == string(row.Payment.CostNature) }>{ CostNatureLabel(ctx, store.CostNature(key)) }</option>
+									}
+								</select>
+							</label>
+							<label>
+								{ T(ctx, "overview.budgetClasses") }
+								<select class="input w-full" name="class">
+									for _, key := range []string{"need", "want", "saving"} {
+										<option value={ key } selected?={ key == string(row.Payment.BudgetClass) }>{ BudgetClassLabel(ctx, store.BudgetClass(key)) }</option>
+									}
+								</select>
+							</label>
+							<label>
+								{ T(ctx, "import.transferAccount") }
+								<select class="input w-full" name="transfer_account">
+									<option value="0">{ T(ctx, "import.choose") }</option>
+									for _, a := range vm.Ledger.Accounts {
+										if a.ID != row.AccountID {
+											<option value={ strconv.FormatInt(a.ID, 10) } selected?={ a.ID == row.Payment.TransferAccountID }>{ BankAccountLabel(ctx, a, vm.Data.Members) }</option>
+										}
+									}
+								</select>
+							</label>
+						</div>
+						<label class="flex gap-2"><input type="checkbox" name="settle" value="yes" checked?={ row.Payment.Settle }/>{ T(ctx, "import.settle") }</label>
+						<label class="flex gap-2"><input type="checkbox" name="allow_duplicate" value="yes"/>{ T(ctx, "import.allowDuplicate") }</label>
+						<div class="flex flex-wrap gap-2">
+							<button class="btn-primary" type="submit" name="decision" value="accepted">{ T(ctx, "import.accept") }</button>
+							<button class="btn-ghost" type="submit" name="decision" value="pending">{ T(ctx, "import.keepDraft") }</button>
+							<button class="btn-ghost" type="submit" name="decision" value="transfer" disabled?={ len(vm.Ledger.Accounts) < 2 }>{ T(ctx, "import.markTransfer") }</button>
+							<button class="btn-ghost" type="submit" name="decision" value="ignored">{ T(ctx, "import.ignore") }</button>
+						</div>
 					</form>
+				} else {
+					<p class="text-sm">{ row.Payment.Reference }</p>
+					for _, sp := range row.Payment.Splits {
+						for _, m := range vm.Data.Members {
+							if m.ID == sp.MemberID {
+								<p class="text-sm">{ m.Name }: { FormatEUR(sp.Cents) }</p>
+							}
+						}
+					}
+					if !row.Closed {
+						<form method="post" action={ row.URL() } class="mt-3">
+							@importHouseholdField(nav)
+							<button class="btn-ghost" type="submit" name="decision" value="pending">{ T(ctx, "import.reopenPayment") }</button>
+						</form>
+					}
+					if row.Payment.Decision == "accepted" && row.Payment.PlanID == 0 {
+						<form method="post" action={ row.URL() + "/plan" } class="mt-3 flex flex-wrap items-end gap-3">
+							@importHouseholdField(nav)
+							<label>{ T(ctx, "import.futureStart") }<input class="input" type="date" name="start" value={ ShiftMonth(NormalizeMonth(""), 1) + "-01" } required/></label>
+							<label>
+								{ T(ctx, "import.frequency") }
+								<select class="input" name="frequency">
+									for _, f := range []store.Frequency{store.FreqOnce, store.FreqMonthly, store.FreqQuarterly, store.FreqYearly} {
+										<option value={ string(f) }>{ FrequencyLabel(ctx, f) }</option>
+									}
+								</select>
+							</label>
+							<button class="btn-ghost" type="submit">{ T(ctx, "import.createPlan") }</button>
+						</form>
+					}
 				}
-				if row.Payment.Decision == "accepted" && row.Payment.PlanID == 0 {
-					<form method="post" action={ row.URL() + "/plan" } class="mt-3 flex flex-wrap items-end gap-3">
-						@importHouseholdField(nav)
-						<label>{ T(ctx, "import.futureStart") }<input class="input" type="date" name="start" value={ ShiftMonth(NormalizeMonth(""), 1) + "-01" } required/></label>
-						<label>
-							{ T(ctx, "import.frequency") }
-							<select class="input" name="frequency">
-								for _, f := range []store.Frequency{store.FreqOnce, store.FreqMonthly, store.FreqQuarterly, store.FreqYearly} {
-									<option value={ string(f) }>{ FrequencyLabel(ctx, f) }</option>
-								}
-							</select>
-						</label>
-						<button class="btn-ghost" type="submit">{ T(ctx, "import.createPlan") }</button>
-					</form>
-				}
-			}
-		</div>
-	</details>
+			</div>
+		</details>
+	</article>
 }

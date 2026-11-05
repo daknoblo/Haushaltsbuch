@@ -194,7 +194,7 @@ func mappingSuggestions(vm ImportMappingVM) []int64 {
 	return selected
 }
 
-func (s *Server) mappingError(w http.ResponseWriter, r *http.Request, problem error) {
+func (s *Server) importPageError(w http.ResponseWriter, r *http.Request, problem error) {
 	if r.Header.Get("Accept") == "application/json" {
 		s.bankError(w, r, problem)
 		return
@@ -211,9 +211,9 @@ func (s *Server) mappingError(w http.ResponseWriter, r *http.Request, problem er
 	}
 	status, key := bankErrorStatus(problem)
 	if status == http.StatusInternalServerError {
-		s.logger.Error("account mapping failed", "err", logsafe.Value(problem.Error()))
+		s.logger.Error("import request failed", "err", logsafe.Value(problem.Error()))
 	} else {
-		s.logger.Warn("account mapping rejected", "reason", key)
+		s.logger.Warn("import request rejected", "reason", key)
 	}
 	vm.MappingMessage = T(r.Context(), string(key))
 	for i := range vm.PendingMappings {
@@ -275,7 +275,7 @@ func (s *Server) handleImportMappingConfirm(w http.ResponseWriter, r *http.Reque
 		return nil
 	})
 	if err != nil {
-		s.mappingError(w, r, err)
+		s.importPageError(w, r, err)
 		return
 	}
 	s.uploadResult(w, r, outcome)
@@ -290,7 +290,7 @@ func (s *Server) handleImportMappingCancel(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if err := s.importPreviews.commit(r.FormValue("preview"), household, func(pendingImport) error { return nil }); err != nil {
-		s.mappingError(w, r, err)
+		s.importPageError(w, r, err)
 		return
 	}
 	if r.Header.Get("Accept") == "application/json" {

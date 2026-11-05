@@ -88,6 +88,8 @@ templ ImportUploader(nav Nav, vm ImportVM) {
 					data-review={ T(ctx, "import.uploadReviewLink") }
 					data-map-link={ T(ctx, "import.mappingTitle") }
 					data-mapping-accounts-changed={ T(ctx, "import.mappingAccountsChanged") }
+					data-review-changed={ T(ctx, "import.reviewChanged") }
+					data-discard-edits={ T(ctx, "import.discardReviewEdits") }
 				></div>
 				<template data-upload-item>
 					<li class="upload-queue-row" data-upload-state="queued">
@@ -156,13 +158,12 @@ templ uploadedFileRow(nav Nav, file UploadedFile) {
 				<span class="badge badge-ok whitespace-nowrap">{ T(ctx,"import.uploadReviewed") }</span>
 			}
 			if file.ReviewURL!="" {
-				<a class="btn-ghost" href={ templ.SafeURL(file.ReviewURL) } target="_blank" rel="noopener">{ T(ctx,"import.uploadReviewLink") }</a>
+				<a class="btn-ghost" href={ templ.SafeURL(file.ReviewURL) } data-review-month-link>{ T(ctx,"import.uploadReviewLink") }</a>
 			}
 		</div>
 		<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{ FormatStamp(file.CreatedAt) } · { UsageLabel(ctx,file.Transactions) }</p>
-		<details class="mt-2 text-xs">
-			<summary class="cursor-pointer">{ T(ctx,"import.uploadFileDetails") }</summary>
-			<div class="mt-2 grid gap-2">
+		<div class="mt-2 text-xs">
+			<div class="grid gap-2">
 				for _, batch := range file.Batches {
 					<div class="flex flex-wrap items-center gap-2">
 						<span class="min-w-0 flex-1 break-words">{ batch.Account } · { batch.Import.Filename }</span>
@@ -173,6 +174,6 @@ templ uploadedFileRow(nav Nav, file UploadedFile) {
 					</div>
 				}
 			</div>
-		</details>
+		</div>
 	</article>
 }

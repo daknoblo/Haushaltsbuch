@@ -13,6 +13,21 @@ var englishMonths = monthNames{
 
 // english mirrors the German catalog key by key.
 var english = Catalog{
+	"import.allocationMissing":         "Review allocation",
+	"import.quickAccept":               "Accept",
+	"import.quickAcceptFor":            "Accept payment %s",
+	"import.ownTransferHint":           "Payment naming a household member: review a possible internal transfer or reimbursement.",
+	"import.discardReviewEdits":        "Discard unsaved payment edits and show the other month?",
+	"import.suggestionPlan":            "Suggestion from plan",
+	"import.suggestionHistory":         "Suggestion from confirmed payments",
+	"import.suggestionRule":            "Local classification suggestion",
+	"import.suggestionConflict":        "Previous classifications are ambiguous",
+	"import.detailsNeeded":             "Review details",
+	"import.categoryMissing":           "Choose category",
+	"import.noSettlement":              "No settlement",
+	"import.planLabel":                 "Plan: %s",
+	"import.allocateHistory":           "Proportional to the last confirmed payment (including tags)",
+	"import.reviewChanged":             "The payment or its proposed settings have changed or need review. Please check the current values or details and confirm again.",
 	"check.title":                      "Plausibility check",
 	"check.overlapPlan":                "Possible duplicate plan: recurring bookings with the same name overlap at month level",
 	"check.inventory":                  "Inventory counts disagree with stored rows",

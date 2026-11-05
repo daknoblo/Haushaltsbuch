@@ -43,6 +43,13 @@ type ImportVM struct {
 	MappingMessage   string
 	Uploads          []UploadedFile
 	UploadGeneration uint64
+	PendingMonths    []ImportMonth
+}
+
+// ImportMonth links to pending rows without one disclosure per payment.
+type ImportMonth struct {
+	Month string
+	Count int
 }
 
 // ImportRow adds non-binding duplicate, transfer and plan hints to a payment.
@@ -55,6 +62,15 @@ type ImportRow struct {
 	TransferCandidate string
 	PlanAmount        int64
 	PlanName          string
+	Category          string
+	Allocation        string
+	AllocationLabel   string
+	HistoryID         int64
+	Suggestion        string
+	Tags              []store.Tag
+	Closed            bool
+	CanQuick          bool
+	original          store.BankTransaction
 }
 
 // DecisionCount summarizes the visible month's review state without mixing amounts.
@@ -107,16 +123,23 @@ func (s *Server) buildImportVM(ctx context.Context, household int64, month strin
 	}
 	vm.AIConfigured = deployment != ""
 	if household != 0 {
-		vm.Ledger, err = s.store.BankLedger(ctx, household)
+		snapshot, err := s.store.ReadHousehold(ctx, household)
 		if err != nil {
 			return vm, err
 		}
-		vm.Data, err = s.loadHouseholdData(ctx, household)
-		if err != nil {
-			return vm, err
-		}
+		vm.Ledger, vm.Data = snapshot.Bank, calc.FromSnapshot(snapshot)
 		vm.Closed = slices.Contains(vm.Ledger.ClosedMonths, month)
 		vm.Rows = importRows(ctx, vm.Ledger, vm.Data, month)
+		counts := map[string]int{}
+		for _, payment := range vm.Ledger.Transactions {
+			if payment.Decision == "pending" && payment.BookedOn[:7] != month {
+				counts[payment.BookedOn[:7]]++
+			}
+		}
+		for pending, count := range counts {
+			vm.PendingMonths = append(vm.PendingMonths, ImportMonth{Month: pending, Count: count})
+		}
+		slices.SortFunc(vm.PendingMonths, func(a, b ImportMonth) int { return strings.Compare(b.Month, a.Month) })
 		vm.PendingMappings = s.importPreviews.list(household)
 		for i := range vm.PendingMappings {
 			mapping := &vm.PendingMappings[i]
@@ -130,10 +153,12 @@ func (s *Server) buildImportVM(ctx context.Context, household int64, month strin
 
 func importRows(ctx context.Context, l store.BankLedger, data calc.Data, month string) []ImportRow {
 	accounts := make(map[int64]string)
+	accountRecords := make(map[int64]store.BankAccount)
 	batches := make(map[int64]store.BankImport)
 	plans := make(map[int64]store.Booking)
 	for _, a := range l.Accounts {
 		accounts[a.ID] = BankAccountLabel(ctx, a, data.Members)
+		accountRecords[a.ID] = a
 	}
 	for _, b := range l.Imports {
 		batches[b.ID] = b
@@ -147,7 +172,9 @@ func importRows(ctx context.Context, l store.BankLedger, data calc.Data, month s
 			continue
 		}
 		batch := batches[p.ImportID]
-		row := ImportRow{Payment: p, AccountID: batch.AccountID, Account: accounts[batch.AccountID], Source: batch.Filename}
+		row := ImportRow{Payment: p, original: p, AccountID: batch.AccountID, Account: accounts[batch.AccountID], Source: batch.Filename, Closed: slices.Contains(l.ClosedMonths, p.BookedOn[:7])}
+		proposeImport(&row, data, l, accountRecords[batch.AccountID])
+		p = row.Payment
 		if plan, ok := plans[p.PlanID]; ok {
 			row.PlanName = plan.Name
 			row.PlanAmount = calc.AmountFor(plan, data.Overrides[plan.ID], month)
@@ -165,6 +192,15 @@ func importRows(ctx context.Context, l store.BankLedger, data calc.Data, month s
 				row.TransferCandidate = accounts[otherAccount]
 			}
 		}
+		if row.TransferCandidate == "" && p.Decision == "pending" {
+			for _, member := range data.Members {
+				if utf8.RuneCountInString(strings.TrimSpace(member.Name)) >= 3 && containsPhrase(p.Name, member.Name) {
+					row.TransferCandidate = T(ctx, "import.ownTransferHint")
+					break
+				}
+			}
+		}
+		describeImport(ctx, &row, data)
 		out = append(out, row)
 	}
 	slices.Reverse(out)
@@ -382,8 +418,8 @@ func suggestPlan(p *store.BankTransaction, data calc.Data) {
 	var matches []store.Booking
 	text := strings.ToLower(p.Name + " " + p.Reference)
 	for _, b := range data.Bookings {
-		name := strings.TrimSpace(strings.ToLower(b.Name))
-		if name != "" && b.Direction == p.Direction && calc.ActiveIn(b, p.BookedOn[:7]) && strings.Contains(text, name) {
+		name := strings.TrimSpace(b.Name)
+		if name != "" && b.Direction == p.Direction && calc.ActiveIn(b, p.BookedOn[:7]) && containsPhrase(text, name) {
 			matches = append(matches, b)
 		}
 	}
@@ -420,6 +456,10 @@ func (s *Server) handleBankReview(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if r.FormValue("quick") == "yes" {
+		s.handleQuickBankReview(w, r, hh)
+		return
+	}
 	ledger, err := s.store.BankLedger(r.Context(), hh)
 	if err != nil {
 		s.bankError(w, r, err)
@@ -431,21 +471,11 @@ func (s *Server) handleBankReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if p.Decision == "pending" {
-		p.Name, p.Reference = strings.TrimSpace(r.FormValue("name")), strings.TrimSpace(r.FormValue("reference"))
-		p.BookedOn, p.Direction = r.FormValue("date"), store.Direction(r.FormValue("direction"))
-		if strings.TrimSpace(r.FormValue("amount")) == "" {
-			s.bankError(w, r, store.ErrInvalid)
-			return
-		}
-		p.AmountCents, err = ParseCents(r.FormValue("amount"))
+		p, err = pendingReview(r, p)
 		if err != nil {
-			s.bankError(w, r, store.ErrInvalid)
+			s.bankError(w, r, err)
 			return
 		}
-		p.CategoryID, p.PlanID = parseID(r.FormValue("category")), parseID(r.FormValue("plan"))
-		p.CostNature, p.BudgetClass = store.CostNature(r.FormValue("nature")), store.BudgetClass(r.FormValue("class"))
-		p.Settle = r.FormValue("settle") == "yes"
-		p.TransferAccountID = parseID(r.FormValue("transfer_account"))
 	}
 	p.Decision = r.FormValue("decision")
 	p.Splits, p.TagIDs = nil, nil
@@ -468,6 +498,22 @@ func (s *Server) handleBankReview(w http.ResponseWriter, r *http.Request) {
 			plan.AmountCents = calc.AmountFor(plan, data.Overrides[plan.ID], p.BookedOn[:min(7, len(p.BookedOn))])
 			p.Splits = calc.ActualAllocation(plan, data.Splits[plan.ID], p.AmountCents)
 			p.TagIDs = data.TagLinks[plan.ID]
+			if len(p.Splits) == 0 {
+				s.bankError(w, r, store.ErrInvalid)
+				return
+			}
+		case "history":
+			previous, source, err := findBankPayment(ledger, parseID(r.FormValue("history_id")))
+			if err != nil {
+				s.bankError(w, r, err)
+				return
+			}
+			if previous.Decision != "accepted" || source.ID != account.ID || previous.Direction != p.Direction {
+				s.bankError(w, r, store.ErrInvalid)
+				return
+			}
+			p.Splits = historyAllocation(previous, p.AmountCents)
+			p.TagIDs = slices.Clone(previous.TagIDs)
 			if len(p.Splits) == 0 {
 				s.bankError(w, r, store.ErrInvalid)
 				return
@@ -584,6 +630,8 @@ func bankErrorStatus(err error) (int, i18n.Key) {
 		key = "import.mappingTargets"
 	case errors.Is(err, errUploadContext):
 		status, key = http.StatusConflict, "import.uploadContextChanged"
+	case errors.Is(err, errReviewChanged):
+		status, key = http.StatusConflict, "import.reviewChanged"
 	case errors.Is(err, bankimport.ErrNoText):
 		key = "import.noText"
 	case errors.Is(err, bankimport.ErrResult):

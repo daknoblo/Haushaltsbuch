@@ -13,6 +13,21 @@ var germanMonths = monthNames{
 
 // german is the default catalog. Keys are grouped by the page they appear on.
 var german = Catalog{ // #nosec G101 -- translated UI text and environment-variable names, never credential values.
+	"import.allocationMissing":         "Aufteilung prüfen",
+	"import.quickAccept":               "Übernehmen",
+	"import.quickAcceptFor":            "Buchung %s übernehmen",
+	"import.ownTransferHint":           "Zahlung mit dem Namen eines Haushaltsmitglieds – mögliche Umbuchung oder Ausgleich prüfen.",
+	"import.discardReviewEdits":        "Ungespeicherte Änderungen an Buchungen verwerfen und den anderen Monat anzeigen?",
+	"import.suggestionPlan":            "Vorschlag aus dem Plan",
+	"import.suggestionHistory":         "Vorschlag aus bestätigten Buchungen",
+	"import.suggestionRule":            "Lokaler Zuordnungsvorschlag",
+	"import.suggestionConflict":        "Bisherige Zuordnungen sind uneindeutig",
+	"import.detailsNeeded":             "Details prüfen",
+	"import.categoryMissing":           "Kategorie wählen",
+	"import.noSettlement":              "Ohne Ausgleich",
+	"import.planLabel":                 "Plan: %s",
+	"import.allocateHistory":           "Proportional wie die zuletzt bestätigte Buchung (inkl. Tags)",
+	"import.reviewChanged":             "Die Buchung oder ihre vorgeschlagenen Einstellungen haben sich geändert oder benötigen eine Prüfung. Bitte die aktuellen Angaben bzw. Details prüfen und erneut bestätigen.",
 	"check.title":                      "Plausibilitätsprüfung",
 	"check.overlapPlan":                "Mögliche doppelte Planung: gleichnamige wiederkehrende Buchungen überschneiden sich auf Monatsebene",
 	"check.inventory":                  "Bestandsstatistik stimmt nicht mit den gespeicherten Zeilen überein",

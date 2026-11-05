@@ -153,7 +153,11 @@ _Not captured yet._
    appears directly below the upload area before anything is persisted. Each
    source remains separate. Queue links scroll to that card without navigating
    away or opening another tab, even while further uploads are running.
-4. Compare the suggestions with the original statement. Correct dates, positive
+4. The imported month and its booking rows appear immediately after reading a
+   file or confirming account mapping. Further months with pending payments are
+   shown as visible count links, rather than a collapsed list. If another row
+   has unsaved edits, the application offers a link instead of discarding them.
+   Compare the suggestions with the original statement. Correct dates, positive
    EUR amounts, income/expense direction, categories and allocations. A unique
    name match suggests a plan and highlights amount deviations, but never edits
    that plan. Allocations can use the account owner or proportionally copy a
@@ -179,10 +183,29 @@ red **Not set**. Only presence is displayed, never a variable's value; this is
 not a credential-validity check. The status reflects the configuration loaded
 at startup, so environment changes require a restart as before.
 
-Statement transactions appear as compact, expandable rows with booking date,
-payee, bank account, review state and signed amount. State counts summarize the
-selected month. Expand a row to edit or approve it; duplicate and possible
-transfer indicators remain visible even when collapsed. The generic AI warning
+Statement transactions show booking date, payee, bank account, review state and
+signed amount, plus category, cost nature, budget class, exact proposed member
+shares, tags and any plan link directly in the row. Local suggestions use active
+plans, consistent accepted history from the same bank account, known merchant
+patterns and matching category/account names. Conflicting history and unknown
+categories are not silently replaced by a catch-all category. Payment-processor
+history also requires the same reference. Pending and ignored rows never train
+the history-based suggestions; CSV/XLSX classification does not call AI.
+
+An eligible row can be **accepted directly** without opening its details.
+Possible duplicates, internal-transfer hints, missing categories or incomplete
+allocations require inspection. Details remain available for corrections and
+explicit duplicate overrides. Suggestions are request-local, not extra stored
+bookings. Direct acceptance checks the displayed values and allocations against
+a fresh database snapshot inside the write transaction; changed payment, plan
+or allocation data must be reviewed again. There is no automatic approval,
+duplicate override or retry. Existing accepted allocation snapshots remain
+unchanged. Editing detail fields disables the row shortcut until those changes
+are submitted through the detailed form.
+
+State counts summarize the selected month. Duplicate and possible transfer
+indicators remain visible when collapsed. Account/file details are also visible
+in uploaded-file history without another disclosure. The generic AI warning
 banner has been removed; manual review and month-completeness confirmation are
 unchanged. The planned booking list also shows category names under booking
 names, retaining its filters, allocation badges and monthly totals.

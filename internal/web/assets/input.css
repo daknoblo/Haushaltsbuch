@@ -70,7 +70,7 @@
   .import-payment-summary {
     @apply grid cursor-pointer list-none items-center gap-x-3 gap-y-1 px-3 py-2.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500;
     grid-template-columns: 0.75rem minmax(0, 1fr) auto;
-    grid-template-areas: "expand description amount" ". date state";
+    grid-template-areas: "expand description amount" ". date state" ". labels labels" ". actions actions";
   }
   .import-payment-summary::-webkit-details-marker { display: none; }
   .import-expand { grid-area: expand; @apply text-lg text-slate-400 transition-transform; }
@@ -78,6 +78,9 @@
   .import-description { grid-area: description; @apply min-w-0; }
   .import-state { grid-area: state; @apply flex flex-wrap justify-end gap-1; }
   .import-amount { grid-area: amount; @apply whitespace-nowrap text-right font-semibold; }
+  .import-actions { grid-area: actions; @apply flex justify-end; }
+  .import-labels { grid-area: labels; @apply flex min-w-0 flex-wrap items-center gap-1 pt-1; }
+  .import-labels .badge { @apply max-w-full whitespace-normal break-words text-left; }
   .import-payment[open] > .import-payment-summary {
     @apply border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/40;
   }
@@ -117,8 +120,8 @@
   }
   @screen md {
     .import-payment-summary {
-      grid-template-columns: 0.75rem 6rem minmax(0, 1fr) auto 8.5rem;
-      grid-template-areas: "expand date description state amount";
+      grid-template-columns: 0.75rem 6rem minmax(0, 1fr) auto 8.5rem auto;
+      grid-template-areas: "expand date description state amount actions" ". labels labels labels labels labels";
     }
     .import-state { @apply max-w-xs; }
   }
