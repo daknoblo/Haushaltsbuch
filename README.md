@@ -148,9 +148,11 @@ _Not captured yet._
    setup blocks only PDF analysis and links to Settings. Model discovery occurs
    in Settings and during PDF analysis, not when opening the import page.
    The bank account and PDF controls sit side by side on wider screens.
-   When a CSV/XLSX file contains multiple own accounts, an explicit mapping
-   step replaces the single destination selection before anything is persisted.
-   The queue links to that mapping without interrupting the remaining uploads.
+   The left destination selection applies to single-account files and PDFs.
+   When a CSV/XLSX file contains multiple own accounts, an inline mapping card
+   appears directly below the upload area before anything is persisted. Each
+   source remains separate. Queue links scroll to that card without navigating
+   away or opening another tab, even while further uploads are running.
 4. Compare the suggestions with the original statement. Correct dates, positive
    EUR amounts, income/expense direction, categories and allocations. A unique
    name match suggests a plan and highlights amount deviations, but never edits
@@ -316,14 +318,23 @@ exports commonly use it for the counterparty. Missing source identifiers are
 errors rather than grounds for silently merging rows.
 
 If multiple source accounts are detected, choose a distinct bank account of the
-active household for each one. The preview shows the source label, only the
+active household for each one directly in Import. The preview shows the source label, only the
 last four characters of its number, and the number of transactions. No
-destination is guessed. Add missing bank accounts in Settings (opens in a new
-tab), then reload the destination list. Confirmation creates all groups in
+destination is silently assigned. Unique exact name matches are preselected as
+suggestions; the left selection can disambiguate a matching destination when the
+source name itself is unique. Every mapping still requires confirmation. Add
+missing bank accounts in Settings (opens in a new tab), then refresh the
+destination list. Background updates retain existing form nodes and choices.
+Confirmation and cancellation stay on the Import page; errors appear inline.
+Without JavaScript, validation errors render the normal Import page with the
+submitted choices. Confirmation creates all groups in
 one database transaction: a duplicate file, foreign/missing destination or
 closed month rolls back every group. Payments remain pending manual review.
 
-Mappings can be resumed from Import or explicitly discarded. At most four are
+Mappings remain directly visible whenever Import is reopened and can be
+explicitly discarded there. Legacy mapping URLs return to Import; missing or
+expired previews show a recovery message instead of a separate dead-end page.
+At most four are
 held temporarily in memory, accessible for 15 minutes; expired entries are
 removed on subsequent preview access. Restarting the process, restoring or
 resetting data, or deleting a household invalidates outstanding mappings.

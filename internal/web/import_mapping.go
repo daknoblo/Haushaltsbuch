@@ -7,10 +7,12 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/bankimport"
+	"github.com/daknoblo/Haushaltsbuch/internal/logsafe"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
 
@@ -26,11 +28,12 @@ var (
 )
 
 type pendingImport struct {
-	household int64
-	digest    string
-	filename  string
-	expires   time.Time
-	sources   []bankimport.SourceAccount
+	household       int64
+	digest          string
+	filename        string
+	expires         time.Time
+	sources         []bankimport.SourceAccount
+	selectedAccount int64
 }
 
 type importPreviews struct {
@@ -126,71 +129,116 @@ func (p *importPreviews) reset(fn func() error) error {
 	return nil
 }
 
-// ImportMappingLink resumes an uncommitted mapping within its original household.
-type ImportMappingLink struct {
-	URL      string
-	Filename string
-}
-
-func (p *importPreviews) list(household int64) []ImportMappingLink {
+func (p *importPreviews) list(household int64) []ImportMappingVM {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.prune()
-	var links []ImportMappingLink
+	var links []ImportMappingVM
 	for token, item := range p.items {
 		if item.household == household {
-			links = append(links, ImportMappingLink{URL: importMappingURL(token), Filename: item.filename})
+			links = append(links, ImportMappingVM{Token: token, Filename: item.filename, Sources: item.sources, SelectedAccount: item.selectedAccount})
 		}
 	}
-	sort.Slice(links, func(i, j int) bool { return links[i].URL < links[j].URL })
+	sort.Slice(links, func(i, j int) bool { return links[i].Token < links[j].Token })
 	return links
 }
 
 func importMappingURL(token string) string {
-	return "/imports/mapping?preview=" + url.QueryEscape(token)
+	return "/imports?preview=" + url.QueryEscape(token) + "#" + importMappingID(token)
 }
+
+func importMappingID(token string) string { return "import-mapping-" + token }
 
 // ImportMappingVM contains no original file or full source-account identifiers.
 type ImportMappingVM struct {
-	Token    string
-	Filename string
-	Sources  []bankimport.SourceAccount
-	Accounts []store.BankAccount
-	Members  []store.Member
+	Token           string
+	Filename        string
+	Sources         []bankimport.SourceAccount
+	Accounts        []store.BankAccount
+	Members         []store.Member
+	Selected        []int64
+	SelectedAccount int64
+}
+
+// URL resumes this mapping on the normal Import page.
+func (vm ImportMappingVM) URL() string { return importMappingURL(vm.Token) }
+
+// ID anchors refreshes without replacing an edited mapping form.
+func (vm ImportMappingVM) ID() string { return importMappingID(vm.Token) }
+
+func mappingSuggestions(vm ImportMappingVM) []int64 {
+	normalize := func(s string) string { return strings.Join(strings.Fields(strings.ToLower(s)), " ") }
+	counts := map[string]int{}
+	for _, source := range vm.Sources {
+		counts[normalize(source.Name)]++
+	}
+	selected := make([]int64, len(vm.Sources))
+	for i, source := range vm.Sources {
+		name := normalize(source.Name)
+		if name == "" || counts[name] != 1 {
+			continue
+		}
+		var matches []int64
+		for _, account := range vm.Accounts {
+			if normalize(account.Name) == name {
+				matches = append(matches, account.ID)
+				if account.ID == vm.SelectedAccount {
+					selected[i] = account.ID
+				}
+			}
+		}
+		if selected[i] == 0 && len(matches) == 1 {
+			selected[i] = matches[0]
+		}
+	}
+	return selected
+}
+
+func (s *Server) mappingError(w http.ResponseWriter, r *http.Request, problem error) {
+	if r.Header.Get("Accept") == "application/json" {
+		s.bankError(w, r, problem)
+		return
+	}
+	nav, err := s.buildNav(r, "imports", "/imports", true)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	vm, err := s.buildImportVM(r.Context(), nav.ActiveHousehold.ID, nav.Month)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	status, key := bankErrorStatus(problem)
+	if status == http.StatusInternalServerError {
+		s.logger.Error("account mapping failed", "err", logsafe.Value(problem.Error()))
+	} else {
+		s.logger.Warn("account mapping rejected", "reason", key)
+	}
+	vm.MappingMessage = T(r.Context(), string(key))
+	for i := range vm.PendingMappings {
+		mapping := &vm.PendingMappings[i]
+		if mapping.Token != r.FormValue("preview") {
+			continue
+		}
+		for j := range mapping.Selected {
+			mapping.Selected[j] = parseID(r.FormValue("target_" + strconv.Itoa(j)))
+		}
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
+	s.render(w, r, ImportsPage(nav, vm))
 }
 
 func (s *Server) handleImportMapping(w http.ResponseWriter, r *http.Request) {
-	household, ok := s.requireActiveHousehold(w, r)
-	if !ok {
-		return
-	}
 	token := r.URL.Query().Get("preview")
-	item, err := s.importPreviews.get(token, household)
-	if err != nil {
-		s.bankError(w, r, err)
+	// Legacy links only return to Import; untrusted tokens never become anchors.
+	if len(token) < 20 || len(token) > 128 || strings.Trim(token, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-") != "" {
+		http.Redirect(w, r, "/imports?mapping_notice=expired", http.StatusSeeOther)
 		return
 	}
-	nav, err := s.buildNav(r, "imports", "/imports", false)
-	if err != nil {
-		s.serverError(w, r, err)
-		return
-	}
-	if nav.ActiveHousehold.ID != household {
-		s.clientError(w, r, http.StatusConflict, "import.householdChanged")
-		return
-	}
-	vm := ImportMappingVM{Token: token, Filename: item.filename, Sources: item.sources}
-	vm.Accounts, err = s.store.ListBankAccounts(r.Context(), household)
-	if err != nil {
-		s.serverError(w, r, err)
-		return
-	}
-	vm.Members, err = s.store.ListMembers(r.Context(), household)
-	if err != nil {
-		s.serverError(w, r, err)
-		return
-	}
-	s.render(w, r, ImportMappingPage(nav, vm))
+	http.Redirect(w, r, importMappingURL(token), http.StatusSeeOther) // #nosec G710 -- fixed /imports path, escaped query and allowlisted fragment token.
 }
 
 func (s *Server) handleImportMappingConfirm(w http.ResponseWriter, r *http.Request) {
@@ -201,7 +249,7 @@ func (s *Server) handleImportMappingConfirm(w http.ResponseWriter, r *http.Reque
 	if !ok {
 		return
 	}
-	month := ""
+	outcome := uploadOutcome{Status: "imported"}
 	err := s.importPreviews.commit(r.FormValue("preview"), household, func(item pendingImport) error {
 		batches := make([]store.BankImportBatch, 0, len(item.sources))
 		seen := make(map[int64]bool, len(item.sources))
@@ -219,14 +267,18 @@ func (s *Server) handleImportMappingConfirm(w http.ResponseWriter, r *http.Reque
 		if err := s.store.CreateBankImports(r.Context(), household, batches); err != nil {
 			return err
 		}
-		month = item.sources[0].Payments[0].BookedOn[:7]
+		outcome.Digest, outcome.Accounts = item.digest, len(item.sources)
+		for _, source := range item.sources {
+			outcome.Transactions += len(source.Payments)
+		}
+		outcome.URL = importMonthURL(item.sources[0].Payments[0].BookedOn[:7])
 		return nil
 	})
 	if err != nil {
-		s.bankError(w, r, err)
+		s.mappingError(w, r, err)
 		return
 	}
-	redirectImportMonth(w, r, month)
+	s.uploadResult(w, r, outcome)
 }
 
 func (s *Server) handleImportMappingCancel(w http.ResponseWriter, r *http.Request) {
@@ -238,7 +290,12 @@ func (s *Server) handleImportMappingCancel(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if err := s.importPreviews.commit(r.FormValue("preview"), household, func(pendingImport) error { return nil }); err != nil {
-		s.bankError(w, r, err)
+		s.mappingError(w, r, err)
+		return
+	}
+	if r.Header.Get("Accept") == "application/json" {
+		w.Header().Set("Cache-Control", "no-store")
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	http.Redirect(w, r, "/imports", http.StatusSeeOther)

@@ -39,7 +39,8 @@ type ImportVM struct {
 	AIEnabled        bool
 	AIConfigured     bool
 	Closed           bool
-	PendingMappings  []ImportMappingLink
+	PendingMappings  []ImportMappingVM
+	MappingMessage   string
 	Uploads          []UploadedFile
 	UploadGeneration uint64
 }
@@ -91,6 +92,10 @@ func (s *Server) handleImports(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
+	preview := r.URL.Query().Get("preview")
+	if r.URL.Query().Get("mapping_notice") == "expired" || (preview != "" && !slices.ContainsFunc(vm.PendingMappings, func(m ImportMappingVM) bool { return m.Token == preview })) {
+		vm.MappingMessage = T(r.Context(), "import.previewExpired")
+	}
 	s.render(w, r, ImportsPage(nav, vm))
 }
 
@@ -113,6 +118,11 @@ func (s *Server) buildImportVM(ctx context.Context, household int64, month strin
 		vm.Closed = slices.Contains(vm.Ledger.ClosedMonths, month)
 		vm.Rows = importRows(ctx, vm.Ledger, vm.Data, month)
 		vm.PendingMappings = s.importPreviews.list(household)
+		for i := range vm.PendingMappings {
+			mapping := &vm.PendingMappings[i]
+			mapping.Accounts, mapping.Members = vm.Ledger.Accounts, vm.Data.Members
+			mapping.Selected = mappingSuggestions(*mapping)
+		}
 		vm.Uploads = uploadedFiles(ctx, vm.Ledger, vm.Data.Members)
 	}
 	return vm, nil
@@ -337,7 +347,7 @@ func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if len(sources) > 1 {
-		token, err := s.importPreviews.put(generation, pendingImport{household: hh, digest: digest, filename: filename, sources: sources})
+		token, err := s.importPreviews.put(generation, pendingImport{household: hh, digest: digest, filename: filename, sources: sources, selectedAccount: accountID})
 		if err != nil {
 			if errors.Is(err, errImportPreview) {
 				err = errUploadContext
@@ -530,6 +540,16 @@ func (s *Server) bankError(w http.ResponseWriter, r *http.Request, err error) {
 		http.Error(w, message, http.StatusBadRequest)
 		return
 	}
+	status, key := bankErrorStatus(err)
+	if status == http.StatusInternalServerError {
+		s.serverError(w, r, err)
+		return
+	}
+	s.logger.Warn("bank import request rejected", "reason", key)
+	s.clientError(w, r, status, key)
+}
+
+func bankErrorStatus(err error) (int, i18n.Key) {
 	status, key := http.StatusBadRequest, i18n.Key("import.invalid")
 	switch {
 	case errors.Is(err, store.ErrNotFound):
@@ -573,9 +593,7 @@ func (s *Server) bankError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, bankimport.ErrUpstream), errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
 		status, key = http.StatusBadGateway, "import.aiError"
 	case !errors.Is(err, store.ErrInvalid):
-		s.serverError(w, r, err)
-		return
+		return http.StatusInternalServerError, "error.internal"
 	}
-	s.logger.Warn("bank import request rejected", "reason", key)
-	s.clientError(w, r, status, key)
+	return status, key
 }

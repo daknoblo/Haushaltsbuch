@@ -9,6 +9,9 @@ import (
 templ ImportsPage(nav Nav, vm ImportVM) {
 	@Layout(nav) {
 		@pageHeading(T(ctx, "nav.imports"), T(ctx, "import.subtitle"))
+		if vm.MappingMessage!="" {
+			<p class="alert-error mb-3" role="alert">{ vm.MappingMessage }</p>
+		}
 		if nav.ActiveHousehold.ID == 0 {
 			@noHousehold()
 		} else {

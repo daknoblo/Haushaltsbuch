@@ -169,7 +169,7 @@ func TestQueuedMappingOutcomeAndHistoryResolution(t *testing.T) {
 		t.Fatalf("mapping shape: %+v", result)
 	}
 	target, err := url.Parse(result.URL)
-	if err != nil || target.Path != "/imports/mapping" || target.Query().Get("preview") == "" {
+	if err != nil || target.Path != "/imports" || target.Query().Get("preview") == "" || target.Fragment != importMappingID(target.Query().Get("preview")) {
 		t.Fatal("mapping link invalid")
 	}
 	before := get(t, h, "/imports").Body.String()

@@ -87,6 +87,7 @@ templ ImportUploader(nav Nav, vm ImportVM) {
 					data-mapping-closed={ T(ctx, "import.uploadMappingClosed") }
 					data-review={ T(ctx, "import.uploadReviewLink") }
 					data-map-link={ T(ctx, "import.mappingTitle") }
+					data-mapping-accounts-changed={ T(ctx, "import.mappingAccountsChanged") }
 				></div>
 				<template data-upload-item>
 					<li class="upload-queue-row" data-upload-state="queued">
@@ -115,33 +116,27 @@ templ ImportUploader(nav Nav, vm ImportVM) {
 templ ImportUploadHistory(nav Nav, vm ImportVM) {
 	<section class="card mt-3" id="import-upload-history" data-upload-generation={ strconv.FormatUint(vm.UploadGeneration, 10) }>
 		<h2 class="mb-3 font-semibold">{ T(ctx, "import.uploadHistory") }</h2>
-		if len(vm.PendingMappings)==0 && len(vm.Uploads)==0 {
-			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "import.uploadHistoryEmpty") }</p>
-		}
-		<div class="grid gap-2">
+		<p class="text-sm text-slate-500 dark:text-slate-400" data-history-empty hidden?={ len(vm.PendingMappings)>0 || len(vm.Uploads)>0 }>{ T(ctx, "import.uploadHistoryEmpty") }</p>
+		<div class="grid gap-2" data-mapping-list>
 			for _, mapping := range vm.PendingMappings {
-				<div class="upload-history-row" data-pending-upload-url={ mapping.URL }>
-					<div class="flex flex-wrap items-center gap-2">
-						<strong class="min-w-0 flex-1 break-all text-sm">{ mapping.Filename }</strong>
-						<span class="badge badge-warn whitespace-nowrap">{ T(ctx, "import.uploadMapping") }</span>
-						<a class="btn-ghost" href={ templ.SafeURL(mapping.URL) } target="_blank" rel="noopener">{ T(ctx, "import.mappingTitle") }</a>
-					</div>
-				</div>
+				@ImportMappingCard(nav, mapping)
 			}
+		</div>
+		<div class="mt-2 grid gap-2" data-uploaded-files hidden?={ len(vm.Uploads)==0 }>
 			for _, file := range vm.Uploads[:min(5,len(vm.Uploads))] {
 				@uploadedFileRow(nav, file)
 			}
+			if len(vm.Uploads)>5 {
+				<details class="mt-3">
+					<summary class="cursor-pointer text-sm">{ Tf(ctx,"import.uploadHistoryOlder",len(vm.Uploads)-5) }</summary>
+					<div class="mt-2 grid gap-2">
+						for _, file := range vm.Uploads[5:] {
+							@uploadedFileRow(nav, file)
+						}
+					</div>
+				</details>
+			}
 		</div>
-		if len(vm.Uploads)>5 {
-			<details class="mt-3">
-				<summary class="cursor-pointer text-sm">{ Tf(ctx,"import.uploadHistoryOlder",len(vm.Uploads)-5) }</summary>
-				<div class="mt-2 grid gap-2">
-					for _, file := range vm.Uploads[5:] {
-						@uploadedFileRow(nav, file)
-					}
-				</div>
-			</details>
-		}
 	</section>
 }
 

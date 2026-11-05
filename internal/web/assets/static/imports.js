@@ -21,6 +21,7 @@
     var refreshing = false;
     var refreshAgain = false;
     var uploadRevision = 0;
+    var historyRevision = 0;
     var stale = false;
     var dragDepth = 0;
     picker.required = false;
@@ -33,6 +34,7 @@
     function updateQueue() {
       queueArea.hidden = entries.length === 0;
       entries.forEach(function (entry) { entry.retry.disabled = running || stale; });
+      if (stale) document.querySelectorAll("[data-import-mapping] select, [data-import-mapping] button").forEach(function (input) { input.disabled = true; });
     }
 
     function snapshotFields() {
@@ -62,7 +64,9 @@
       entry.retry.textContent = value === "paused" ? labels.resume : labels.retry;
       entry.link.hidden = value !== "imported" && value !== "mapping";
       if (!entry.link.hidden) {
-        entry.link.href = entry.result.url;
+        entry.link.href = value === "mapping" ? new URL(entry.result.url, location.origin).hash : entry.result.url;
+        if (value === "mapping") entry.link.removeAttribute("target");
+        else entry.link.target = "_blank";
         entry.link.textContent = value === "mapping" ? labels.mapLink : labels.review;
       }
       entry.actions.hidden = entry.retry.hidden && entry.link.hidden;
@@ -178,11 +182,12 @@
         throw new Error("Invalid upload response");
       }
       var target = new URL(result.url, location.origin);
-      if (target.origin !== location.origin || target.username || target.password || target.hash ||
-          !["/imports", "/imports/mapping"].includes(target.pathname)) {
+      if (target.origin !== location.origin || target.username || target.password || target.pathname !== "/imports" ||
+          (result.status === "mapping" ? (!/^#import-mapping-[A-Za-z0-9_-]{20,128}$/.test(target.hash) ||
+            target.searchParams.get("preview") !== target.hash.slice("#import-mapping-".length)) : target.hash !== "")) {
         throw new Error("Invalid upload destination");
       }
-      result.url = target.pathname + target.search;
+      result.url = target.pathname + target.search + target.hash;
       if (result.detected !== undefined && (!Array.isArray(result.detected) ||
           result.detected.length > 20 || result.detected.some(function (line) {
             return typeof line !== "string" || line.length > 2048;
@@ -281,17 +286,56 @@
     }
 
     async function refreshPart(url, id) {
+      var revision = id === "import-upload-history" ? ++historyRevision : 0;
       var response = await fetch(url, { credentials: "same-origin", cache: "no-store", redirect: "error" });
       if (!response.ok) throw new Error("Import status request failed");
       var parsed = new DOMParser().parseFromString(await response.text(), "text/html");
       var replacement = parsed.getElementById(id);
       var current = document.getElementById(id);
       if (!replacement || !current) throw new Error("Import status fragment missing");
+      if (id === "import-upload-history") {
+        if (revision !== historyRevision) return false;
+        var mappings = current.querySelector("[data-mapping-list]");
+        var incoming = Array.from(replacement.querySelectorAll("[data-import-mapping]"));
+        var sameGeneration = current.dataset.uploadGeneration === replacement.dataset.uploadGeneration;
+        Array.from(mappings.children).forEach(function (card) {
+          if (!sameGeneration || !incoming.some(function (fresh) { return fresh.id === card.id; })) {
+            if (card.hasAttribute("data-import-dirty") && !card.hasAttribute("data-mapping-busy")) showMessage(labels.mappingClosed);
+            card.remove();
+          }
+        });
+        incoming.forEach(function (fresh) {
+            var previous = document.getElementById(fresh.id);
+            if (!previous || !mappings.contains(previous)) { mappings.appendChild(fresh); return; }
+            if (!previous.hasAttribute("data-mapping-busy")) {
+              fresh.querySelectorAll("select").forEach(function (select) {
+                var existing = Array.from(previous.querySelectorAll("select")).find(function (node) { return node.name === select.name; });
+                if (!existing || existing.innerHTML === select.innerHTML) return;
+                var value = existing.value;
+                existing.replaceChildren.apply(existing, Array.from(select.childNodes));
+                existing.value = value;
+                if (value && existing.value !== value) {
+                  existing.value = "";
+                  mappingError(previous, labels.mappingAccountsChanged);
+                }
+              });
+            }
+        });
+        current.querySelector("[data-uploaded-files]").replaceWith(replacement.querySelector("[data-uploaded-files]"));
+        current.querySelector("[data-history-empty]").hidden = replacement.querySelector("[data-history-empty]").hidden;
+        current.dataset.uploadGeneration = replacement.dataset.uploadGeneration;
+        return true;
+      }
       if (id === "import-review" && current.querySelector(".import-payment[open], [data-import-dirty]")) {
         reviewDeferred.hidden = false;
-        return;
+        return false;
       }
       current.replaceWith(replacement);
+      return true;
+    }
+
+    async function refreshHistory() {
+      if (await refreshPart(form.dataset.historyUrl, "import-upload-history")) reconcileMappings();
     }
 
     async function refreshStatus() {
@@ -302,9 +346,8 @@
       var revision = uploadRevision;
       refreshError.hidden = true;
       try {
-        await refreshPart(form.dataset.historyUrl, "import-upload-history");
+        await refreshHistory();
         if (running || revision !== uploadRevision) { refreshAgain = true; return; }
-        reconcileMappings();
         var editing = document.querySelector("#import-review .import-payment[open], #import-review [data-import-dirty]");
         reviewDeferred.hidden = !editing;
         if (!editing) await refreshPart(form.dataset.reviewUrl, "import-review");
@@ -333,7 +376,13 @@
       try {
         var entry;
         while ((entry = entries.find(function (candidate) { return candidate.state === "queued"; }))) {
-          if (await send(entry, entry.fields)) {
+          var stop = await send(entry, entry.fields);
+          try {
+            await refreshHistory();
+          } catch {
+            refreshError.hidden = false;
+          }
+          if (stop || stale) {
             paused = true;
             entries.forEach(function (pending) {
               if (pending.state === "queued") state(pending, stale ? "error" : "paused", stale ? labels.context : "");
@@ -354,6 +403,88 @@
       event.preventDefault();
       runQueue();
     });
+
+    function mappingError(card, text) {
+      var error = card.querySelector("[data-mapping-error]");
+      error.textContent = text;
+      error.hidden = !text;
+      if (text && card.hasAttribute("data-mapping-busy")) error.scrollIntoView({ block: "nearest" });
+    }
+
+    document.addEventListener("submit", async function (event) {
+      var mappingForm = event.target;
+      var card = mappingForm.closest("[data-import-mapping]");
+      if (!card) return;
+      event.preventDefault();
+      if (card.hasAttribute("data-mapping-busy")) return;
+      if (stale) { mappingError(card, labels.context); return; }
+      if (!mappingForm.reportValidity()) return;
+      var target = new URL(mappingForm.action, location.origin);
+      if (target.origin !== location.origin || !["/imports/mapping", "/imports/mapping/cancel"].includes(target.pathname)) {
+        mappingError(card, labels.response);
+        return;
+      }
+      var body = new URLSearchParams(new FormData(mappingForm));
+      var pendingURL = card.dataset.pendingUploadUrl;
+      card.setAttribute("data-mapping-busy", "");
+      card.setAttribute("aria-busy", "true");
+      mappingError(card, "");
+      var controls = Array.from(card.querySelectorAll("button, select"));
+      controls.forEach(function (input) { input.disabled = true; });
+      try {
+        var response = await fetch(target.pathname, {
+          method: "POST", body: body, credentials: "same-origin", cache: "no-store",
+          redirect: "error", headers: { Accept: "application/json" }
+        });
+        if (!response.ok) {
+          var reason = (response.headers.get("Content-Type") || "").startsWith("text/plain") ?
+            (await response.text()).trim().slice(0, 1000) : labels.http.replace("%d", String(response.status));
+          if (reason === labels.context || reason === labels.household) stale = true;
+          mappingError(card, reason || labels.response);
+          return;
+        }
+        var result = null;
+        if (target.pathname === "/imports/mapping") {
+          result = readOutcome(await response.text());
+          if (result.status !== "imported") throw new Error("Invalid mapping confirmation");
+        } else if (response.status !== 204) {
+          throw new Error("Invalid mapping cancellation");
+        }
+        entries.forEach(function (entry) {
+          if (entry.state !== "mapping" || entry.result.url !== pendingURL) return;
+          if (result) { entry.result = result; state(entry, "imported"); }
+          else state(entry, "error", labels.mappingClosed);
+        });
+        card.remove();
+      } catch {
+        mappingError(card, labels.network);
+      } finally {
+        card.removeAttribute("data-mapping-busy");
+        card.removeAttribute("aria-busy");
+        controls.forEach(function (input) { input.disabled = stale; });
+        try { await refreshHistory(); } catch { refreshError.hidden = false; }
+        await refreshStatus();
+      }
+    });
+
+    document.addEventListener("click", async function (event) {
+      var link = event.target.closest("a");
+      if (!link) return;
+      var refresh = link.hasAttribute("data-refresh-mapping");
+      if (!refresh && !link.hasAttribute("data-upload-link")) return;
+      var hash = new URL(link.href, location.origin).hash;
+      if (!refresh && !(link.hasAttribute("data-upload-link") && hash.startsWith("#import-mapping-"))) return;
+      event.preventDefault();
+      try {
+        if (refresh || !document.getElementById(hash.slice(1))) await refreshHistory();
+        var card = document.getElementById(hash.slice(1));
+        if (!card) { showMessage(labels.mappingClosed); return; }
+        card.scrollIntoView({ block: "nearest" });
+        card.focus({ preventScroll: true });
+      } catch {
+        refreshError.hidden = false;
+      }
+    });
     document.addEventListener("input", function (event) {
       var reviewForm = event.target.closest("#import-review .import-payment form");
       if (reviewForm) reviewForm.dataset.importDirty = "true";
@@ -361,11 +492,14 @@
     document.addEventListener("change", function (event) {
       var reviewForm = event.target.closest("#import-review .import-payment form");
       if (reviewForm) reviewForm.dataset.importDirty = "true";
+      var mapping = event.target.closest("[data-import-mapping]");
+      if (mapping) mapping.dataset.importDirty = "true";
     });
     window.addEventListener("focus", refreshStatus);
     window.addEventListener("pageshow", refreshStatus);
     window.addEventListener("beforeunload", function (event) {
-      if (running || entries.some(function (entry) { return entry.state === "queued" || entry.state === "paused"; })) {
+      if (running || document.querySelector("[data-mapping-busy], [data-import-mapping][data-import-dirty]") ||
+          entries.some(function (entry) { return entry.state === "queued" || entry.state === "paused"; })) {
         event.preventDefault();
         event.returnValue = "";
       }
