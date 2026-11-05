@@ -169,7 +169,8 @@ _Not captured yet._
 
 Settings group households, members and bank accounts into three compact desktop
 tiles, stacking them on smaller screens. **Configure the Azure connection**
-lists each of the four environment variables on its own row: green **Set** or
+always shows each of the four environment variables without an expandable
+menu, on its own row: green **Set** or
 red **Not set**. Only presence is displayed, never a variable's value; this is
 not a credential-validity check. The status reflects the configuration loaded
 at startup, so environment changes require a restart as before.

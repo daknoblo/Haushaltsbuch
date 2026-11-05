@@ -11,8 +11,8 @@ templ importAISettings(vm ImportAISettingsVM) {
 		<div class="card-head"><h2 class="text-base font-semibold">{ T(ctx, "settings.importAI") }</h2></div>
 		<div class="card-body grid gap-3 lg:grid-cols-2">
 			<p class="text-sm text-slate-500 dark:text-slate-400 lg:col-span-2">{ T(ctx, "settings.importAIHint") }</p>
-			<details class="min-w-0 text-sm">
-				<summary class="cursor-pointer">{ T(ctx, "settings.azureConnection") }</summary>
+			<section class="min-w-0 text-sm" aria-labelledby="azure-environment-title">
+				<h3 id="azure-environment-title" class="font-medium">{ T(ctx, "settings.azureConnection") }</h3>
 				<dl class="mt-2 grid max-w-lg gap-1">
 					for _, variable := range vm.Environment {
 						<div class="flex min-w-0 items-center justify-between gap-2 rounded-md border border-slate-200 px-2 py-1.5 dark:border-slate-800" data-env-variable={ variable.Name }>
@@ -27,7 +27,7 @@ templ importAISettings(vm ImportAISettingsVM) {
 						</div>
 					}
 				</dl>
-			</details>
+			</section>
 			<div class="min-w-0">
 				if !vm.Enabled {
 					<p class="alert-info">{ T(ctx, "import.disabled") }</p>

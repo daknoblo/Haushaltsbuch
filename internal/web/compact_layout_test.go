@@ -65,6 +65,28 @@ func TestImportEnvironmentStatusNeverDisclosesValues(t *testing.T) {
 	}
 }
 
+func TestImportEnvironmentStatusAlwaysVisible(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		vm := ImportAISettingsVM{
+			Enabled:     enabled,
+			Environment: (bankimport.Identity{ResourceID: "synthetic-resource"}).Environment(),
+		}
+		var rendered bytes.Buffer
+		if err := importAISettings(vm).Render(t.Context(), &rendered); err != nil {
+			t.Fatal(err)
+		}
+		body := rendered.String()
+		if strings.Contains(body, "<details") || strings.Contains(body, "<summary") {
+			t.Fatal("environment status must not require opening a disclosure")
+		}
+		if strings.Count(body, `data-env-variable=`) != 4 ||
+			!strings.Contains(body, `aria-labelledby="azure-environment-title"`) ||
+			!strings.Contains(body, `<h3 id="azure-environment-title"`) {
+			t.Fatal("always-visible environment status section is incomplete")
+		}
+	}
+}
+
 // compactUIFixture is deliberately synthetic and runs only against t.TempDir.
 func compactUIFixture(t *testing.T) (*Server, http.Handler, store.Household) {
 	t.Helper()
