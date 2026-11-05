@@ -218,7 +218,7 @@ func TestImportUsesDefaultAccountsAndSettingsLinks(t *testing.T) {
 			!strings.Contains(selectHTML, members[0].Name) ||
 			!strings.Contains(selectHTML, i18n.T(lang, "settings.defaultAccount")) ||
 			!strings.Contains(selectHTML, `value="`+strconv.FormatInt(ledger.Accounts[0].ID, 10)+`"`) ||
-			!strings.Contains(body, `href="/settings#bank-accounts"`) {
+			strings.Contains(body, `href="/settings#bank-accounts"`) {
 			t.Fatalf("default account is not selectable for %s", lang)
 		}
 	}

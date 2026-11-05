@@ -49,6 +49,14 @@ func syntheticXLSX(t *testing.T) []byte {
 
 func uploadStatement(t *testing.T, h http.Handler, household, account int64, filename string, data []byte, options url.Values) *httptest.ResponseRecorder {
 	t.Helper()
+	request := statementRequest(t, household, account, filename, data, options)
+	response := httptest.NewRecorder()
+	h.ServeHTTP(response, request)
+	return response
+}
+
+func statementRequest(t *testing.T, household, account int64, filename string, data []byte, options url.Values) *http.Request {
+	t.Helper()
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 	fields := url.Values{"household": {strconv.FormatInt(household, 10)}, "account": {strconv.FormatInt(account, 10)}}
@@ -75,9 +83,7 @@ func uploadStatement(t *testing.T, h http.Handler, household, account int64, fil
 	request := httptest.NewRequest(http.MethodPost, "/imports/upload", &body)
 	request.Header.Set("Content-Type", writer.FormDataContentType())
 	request.Header.Set("Sec-Fetch-Site", "same-origin")
-	response := httptest.NewRecorder()
-	h.ServeHTTP(response, request)
-	return response
+	return request
 }
 
 func TestStructuredStatementUploadsDoNotNeedOrCallAI(t *testing.T) {

@@ -64,6 +64,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /settings/bank-accounts/{id}/default", s.handleBankAccountDefault)
 	mux.HandleFunc("POST /settings/bank-accounts/{id}/delete", s.handleBankAccountDelete)
 	mux.HandleFunc("GET /imports", s.handleImports)
+	mux.HandleFunc("GET /imports/status", s.handleImportStatus)
 	mux.HandleFunc("POST /imports/accounts", s.handleBankAccount)
 	mux.HandleFunc("POST /imports/accounts/{id}/delete", s.handleBankAccountDelete)
 	mux.HandleFunc("POST /imports/batches/{id}/delete", s.handleBankImportDiscard)

@@ -140,7 +140,9 @@ _Not captured yet._
    IDs or statement history.
 3. In **Import & reconciliation**, select the **bank account shown on the
    statement** (labelled with its member), upload a PDF, CSV or XLSX file and
-   start reading it. Only PDF analysis sends extracted text to Azure, without an
+   start reading it. Multiple files can be dropped onto the upload area or
+   selected by clicking it; they are collected first and processed sequentially
+   only after **Read files** is clicked. Only PDF analysis sends extracted text to Azure, without an
    additional confirmation checkbox. CSV/XLSX are parsed locally. Original files
    are not retained, and document text and model responses are not logged. PDFs
    use the saved model, never a model supplied by the upload form. Missing AI
@@ -149,6 +151,7 @@ _Not captured yet._
    The bank account and PDF controls sit side by side on wider screens.
    When a CSV/XLSX file contains multiple own accounts, an explicit mapping
    step replaces the single destination selection before anything is persisted.
+   The queue links to that mapping without interrupting the remaining uploads.
 4. Compare the suggestions with the original statement. Correct dates, positive
    EUR amounts, income/expense direction, categories and allocations. A unique
    name match suggests a plan and highlights amount deviations, but never edits
@@ -178,6 +181,24 @@ transfer indicators remain visible even when collapsed. The generic AI warning
 banner has been removed; manual review and month-completeness confirmation are
 unchanged. The planned booking list also shows category names under booking
 names, retaining its filters, allocation badges and monthly totals.
+
+The upload queue shows each filename, actual transfer progress, server
+processing, success, required account mapping or an explicit error. The bank
+account and CSV/Excel options are fixed for the files in a started run. Files
+added during a run wait for the next manual start. Failed files can be requeued;
+there are no automatic retries that could repeat a paid PDF analysis.
+Rate limits and network failures pause the queue. An interrupted connection is
+reported as an uncertain result: check saved history before retrying.
+
+**Uploaded files** is visible directly below the upload area and survives page
+reloads. It groups a file's imports across mapped accounts, shows remaining
+review counts and provides links to transactions and per-account import
+management. The five newest files are shown directly; older files remain
+available in an expandable list. Original file contents are still not retained.
+Open or edited review forms are not replaced by background status refreshes.
+Unstarted selections are browser-memory only; navigating away can discard them.
+Without JavaScript, single-file uploads still work, while requests containing
+multiple files are explicitly rejected rather than silently importing only one.
 
 The overview shows plan and actual side by side. Overview, dashboard, charts,
 matrix, member shares, settlement and their PDFs support three bases:

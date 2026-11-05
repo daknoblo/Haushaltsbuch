@@ -33,13 +33,15 @@ func (s *Server) SetBankImporter(importer BankImporter) { s.bankAI = importer }
 
 // ImportVM combines persisted review state with global AI readiness.
 type ImportVM struct {
-	Ledger          store.BankLedger
-	Data            calc.Data
-	Rows            []ImportRow
-	AIEnabled       bool
-	AIConfigured    bool
-	Closed          bool
-	PendingMappings []ImportMappingLink
+	Ledger           store.BankLedger
+	Data             calc.Data
+	Rows             []ImportRow
+	AIEnabled        bool
+	AIConfigured     bool
+	Closed           bool
+	PendingMappings  []ImportMappingLink
+	Uploads          []UploadedFile
+	UploadGeneration uint64
 }
 
 // ImportRow adds non-binding duplicate, transfer and plan hints to a payment.
@@ -84,29 +86,36 @@ func (s *Server) handleImports(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	vm := ImportVM{AIEnabled: s.bankAI != nil}
-	deployment, err := s.store.AIDeployment(r.Context())
+	vm, err := s.buildImportVM(r.Context(), nav.ActiveHousehold.ID, nav.Month)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
 	}
-	vm.AIConfigured = deployment != ""
-	if nav.ActiveHousehold.ID != 0 {
-		vm.Ledger, err = s.store.BankLedger(r.Context(), nav.ActiveHousehold.ID)
-		if err != nil {
-			s.serverError(w, r, err)
-			return
-		}
-		vm.Data, err = s.loadHouseholdData(r.Context(), nav.ActiveHousehold.ID)
-		if err != nil {
-			s.serverError(w, r, err)
-			return
-		}
-		vm.Closed = slices.Contains(vm.Ledger.ClosedMonths, nav.Month)
-		vm.Rows = importRows(r.Context(), vm.Ledger, vm.Data, nav.Month)
-		vm.PendingMappings = s.importPreviews.list(nav.ActiveHousehold.ID)
-	}
 	s.render(w, r, ImportsPage(nav, vm))
+}
+
+func (s *Server) buildImportVM(ctx context.Context, household int64, month string) (ImportVM, error) {
+	vm := ImportVM{AIEnabled: s.bankAI != nil, UploadGeneration: s.importPreviews.epoch()}
+	deployment, err := s.store.AIDeployment(ctx)
+	if err != nil {
+		return vm, err
+	}
+	vm.AIConfigured = deployment != ""
+	if household != 0 {
+		vm.Ledger, err = s.store.BankLedger(ctx, household)
+		if err != nil {
+			return vm, err
+		}
+		vm.Data, err = s.loadHouseholdData(ctx, household)
+		if err != nil {
+			return vm, err
+		}
+		vm.Closed = slices.Contains(vm.Ledger.ClosedMonths, month)
+		vm.Rows = importRows(ctx, vm.Ledger, vm.Data, month)
+		vm.PendingMappings = s.importPreviews.list(household)
+		vm.Uploads = uploadedFiles(ctx, vm.Ledger, vm.Data.Members)
+	}
+	return vm, nil
 }
 
 func importRows(ctx context.Context, l store.BankLedger, data calc.Data, month string) []ImportRow {
@@ -242,9 +251,20 @@ func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer func() { _ = r.MultipartForm.RemoveAll() }()
+	if len(r.MultipartForm.File["statement"]) != 1 || len(r.MultipartForm.File) != 1 {
+		s.clientError(w, r, http.StatusBadRequest, "import.singleRequestFile")
+		return
+	}
 	hh, ok := s.importHousehold(w, r)
 	if !ok {
 		return
+	}
+	if raw := r.FormValue("upload_generation"); raw != "" {
+		expected, err := strconv.ParseUint(raw, 10, 64)
+		if err != nil || expected != generation {
+			s.bankError(w, r, errUploadContext)
+			return
+		}
 	}
 	accountID := parseID(r.FormValue("account"))
 	ledger, err := s.store.BankLedger(ctx, hh)
@@ -313,10 +333,17 @@ func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
 	if len(sources) > 1 {
 		token, err := s.importPreviews.put(generation, pendingImport{household: hh, digest: digest, filename: filename, sources: sources})
 		if err != nil {
+			if errors.Is(err, errImportPreview) {
+				err = errUploadContext
+			}
 			s.bankError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, importMappingURL(token), http.StatusSeeOther)
+		count := 0
+		for _, source := range sources {
+			count += len(source.Payments)
+		}
+		s.uploadResult(w, r, uploadOutcome{Status: "mapping", URL: importMappingURL(token), Digest: digest, Transactions: count, Accounts: len(sources)})
 		return
 	}
 	payments := sources[0].Payments
@@ -326,10 +353,13 @@ func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
 		}, payments)
 	})
 	if err != nil {
+		if errors.Is(err, errImportPreview) {
+			err = errUploadContext
+		}
 		s.bankError(w, r, err)
 		return
 	}
-	redirectImportMonth(w, r, payments[0].BookedOn[:7])
+	s.uploadResult(w, r, uploadOutcome{Status: "imported", URL: importMonthURL(payments[0].BookedOn[:7]), Digest: digest, Transactions: len(payments), Accounts: 1})
 }
 
 func suggestPlan(p *store.BankTransaction, data calc.Data) {
@@ -461,8 +491,10 @@ func (s *Server) handleBankMonth(w http.ResponseWriter, r *http.Request) {
 }
 
 func redirectImportMonth(w http.ResponseWriter, r *http.Request, month string) {
-	http.Redirect(w, r, "/imports?m="+url.QueryEscape(month), http.StatusSeeOther)
+	http.Redirect(w, r, importMonthURL(month), http.StatusSeeOther) // #nosec G710 -- fixed /imports path; importMonthURL query-escapes the month.
 }
+
+func importMonthURL(month string) string { return "/imports?m=" + url.QueryEscape(month) }
 
 func (s *Server) handleBankPlan(w http.ResponseWriter, r *http.Request) {
 	if !s.parseForm(w, r) {
@@ -524,6 +556,8 @@ func (s *Server) bankError(w http.ResponseWriter, r *http.Request, err error) {
 		status, key = http.StatusTooManyRequests, "import.previewFull"
 	case errors.Is(err, errImportMapping), errors.Is(err, bankimport.ErrAccountMapping):
 		key = "import.mappingTargets"
+	case errors.Is(err, errUploadContext):
+		status, key = http.StatusConflict, "import.uploadContextChanged"
 	case errors.Is(err, bankimport.ErrNoText):
 		key = "import.noText"
 	case errors.Is(err, bankimport.ErrResult):

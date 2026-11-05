@@ -1,0 +1,175 @@
+package web
+
+import "strconv"
+
+templ ImportUploader(nav Nav, vm ImportVM) {
+	<section class="card-tight">
+		<div class="card-body">
+			<h2 class="mb-3 font-semibold">{ T(ctx, "import.upload") }</h2>
+			if !vm.AIEnabled || !vm.AIConfigured {
+				<p class="alert-info mb-3">{ T(ctx, "import.localFormats") } <a class="underline" href="/settings#import-ai">{ T(ctx, "import.openAISettings") }</a></p>
+			}
+			<form
+				method="post"
+				action="/imports/upload"
+				enctype="multipart/form-data"
+				class="grid gap-3"
+				data-bank-upload
+				data-max-bytes={ strconv.Itoa(UploadByteLimit()) }
+				data-history-url={ "/imports/status?part=history&m=" + nav.Month + "&household=" + strconv.FormatInt(nav.ActiveHousehold.ID, 10) }
+				data-review-url={ "/imports/status?part=review&m=" + nav.Month + "&household=" + strconv.FormatInt(nav.ActiveHousehold.ID, 10) }
+			>
+				@importHouseholdField(nav)
+				<input type="hidden" name="upload_generation" value={ strconv.FormatUint(vm.UploadGeneration, 10) }/>
+				<div class="grid min-w-0 items-start gap-3 md:grid-cols-2" data-import-upload-fields>
+					<label class="min-w-0">
+						{ T(ctx, "import.account") }
+						<select class="input mt-1 w-full" name="account" aria-label={ T(ctx, "import.account") } aria-describedby="upload-account-hint" required disabled?={ len(vm.Ledger.Accounts) == 0 }>
+							if len(vm.Ledger.Accounts)==0 {
+								<option value="" selected>{ T(ctx, "import.noAccounts") }</option>
+							} else {
+								for _, a := range vm.Ledger.Accounts {
+									<option value={ strconv.FormatInt(a.ID, 10) }>{ BankAccountLabel(ctx,a,vm.Data.Members) }</option>
+								}
+							}
+						</select>
+						<span id="upload-account-hint" class="mt-2 block text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "import.multiAccountHint") }</span>
+					</label>
+					<label class="upload-dropzone" for="statement-files" tabindex="0" role="button" data-upload-dropzone aria-label={ T(ctx, "import.dropFiles") }>
+						<span class="font-semibold">{ T(ctx, "import.dropFiles") }</span>
+						<span class="text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "import.file") }</span>
+					</label>
+					<input id="statement-files" class="sr-only" tabindex="-1" aria-hidden="true" type="file" name="statement" accept=".pdf,.csv,.xlsx,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-label={ T(ctx, "import.file") } multiple required/>
+				</div>
+				if len(vm.Ledger.Accounts)==0 {
+					<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "import.accountSetup") } <a class="underline" href="/settings#people">{ T(ctx, "import.openPeopleSettings") }</a></p>
+				}
+				@statementTableOptionsForm()
+				<noscript><p class="alert-info">{ T(ctx, "import.uploadNoJS") }</p></noscript>
+				<div data-upload-queue-area hidden>
+					<h3 class="mb-2 text-sm font-semibold">{ T(ctx, "import.uploadQueue") }</h3>
+					<ul class="grid gap-2" data-upload-queue aria-label={ T(ctx, "import.uploadQueue") }></ul>
+				</div>
+				<p class="alert-error" role="alert" data-upload-message hidden></p>
+				<div class="flex flex-wrap items-center gap-3">
+					<button class="btn-primary" type="submit" disabled?={ len(vm.Ledger.Accounts)==0 }>{ T(ctx, "import.analyze") }</button>
+					<span class="text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "import.uploadManual") }</span>
+				</div>
+				<p class="alert-info" data-bank-progress role="status" hidden>{ T(ctx, "import.uploadRunning") }</p>
+				<p class="alert-error" data-upload-refresh-error role="alert" hidden>{ T(ctx, "import.uploadRefreshError") }</p>
+				<p class="alert-info" data-upload-review-deferred hidden>
+					{ T(ctx, "import.uploadReviewDeferred") }
+					<a class="underline" href={ templ.SafeURL(importMonthURL(nav.Month)) }>{ T(ctx, "import.uploadReloadReview") }</a>
+				</p>
+				<div
+					hidden
+					data-upload-labels
+					data-queued={ T(ctx, "import.uploadQueued") }
+					data-uploading={ T(ctx, "import.uploadSending") }
+					data-processing={ T(ctx, "import.uploadProcessing") }
+					data-imported={ T(ctx, "import.uploadImported") }
+					data-imported-one={ T(ctx, "import.uploadImportedOne") }
+					data-mapping={ T(ctx, "import.uploadMapping") }
+					data-error={ T(ctx, "import.uploadFailed") }
+					data-network={ T(ctx, "import.uploadNetwork") }
+					data-http={ T(ctx, "import.uploadHTTPError") }
+					data-context={ T(ctx, "import.uploadContextChanged") }
+					data-household={ T(ctx, "import.householdChanged") }
+					data-response={ T(ctx, "import.uploadResponse") }
+					data-invalid={ T(ctx, "import.fileError") }
+					data-empty={ T(ctx, "import.uploadChooseFiles") }
+					data-duplicate={ T(ctx, "import.uploadQueuedDuplicate") }
+					data-outside={ T(ctx, "import.uploadDropInside") }
+					data-mapping-closed={ T(ctx, "import.uploadMappingClosed") }
+					data-review={ T(ctx, "import.uploadReviewLink") }
+					data-map-link={ T(ctx, "import.mappingTitle") }
+				></div>
+				<template data-upload-item>
+					<li class="upload-queue-row" data-upload-state="queued">
+						<div class="flex min-w-0 flex-wrap items-start gap-2">
+							<strong class="min-w-0 flex-1 break-all text-sm" data-upload-name></strong>
+							<span class="upload-state-label text-xs font-medium" data-upload-state-label role="status" aria-live="polite"></span>
+							<button class="btn-icon btn-icon-danger" type="button" data-upload-remove aria-label={ T(ctx, "import.uploadRemove") }>✕</button>
+						</div>
+						<progress class="mt-2 h-2 w-full accent-indigo-500" max="100" value="0" data-upload-progress hidden></progress>
+						<p class="mt-1 break-words text-sm text-rose-700 dark:text-rose-300" data-upload-error role="alert" hidden></p>
+						<div class="mt-2 flex flex-wrap gap-2" data-upload-actions hidden>
+							<a class="btn-ghost" data-upload-link target="_blank" rel="noopener" hidden></a>
+							<button class="btn-ghost" type="button" data-upload-retry hidden>{ T(ctx, "import.uploadRetry") }</button>
+						</div>
+					</li>
+				</template>
+			</form>
+		</div>
+	</section>
+}
+
+templ ImportUploadHistory(nav Nav, vm ImportVM) {
+	<section class="card mt-3" id="import-upload-history" data-upload-generation={ strconv.FormatUint(vm.UploadGeneration, 10) }>
+		<h2 class="mb-3 font-semibold">{ T(ctx, "import.uploadHistory") }</h2>
+		if len(vm.PendingMappings)==0 && len(vm.Uploads)==0 {
+			<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "import.uploadHistoryEmpty") }</p>
+		}
+		<div class="grid gap-2">
+			for _, mapping := range vm.PendingMappings {
+				<div class="upload-history-row" data-pending-upload-url={ mapping.URL }>
+					<div class="flex flex-wrap items-center gap-2">
+						<strong class="min-w-0 flex-1 break-all text-sm">{ mapping.Filename }</strong>
+						<span class="badge badge-warn whitespace-nowrap">{ T(ctx, "import.uploadMapping") }</span>
+						<a class="btn-ghost" href={ templ.SafeURL(mapping.URL) } target="_blank" rel="noopener">{ T(ctx, "import.mappingTitle") }</a>
+					</div>
+				</div>
+			}
+			for _, file := range vm.Uploads[:min(5,len(vm.Uploads))] {
+				@uploadedFileRow(nav, file)
+			}
+		</div>
+		if len(vm.Uploads)>5 {
+			<details class="mt-3">
+				<summary class="cursor-pointer text-sm">{ Tf(ctx,"import.uploadHistoryOlder",len(vm.Uploads)-5) }</summary>
+				<div class="mt-2 grid gap-2">
+					for _, file := range vm.Uploads[5:] {
+						@uploadedFileRow(nav, file)
+					}
+				</div>
+			</details>
+		}
+	</section>
+}
+
+templ uploadedFileRow(nav Nav, file UploadedFile) {
+	<article
+		class="upload-history-row"
+		data-uploaded-digest={ file.Digest }
+		data-uploaded-transactions={ strconv.Itoa(file.Transactions) }
+		data-uploaded-accounts={ strconv.Itoa(len(file.Batches)) }
+		data-uploaded-url={ file.ReviewURL }
+	>
+		<div class="flex flex-wrap items-center gap-2">
+			<strong class="min-w-0 flex-1 break-all text-sm">{ file.Filename }</strong>
+			if file.Pending>0 {
+				<span class="badge badge-warn whitespace-nowrap">{ Tf(ctx,"import.uploadPending",file.Pending) }</span>
+			} else {
+				<span class="badge badge-ok whitespace-nowrap">{ T(ctx,"import.uploadReviewed") }</span>
+			}
+			if file.ReviewURL!="" {
+				<a class="btn-ghost" href={ templ.SafeURL(file.ReviewURL) } target="_blank" rel="noopener">{ T(ctx,"import.uploadReviewLink") }</a>
+			}
+		</div>
+		<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{ FormatStamp(file.CreatedAt) } · { UsageLabel(ctx,file.Transactions) }</p>
+		<details class="mt-2 text-xs">
+			<summary class="cursor-pointer">{ T(ctx,"import.uploadFileDetails") }</summary>
+			<div class="mt-2 grid gap-2">
+				for _, batch := range file.Batches {
+					<div class="flex flex-wrap items-center gap-2">
+						<span class="min-w-0 flex-1 break-words">{ batch.Account } · { batch.Import.Filename }</span>
+						<form method="post" action={ "/imports/batches/" + strconv.FormatInt(batch.Import.ID, 10) + "/delete" }>
+							@importHouseholdField(nav)
+							<button type="submit" class="btn-ghost">{ T(ctx,"import.discardBatch") }</button>
+						</form>
+					</div>
+				}
+			</div>
+		</details>
+	</article>
+}
