@@ -661,7 +661,8 @@
         option.disabled = !!option.value && selected.some(function (row) { return row.dataset.reviewDirection !== option.dataset.direction; });
       });
       var category = bulk.elements.category.selectedOptions[0];
-      bulk.querySelector("[data-bulk-category]").disabled = stale || reviewBusy || !selected.length || !category || !category.value || category.disabled;
+      bulk.querySelector("[data-bulk-category]").disabled = stale || reviewBusy || !selected.length || !category || !category.value || category.disabled ||
+        selected.some(function (row) { return row.dataset.reviewCategoryReady !== "true"; });
       document.querySelector("[data-select-ready]").disabled = stale || reviewBusy ||
         !rows.some(function (row) { return !row.hidden && row.dataset.reviewStage === "ready" && !row.querySelector("[data-review-select]").disabled; });
       document.querySelector("[data-select-visible]").disabled = stale || reviewBusy ||

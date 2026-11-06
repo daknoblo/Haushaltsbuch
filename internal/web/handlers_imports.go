@@ -656,6 +656,8 @@ func bankErrorStatus(err error) (int, i18n.Key) {
 		status, key = http.StatusConflict, "import.uploadContextChanged"
 	case errors.Is(err, errReviewChanged):
 		status, key = http.StatusConflict, "import.reviewChanged"
+	case errors.Is(err, errBatchAllocation):
+		key = "import.allocationMissing"
 	case errors.Is(err, errFilesNotStored):
 		status, key = http.StatusGone, "import.filesNotStored"
 	case errors.Is(err, bankimport.ErrNoText):

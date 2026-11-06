@@ -160,7 +160,7 @@ templ importHouseholdField(nav Nav) {
 }
 
 templ importPayment(nav Nav, vm ImportVM, row ImportRow) {
-	<article id={ row.ID() } data-bank-row={ strconv.FormatInt(row.Payment.ID, 10) } data-review-stage={ row.Stage } data-review-token={ row.ReviewToken() } data-review-match={ row.MatchKey() } data-review-quick={ strconv.FormatBool(row.CanQuick) } data-review-direction={ string(row.Payment.Direction) }>
+	<article id={ row.ID() } data-bank-row={ strconv.FormatInt(row.Payment.ID, 10) } data-review-stage={ row.Stage } data-review-token={ row.ReviewToken() } data-review-match={ row.MatchKey() } data-review-quick={ strconv.FormatBool(row.CanQuick) } data-review-direction={ string(row.Payment.Direction) } data-review-category-ready={ strconv.FormatBool(row.Payment.PlanID != 0 || len(row.Payment.Splits) > 0) }>
 		<p class="alert-error mb-2" data-payment-error role="alert" hidden></p>
 		<details class="import-payment" data-bank-payment={ strconv.FormatInt(row.Payment.ID, 10) }>
 			<summary class="import-payment-summary">

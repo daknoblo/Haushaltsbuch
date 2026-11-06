@@ -455,6 +455,51 @@ func TestCategoryNameMatchDoesNotClaimDefaultFieldsWereDetected(t *testing.T) {
 	}
 }
 
+func TestBulkCategoryDoesNotInventSharesFromZeroHistory(t *testing.T) {
+	srv, handler, household, vm := quickReviewFixture(t)
+	var source, target ImportRow
+	for _, row := range vm.Rows {
+		if row.Payment.Name == "REWE Example" {
+			if source.Payment.ID == 0 {
+				source = row
+			} else {
+				target = row
+			}
+		}
+	}
+	p := source.Payment
+	p.Decision, p.AmountCents = "accepted", 0
+	p.Splits = []store.BankSplit{{MemberID: vm.Data.Members[0].ID}, {MemberID: vm.Data.Members[1].ID}}
+	if err := srv.store.ReviewBankTransaction(t.Context(), household.ID, p, false); err != nil {
+		t.Fatal(err)
+	}
+	vm = workflowVM(t, srv, household.ID)
+	for _, row := range vm.Rows {
+		if row.Payment.ID == target.Payment.ID {
+			target = row
+		}
+	}
+	if target.Allocation != "history" || len(target.Payment.Splits) != 0 {
+		t.Fatal("expected indeterminate shared allocation from a zero payment")
+	}
+	_, markup, found := strings.Cut(get(t, handler, "/imports?m=2020-01").Body.String(), `id="`+target.ID()+`"`)
+	attributes, _, _ := strings.Cut(markup, ">")
+	if !found || !strings.Contains(attributes, `data-review-category-ready="false"`) {
+		t.Fatal("unsafe category action was not marked unavailable in the UI")
+	}
+	form := batchForm(t, srv, household.ID, "category", target)
+	form.Set("category", strconv.FormatInt(target.Payment.CategoryID, 10))
+	w := postMappingJSON(t, handler, "/imports/review-batch", form)
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), T(t.Context(), "import.allocationMissing")) {
+		t.Fatalf("indeterminate shares silently replaced: %d %s", w.Code, w.Body)
+	}
+	for _, row := range workflowVM(t, srv, household.ID).Rows {
+		if row.Payment.ID == target.Payment.ID && (row.Allocation != "history" || len(row.Payment.Splits) != 0 || row.CanQuick) {
+			t.Fatal("category action invented account-owner shares")
+		}
+	}
+}
+
 func TestMarketplaceHistoryRequiresMeaningfulReferences(t *testing.T) {
 	a := store.BankTransaction{ID: 1, Name: "Amazon"}
 	b := store.BankTransaction{ID: 2, Name: "Amazon"}

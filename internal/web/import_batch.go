@@ -16,6 +16,8 @@ import (
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
 
+var errBatchAllocation = errors.New("batch classification requires an allocation")
+
 func selectedImportRows(ctx context.Context, snapshot store.HouseholdSnapshot, ids []int64) []ImportRow {
 	wanted := map[int64]bool{}
 	for _, id := range ids {
@@ -231,6 +233,9 @@ func (s *Server) handleBankBatch(w http.ResponseWriter, r *http.Request) {
 					p.Decision = "accepted"
 					payments = append(payments, p)
 				case "category":
+					if row.Payment.PlanID == 0 && len(row.Payment.Splits) == 0 {
+						return nil, errBatchAllocation
+					}
 					p := row.Payment
 					category := parseID(r.FormValue("category"))
 					if !slices.ContainsFunc(snapshot.Categories, func(c store.Category) bool { return c.ID == category && c.Classification == p.Direction }) {
