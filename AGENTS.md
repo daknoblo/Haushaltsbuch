@@ -23,8 +23,10 @@ Visual disabling never replaces server-side validation.
 
 Comparable settings tiles share the same text-field and reserved action-column
 widths, including their add rows. Start each row with the text field, followed
-by options such as the member color picker. Add buttons fill the action column
-and center their label; fewer options must not make the text field wider.
+by options such as the member color picker. Use compact outlined checkmark
+buttons for add rows, aligned in the same column as the delete icons above.
+Keep the text-to-action gap compact and size the shared action column to the
+widest visible control group; fewer options must not make a text field wider.
 
 ## Domain model
 

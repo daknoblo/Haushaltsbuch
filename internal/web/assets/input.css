@@ -53,17 +53,17 @@
     @apply sm:h-8 sm:w-8;
   }
   .settings-row {
-    @apply grid min-w-0 items-center gap-2;
-    grid-template-columns: minmax(0, 1fr) 12rem;
+    @apply grid min-w-0 items-center gap-x-0.5 gap-y-2;
+    grid-template-columns: minmax(0, 1fr) var(--settings-action-width, 12rem);
   }
   .settings-row-actions {
-    @apply flex min-w-0 flex-wrap items-center justify-end gap-1;
+    @apply flex min-w-0 items-center justify-end gap-1;
+  }
+  .settings-row-actions > * {
+    @apply shrink-0;
   }
   .settings-row-actions .btn-ghost {
     @apply px-2 text-xs;
-  }
-  .settings-row-actions > .btn-primary {
-    @apply w-full;
   }
   .import-payment {
     @apply min-w-0 rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/50;

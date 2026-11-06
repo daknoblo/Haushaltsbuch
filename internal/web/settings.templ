@@ -32,7 +32,7 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 						>
 							<input class="input min-w-0" type="text" name="name" placeholder={ T(ctx, "settings.newHousehold") } required/>
 							<div class="settings-row-actions">
-								<button class="btn-primary" type="submit">{ T(ctx, "action.add") }</button>
+								<button class="btn-icon" type="submit" aria-label={ T(ctx, "settings.addHousehold") } title={ T(ctx, "settings.addHousehold") }><span aria-hidden="true">✓</span></button>
 							</div>
 						</form>
 					</div>
@@ -54,7 +54,7 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 						>
 							<input class="input min-w-0" type="text" name="name" placeholder={ T(ctx, "settings.name") } required/>
 							<div class="settings-row-actions">
-								<button class="btn-primary" type="submit">{ T(ctx, "action.add") }</button>
+								<button class="btn-icon" type="submit" aria-label={ T(ctx, "settings.addMember") } title={ T(ctx, "settings.addMember") }><span aria-hidden="true">✓</span></button>
 							</div>
 						</form>
 					</div>

@@ -244,6 +244,8 @@ var english = Catalog{
 	"settings.accountFor":              "Bank account of %s",
 	"settings.newAccountFor":           "Additional bank account of %s",
 	"settings.addBankAccount":          "Add another bank account",
+	"settings.addHousehold":            "Add household",
+	"settings.addMember":               "Add person",
 	"import.configureModel":            "Set up the AI connection and preferred model once in Settings.",
 	"import.openAISettings":            "Open AI settings",
 	"import.openPeopleSettings":        "Manage members",

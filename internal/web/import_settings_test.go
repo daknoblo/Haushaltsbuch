@@ -218,7 +218,7 @@ func TestSettingsTilesShareTextAndActionColumns(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			rows, memberForms := 0, 0
+			rows, memberForms, addButtons := 0, 0, 0
 			var visit func(*html.Node)
 			visit = func(node *html.Node) {
 				if strings.Contains(" "+attribute(node, "class")+" ", " settings-row ") {
@@ -242,6 +242,29 @@ func TestSettingsTilesShareTextAndActionColumns(t *testing.T) {
 					if name == nil || name.Data != "input" || attribute(name, "name") != "name" {
 						t.Fatal("text field must be the first visible control")
 					}
+					label := ""
+					switch {
+					case attribute(node, "hx-post") == "/households":
+						label = i18n.T(lang, "settings.addHousehold")
+					case attribute(node, "hx-post") == "/members":
+						label = i18n.T(lang, "settings.addMember")
+					case attribute(node, "action") == "/settings/bank-accounts":
+						label = i18n.T(lang, "settings.addBankAccount")
+					}
+					if label != "" {
+						addButtons++
+						button := columns[1].FirstChild
+						if button == nil || button.Data != "button" || button.NextSibling != nil ||
+							attribute(button, "class") != "btn-icon" || attribute(button, "type") != "submit" ||
+							attribute(button, "aria-label") != label || attribute(button, "title") != label {
+							t.Fatal("add action must be a labeled submit icon in the shared action column")
+						}
+						icon := button.FirstChild
+						if icon == nil || icon.Data != "span" || attribute(icon, "aria-hidden") != "true" ||
+							icon.FirstChild == nil || icon.FirstChild.Data != "✓" {
+							t.Fatal("add icon must show a decorative checkmark")
+						}
+					}
 					if node.Data == "form" && strings.HasPrefix(attribute(node, "hx-post"), "/members/") {
 						memberForms++
 						color := columns[1].FirstChild
@@ -262,6 +285,9 @@ func TestSettingsTilesShareTextAndActionColumns(t *testing.T) {
 			visit(document)
 			if want := len(households) + 2*len(members) + len(accounts) + 2; rows != want || memberForms != len(members) {
 				t.Fatalf("rows = %d (want %d), member forms = %d (want %d)", rows, want, memberForms, len(members))
+			}
+			if addButtons != len(members)+2 {
+				t.Fatalf("add icons = %d, want %d", addButtons, len(members)+2)
 			}
 		})
 	}

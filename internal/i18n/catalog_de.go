@@ -244,6 +244,8 @@ var german = Catalog{ // #nosec G101 -- translated UI text and environment-varia
 	"settings.accountFor":              "Bankkonto von %s",
 	"settings.newAccountFor":           "Weiteres Bankkonto von %s",
 	"settings.addBankAccount":          "Weiteres Bankkonto hinzufügen",
+	"settings.addHousehold":            "Haushalt hinzufügen",
+	"settings.addMember":               "Person hinzufügen",
 	"import.configureModel":            "Richte die KI-Verbindung und das gewünschte Modell einmalig in den Einstellungen ein.",
 	"import.openAISettings":            "KI-Einstellungen öffnen",
 	"import.openPeopleSettings":        "Personen verwalten",

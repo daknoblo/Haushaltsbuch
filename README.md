@@ -176,8 +176,11 @@ Settings group households, members and bank accounts into three equally sized
 desktop tiles, leaving empty space below shorter content. They stack naturally
 on smaller screens. Household, member and bank-account name fields share the
 same width, including new-entry rows, with a reserved column for their actions.
-The member color picker follows the name field. Add buttons fill the action
-column with a centered label.
+The member color picker follows the name field. Compact outlined checkmark
+buttons add entries and align with the delete icons above, with tooltips and
+accessible names. The text-to-action gap is 2px instead of 8px; the shared action
+column fits the widest current control group without widening individual name
+fields when their rows have fewer options.
 The delete icon on a default account stays visible but is gray and disabled;
 another account must become the default before it can be deleted.
 **Configure the Azure connection**

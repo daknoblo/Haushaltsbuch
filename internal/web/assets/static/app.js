@@ -19,7 +19,28 @@
     indicator = document.getElementById("save-indicator");
     filterBookings();
     filterCosts();
+    fitSettingsActions();
   });
+
+  // Share the widest actual control group, not a permanently oversized column.
+  function fitSettingsActions() {
+    var root = document.querySelector(".settings-overview");
+    if (!root) return;
+    var width = 0;
+    root.querySelectorAll(".settings-row-actions").forEach(function (actions) {
+      var children = Array.from(actions.children);
+      var gap = parseFloat(getComputedStyle(actions).columnGap);
+      var contentWidth = children.reduce(function (total, child) {
+        return total + child.getBoundingClientRect().width;
+      }, 0) + Math.max(0, children.length - 1) * gap;
+      width = Math.max(width, contentWidth);
+    });
+    root.style.setProperty("--settings-action-width", Math.ceil(width) + "px");
+  }
+
+  window.addEventListener("resize", fitSettingsActions);
+  window.addEventListener("pageshow", fitSettingsActions);
+  document.addEventListener("htmx:afterSettle", fitSettingsActions);
 
   function filterCosts() {
     var root = document.querySelector("[data-cost-overview]");

@@ -106,7 +106,7 @@ templ bankAccountSettings(householdID int64, members []store.Member, accounts []
 						<input type="hidden" name="member" value={ strconv.FormatInt(m.ID, 10) }/>
 						<input class="input min-w-0" name="name" maxlength="120" aria-label={ Tf(ctx, "settings.newAccountFor", m.Name) } placeholder={ T(ctx, "import.accountExample") } required/>
 						<div class="settings-row-actions">
-							<button class="btn-primary" type="submit" aria-label={ T(ctx, "settings.addBankAccount") }>{ T(ctx, "action.add") }</button>
+							<button class="btn-icon" type="submit" aria-label={ T(ctx, "settings.addBankAccount") } title={ T(ctx, "settings.addBankAccount") }><span aria-hidden="true">✓</span></button>
 						</div>
 					</form>
 				</fieldset>
