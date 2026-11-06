@@ -538,19 +538,18 @@
     document.addEventListener("click", async function (event) {
       var link = event.target.closest("a");
       if (!link) return;
-      var refresh = link.hasAttribute("data-refresh-mapping");
       if (link.hasAttribute("data-review-month-link") || link.closest("[data-upload-review-deferred]") ||
           (link.hasAttribute("data-upload-link") && !new URL(link.href, location.origin).hash)) {
         event.preventDefault();
         try { await showImported(link.href, true); } catch { refreshError.hidden = false; }
         return;
       }
-      if (!refresh && !link.hasAttribute("data-upload-link")) return;
+      if (!link.hasAttribute("data-upload-link")) return;
       var hash = new URL(link.href, location.origin).hash;
-      if (!refresh && !(link.hasAttribute("data-upload-link") && hash.startsWith("#import-mapping-"))) return;
+      if (!hash.startsWith("#import-mapping-")) return;
       event.preventDefault();
       try {
-        if (refresh || !document.getElementById(hash.slice(1))) await refreshHistory();
+        if (!document.getElementById(hash.slice(1))) await refreshHistory();
         var card = document.getElementById(hash.slice(1));
         if (!card) { showMessage(labels.mappingClosed); return; }
         card.scrollIntoView({ block: "nearest" });

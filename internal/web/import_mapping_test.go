@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/html"
+
 	"github.com/daknoblo/Haushaltsbuch/internal/bankimport"
 	"github.com/daknoblo/Haushaltsbuch/internal/store"
 )
@@ -225,6 +227,71 @@ func TestInlineMappingHasNoOrphanPageAndSupportsJSONActions(t *testing.T) {
 		target, err := url.Parse(response.Header().Get("Location"))
 		if err != nil || target.Path != "/imports" || target.Host != "" {
 			t.Fatal("legacy mapping redirect escaped Import")
+		}
+	}
+}
+
+func TestMappingActionsShareRowAndKeepSeparateForms(t *testing.T) {
+	srv, handler, household := newTestServer(t)
+	mappingPreview(t, srv, handler, household.ID)
+	mappingPreview(t, srv, handler, household.ID)
+	body := get(t, handler, "/imports").Body.String()
+	if strings.Contains(body, `href="/settings#bank-accounts"`) || strings.Contains(body, "data-refresh-mapping") {
+		t.Fatal("mapping still contains removed settings or reload links")
+	}
+	document, err := html.Parse(strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	attribute := func(node *html.Node, key string) string {
+		for _, attr := range node.Attr {
+			if attr.Key == key {
+				return attr.Val
+			}
+		}
+		return ""
+	}
+	forms := map[string]*html.Node{}
+	var actions []*html.Node
+	var visit func(*html.Node)
+	visit = func(node *html.Node) {
+		if node.Data == "form" && attribute(node, "action") == "/imports/mapping" {
+			id := attribute(node, "id")
+			if id == "" || forms[id] != nil {
+				t.Fatal("each mapping needs its own uniquely associated confirmation form")
+			}
+			forms[id] = node
+		}
+		for _, attr := range node.Attr {
+			if attr.Key == "data-mapping-actions" {
+				actions = append(actions, node)
+			}
+		}
+		for child := node.FirstChild; child != nil; child = child.NextSibling {
+			visit(child)
+		}
+	}
+	visit(document)
+	if len(actions) != 2 || len(forms) != 2 {
+		t.Fatal("missing per-file action rows")
+	}
+	for _, row := range actions {
+		confirm := row.FirstChild
+		if confirm == nil || confirm.Data != "button" || attribute(confirm, "type") != "submit" {
+			t.Fatal("confirmation must start the shared action row")
+		}
+		form := forms[attribute(confirm, "form")]
+		if form == nil || form.Parent != row.Parent {
+			t.Fatal("confirmation submits another file's mapping")
+		}
+		cancel := confirm.NextSibling
+		if cancel == nil || cancel.Data != "form" || attribute(cancel, "action") != "/imports/mapping/cancel" {
+			t.Fatal("discard must be a separate form beside confirmation, not subject to destination validation")
+		}
+		button := cancel.LastChild
+		if button == nil || button.Data != "button" || attribute(button, "type") != "submit" ||
+			!strings.Contains(attribute(button, "class"), "btn-danger") {
+			t.Fatal("discard must use the existing red danger button style")
 		}
 	}
 }

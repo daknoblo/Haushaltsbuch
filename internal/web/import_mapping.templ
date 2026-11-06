@@ -9,12 +9,8 @@ templ ImportMappingCard(nav Nav, vm ImportMappingVM) {
 			<span class="badge badge-warn">{ Tf(ctx,"import.mappingCount",len(vm.Sources)) }</span>
 		</div>
 		<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx, "import.mappingHint") }</p>
-		<div class="flex flex-wrap gap-2">
-			<a class="btn-ghost" href="/settings#bank-accounts" target="_blank" rel="noopener">{ T(ctx, "import.manageBankAccounts") }</a>
-			<a class="btn-ghost" href={ templ.SafeURL(vm.URL()) } data-refresh-mapping>{ T(ctx, "import.refreshAccounts") }</a>
-		</div>
 		<p class="alert-error" role="alert" data-mapping-error hidden></p>
-		<form method="post" action="/imports/mapping" class="grid gap-3">
+		<form id={ vm.ID() + "-confirm" } method="post" action="/imports/mapping" class="grid gap-3">
 			@importHouseholdField(nav)
 			<input type="hidden" name="preview" value={ vm.Token }/>
 			for i, source := range vm.Sources {
@@ -43,13 +39,15 @@ templ ImportMappingCard(nav Nav, vm ImportMappingVM) {
 					</label>
 				</div>
 			}
-			<button class="btn-primary max-w-full justify-self-start whitespace-normal text-left" type="submit">{ T(ctx, "import.confirmMapping") }</button>
 		</form>
-		<form method="post" action="/imports/mapping/cancel">
-			@importHouseholdField(nav)
-			<input type="hidden" name="preview" value={ vm.Token }/>
-			<button class="btn-ghost" type="submit">{ T(ctx, "import.cancelMapping") }</button>
-		</form>
+		<div class="grid grid-cols-2 items-stretch gap-2 sm:flex" data-mapping-actions>
+			<button class="btn-primary min-w-0 whitespace-normal" type="submit" form={ vm.ID() + "-confirm" }>{ T(ctx, "import.confirmMapping") }</button>
+			<form method="post" action="/imports/mapping/cancel" class="grid min-w-0">
+				@importHouseholdField(nav)
+				<input type="hidden" name="preview" value={ vm.Token }/>
+				<button class="btn-danger whitespace-normal" type="submit">{ T(ctx, "import.cancelMapping") }</button>
+			</form>
+		</div>
 		<p class="text-xs text-slate-500 dark:text-slate-400">{ T(ctx, "import.mappingLifetime") }</p>
 	</article>
 }

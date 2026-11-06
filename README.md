@@ -377,10 +377,13 @@ borders separate the groups, while names and numbered destination labels remain
 visible. Selection fields have stronger boundaries in both themes. No
 destination is silently assigned. Unique exact name matches are preselected as
 suggestions; the left selection can disambiguate a matching destination when the
-source name itself is unique. Every mapping still requires confirmation. Add
-missing bank accounts in Settings (opens in a new tab), then refresh the
-destination list. Background updates retain existing form nodes and choices.
-Confirmation and cancellation stay on the Import page; errors appear inline.
+source name itself is unique. Every mapping still requires confirmation.
+Confirmation and the red discard button share one action row. Mapping cards
+contain no settings or manual account-reload links. Manage missing accounts
+through the normal Settings navigation; returning focus to Import refreshes
+destination choices automatically. Background updates retain existing form
+nodes and choices. Confirmation and cancellation stay on the Import page;
+errors appear inline.
 Without JavaScript, validation errors render the normal Import page with the
 submitted choices. Confirmation compares every group and inserts only new rows
 in one database transaction: a foreign/missing destination or a new payment in
