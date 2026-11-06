@@ -21,6 +21,7 @@ func BankSourceFingerprint(b BankTransaction) string {
 type BankReconciliation struct {
 	Added, Existing, Preserved int
 	ReviewMonth                string
+	AddedIDs                   []int64
 }
 
 // ReconcileBankImports compares against all current decisions in the selected
@@ -114,14 +115,16 @@ func (s *Store) ReconcileBankImports(ctx context.Context, householdID int64, bat
 				}
 				payment.ID, payment.ImportID, payment.Decision = 0, batchID, "pending"
 				payment.Splits, payment.TagIDs = nil, nil
+				payment.Analysis = nil
 				payment.SourceFingerprint = BankSourceFingerprint(payment)
 				if err := tx.validateBankReferences(ctx, householdID, payment); err != nil {
 					return err
 				}
-				if err := tx.insertBankTransaction(ctx, householdID, payment); err != nil {
+				if err := tx.insertBankTransaction(ctx, householdID, &payment); err != nil {
 					return err
 				}
 				out.Added++
+				out.AddedIDs = append(out.AddedIDs, payment.ID)
 				if addedMonth == "" {
 					addedMonth = payment.BookedOn[:7]
 				}

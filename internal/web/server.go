@@ -26,17 +26,19 @@ type Server struct {
 	api            *api.Server
 	bankAI         BankImporter
 	importGate     chan struct{}
+	analysisGate   chan struct{}
 	importPreviews importPreviews
 }
 
 // New creates a Server. An empty apiToken leaves the machine-facing API off.
 func New(st *store.Store, logger *slog.Logger, apiToken string) *Server {
 	return &Server{
-		store:      st,
-		logger:     logger,
-		limiter:    newRateLimiter(),
-		api:        api.New(st, logger, apiToken),
-		importGate: make(chan struct{}, 1),
+		store:        st,
+		logger:       logger,
+		limiter:      newRateLimiter(),
+		api:          api.New(st, logger, apiToken),
+		importGate:   make(chan struct{}, 1),
+		analysisGate: make(chan struct{}, 1),
 	}
 }
 
@@ -73,6 +75,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /imports/mapping", s.handleImportMappingConfirm)
 	mux.HandleFunc("POST /imports/mapping/cancel", s.handleImportMappingCancel)
 	mux.HandleFunc("POST /imports/transactions/{id}", s.handleBankReview)
+	mux.HandleFunc("POST /imports/analyze", s.handleBankAnalysis)
+	mux.HandleFunc("POST /imports/review-batch", s.handleBankBatch)
 	mux.HandleFunc("POST /imports/month", s.handleBankMonth)
 	mux.HandleFunc("POST /imports/transactions/{id}/plan", s.handleBankPlan)
 

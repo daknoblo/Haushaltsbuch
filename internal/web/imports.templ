@@ -29,13 +29,23 @@ templ ImportReview(nav Nav, vm ImportVM) {
 			<section class="card mt-4">
 				<div class="flex flex-wrap items-center gap-3">
 					<h2 class="font-semibold">{ nav.CurrentMonthLabel(ctx) }</h2>
-					<form method="get" action="/imports" class="flex gap-2" data-import-month-form>
-						<input type="month" class="input" name="m" value={ nav.Month } aria-label={ T(ctx, "pdf.month") } required/>
+					<form method="get" action="/imports" class="flex min-w-0 gap-2" data-import-month-form>
+						<input type="month" class="input min-w-0" name="m" value={ nav.Month } aria-label={ T(ctx, "pdf.month") } required/>
 						<button class="btn-ghost" type="submit">{ T(ctx, "import.show") }</button>
 					</form>
 					<a class="btn-ghost" href={ templ.SafeURL("/?m=" + nav.Month) }>{ T(ctx, "basis.comparison") }</a>
 				</div>
 				<p class="my-3 text-sm">{ T(ctx, "import.closeHint") }</p>
+				<p class="mb-2 text-sm font-semibold">{ Tf(ctx,"review.progress",len(vm.Rows)-vm.DecisionCount("pending"),len(vm.Rows),vm.DecisionCount("pending")) }</p>
+				<p class="mb-3 text-sm text-slate-500 dark:text-slate-400">
+					if nav.Month>=NormalizeMonth("") {
+						{ T(ctx,"review.monthPlan") }
+					} else if vm.Closed {
+						{ T(ctx,"review.monthActual") }
+					} else {
+						{ T(ctx,"review.monthEstimate") }
+					}
+				</p>
 				<form method="post" action="/imports/month" class="flex flex-wrap items-center gap-3">
 					@importHouseholdField(nav)
 					<input type="hidden" name="month" value={ nav.Month }/>
@@ -44,7 +54,7 @@ templ ImportReview(nav Nav, vm ImportVM) {
 						<button class="btn-ghost" type="submit" name="closed" value="no">{ T(ctx, "import.reopenMonth") }</button>
 					} else {
 						<label class="flex items-start gap-2"><input type="checkbox" name="complete" value="yes" required/>{ T(ctx, "import.complete") }</label>
-						<button class="btn-primary" type="submit" name="closed" value="yes">{ T(ctx, "import.closeMonth") }</button>
+						<button class="btn-primary" type="submit" name="closed" value="yes" disabled?={ vm.DecisionCount("pending")>0 || nav.Month>=NormalizeMonth("") } title={ T(ctx, "review.closeBlocked") }>{ T(ctx, "import.closeMonth") }</button>
 					}
 				</form>
 			</section>
@@ -57,6 +67,73 @@ templ ImportReview(nav Nav, vm ImportVM) {
 						{ strconv.Itoa(vm.DecisionCount(decision)) } { ImportDecisionLabel(ctx, decision) }
 					</span>
 				}
+			</div>
+			<div class="card-tight" data-review-controls>
+				<div class="card-body grid gap-3">
+					<p class="text-sm text-slate-500 dark:text-slate-400">{ T(ctx,"review.stageHint") }</p>
+					<div class="flex flex-wrap gap-2" data-review-filters>
+						<button class="btn-ghost" type="button" data-review-filter="all" aria-pressed="true" disabled>{ T(ctx, "review.all") } · { strconv.Itoa(len(vm.Rows)) }</button>
+						for _, stage:=range []string{"ready","suggested","needs","done"} {
+							<button class="btn-ghost" type="button" data-review-filter={ stage } aria-pressed="false" disabled>{ ReviewStageLabel(ctx, stage) } · { strconv.Itoa(vm.StageCount(stage)) }</button>
+						}
+					</div>
+					<div class="flex flex-wrap items-center gap-2">
+						<button class="btn-ghost" type="button" data-select-ready disabled>{ T(ctx, "review.selectReady") }</button>
+						<button class="btn-ghost" type="button" data-select-visible disabled>{ T(ctx,"review.selectVisible") }</button>
+						<button class="btn-ghost" type="button" data-clear-selection disabled>{ T(ctx, "review.clearSelection") }</button>
+						<span class="text-sm"><strong data-selected-count>0</strong> { T(ctx,"review.selected") }</span>
+						<button class="btn-primary" type="submit" form="bank-bulk-form" name="operation" value="accept" data-bulk-accept disabled>{ T(ctx,"review.acceptSelected") }</button>
+					</div>
+					<form id="bank-bulk-form" method="post" action="/imports/review-batch" class="grid gap-2 md:grid-cols-4" data-bank-bulk>
+						@importHouseholdField(nav)
+						<input type="hidden" name="upload_generation" value={ strconv.FormatUint(vm.UploadGeneration, 10) }/>
+						<input type="hidden" name="month" value={ nav.Month }/>
+						<label>
+							{ T(ctx,"import.category") }
+							<select name="category" class="input w-full">
+								<option value="">{ T(ctx,"import.choose") }</option>
+								for _, c:=range vm.Data.Categories {
+									<option value={ strconv.FormatInt(c.ID, 10) } data-direction={ string(c.Classification) }>{ c.Name } · { DirectionLabel(ctx, c.Classification) }</option>
+								}
+							</select>
+						</label>
+						<label>
+							{ T(ctx,"overview.costNature") }
+							<select name="nature" class="input w-full">
+								<option value="">{ T(ctx,"review.keep") }</option>
+								for _, value:=range []store.CostNature{store.CostFix,store.CostVariable} {
+									<option value={ string(value) }>{ CostNatureLabel(ctx,value) }</option>
+								}
+							</select>
+						</label>
+						<label>
+							{ T(ctx,"overview.budgetClasses") }
+							<select name="class" class="input w-full">
+								<option value="">{ T(ctx,"review.keep") }</option>
+								for _, value:=range []store.BudgetClass{store.ClassNeed,store.ClassWant,store.ClassSaving} {
+									<option value={ string(value) }>{ BudgetClassLabel(ctx,value) }</option>
+								}
+							</select>
+						</label>
+						<button class="btn-ghost self-end" type="submit" name="operation" value="category" data-bulk-category disabled>{ T(ctx,"review.applyCategory") }</button>
+					</form>
+					<p class="text-xs text-slate-500 dark:text-slate-400">{ T(ctx,"review.bulkHint") }</p>
+					<form method="post" action="/imports/analyze" data-bank-analyze>
+						@importHouseholdField(nav)
+						<input type="hidden" name="upload_generation" value={ strconv.FormatUint(vm.UploadGeneration, 10) }/>
+						<input type="hidden" name="month" value={ nav.Month }/>
+						<button class="btn-ghost" type="submit" disabled?={ !vm.CanAnalyze || vm.AnalysisCount() == 0 } data-ai-available={ strconv.FormatBool(vm.CanAnalyze) } data-ai-count={ strconv.Itoa(vm.AnalysisCount()) } title={ T(ctx, "review.aiButtonHint") }>{ T(ctx, "review.aiAnalyze") } · { strconv.Itoa(vm.AnalysisCount()) }</button>
+					</form>
+					<p class="text-xs text-slate-500 dark:text-slate-400">
+						if vm.CanAnalyze {
+							{ T(ctx, "review.aiAutomatic") }
+						} else {
+							{ T(ctx, "review.aiUnavailable") }
+						}
+					</p>
+					<p class="alert-info" data-review-operation-status role="status" aria-live="polite" hidden></p>
+					<p class="alert-error" data-review-operation-error role="alert" hidden></p>
+				</div>
 			</div>
 			<div class="grid gap-2" data-bank-rows>
 				if len(vm.Rows) == 0 {
@@ -83,10 +160,11 @@ templ importHouseholdField(nav Nav) {
 }
 
 templ importPayment(nav Nav, vm ImportVM, row ImportRow) {
-	<article id={ row.ID() } data-bank-row={ strconv.FormatInt(row.Payment.ID, 10) }>
+	<article id={ row.ID() } data-bank-row={ strconv.FormatInt(row.Payment.ID, 10) } data-review-stage={ row.Stage } data-review-token={ row.ReviewToken() } data-review-match={ row.MatchKey() } data-review-quick={ strconv.FormatBool(row.CanQuick) } data-review-direction={ string(row.Payment.Direction) }>
 		<p class="alert-error mb-2" data-payment-error role="alert" hidden></p>
 		<details class="import-payment" data-bank-payment={ strconv.FormatInt(row.Payment.ID, 10) }>
 			<summary class="import-payment-summary">
+				<span class="import-select"><input type="checkbox" data-review-select aria-label={ Tf(ctx, "review.select", row.Payment.Name) } disabled/></span>
 				<span class="import-expand" aria-hidden="true">›</span>
 				<span class="import-date tnum">{ FormatDate(row.Payment.BookedOn) }</span>
 				<span class="import-description">
@@ -94,7 +172,10 @@ templ importPayment(nav Nav, vm ImportVM, row ImportRow) {
 					<span class="block truncate text-xs text-slate-500 dark:text-slate-400" title={ row.Account }>{ row.Account }</span>
 				</span>
 				<span class="import-state">
-					<span class={ "badge whitespace-nowrap", ImportDecisionBadge(row.Payment.Decision) }>{ ImportDecisionLabel(ctx, row.Payment.Decision) }</span>
+					<span class={ ReviewStageBadge(row.Stage) }>{ ReviewStageLabel(ctx,row.Stage) }</span>
+					if row.Payment.Decision!="pending" {
+						<span class={ "badge",ImportDecisionBadge(row.Payment.Decision) }>{ ImportDecisionLabel(ctx,row.Payment.Decision) }</span>
+					}
 					if row.Duplicate {
 						<span class="badge badge-warn whitespace-nowrap" title={ T(ctx, "import.duplicateHint") }>{ T(ctx, "import.duplicateShort") }</span>
 					}
@@ -111,11 +192,7 @@ templ importPayment(nav Nav, vm ImportVM, row ImportRow) {
 				</span>
 				<span class="import-actions">
 					if row.Payment.Decision=="pending" && !row.Closed {
-						if row.CanQuick {
-							<button class="btn-primary sm:px-3 sm:py-1.5 sm:text-xs" type="submit" form={ row.FormID() } name="quick" value="yes" aria-label={ Tf(ctx, "import.quickAcceptFor", row.Payment.Name) } data-bank-quick>{ T(ctx, "import.quickAccept") }</button>
-						} else {
-							<span class="badge badge-warn">{ T(ctx,"import.detailsNeeded") }</span>
-						}
+						<button class="btn-primary sm:px-3 sm:py-1.5 sm:text-xs" type="submit" form={ row.FormID() } name="quick" value="yes" aria-label={ Tf(ctx, "import.quickAcceptFor", row.Payment.Name) } data-bank-quick disabled?={ !row.CanQuick } title={ T(ctx, "review.stageHint") }>{ T(ctx, "import.quickAccept") }</button>
 					}
 				</span>
 				<span class="import-labels">
@@ -125,19 +202,33 @@ templ importPayment(nav Nav, vm ImportVM, row ImportRow) {
 						<span class="badge badge-warn">{ T(ctx,"import.categoryMissing") }</span>
 					}
 					if row.Payment.Direction==store.DirExpense {
-						<span class="badge badge-muted">{ CostNatureLabel(ctx,row.Payment.CostNature) }</span>
-						<span class="badge badge-muted">{ BudgetClassLabel(ctx,row.Payment.BudgetClass) }</span>
+						<span class="badge badge-muted">
+							{ CostNatureLabel(ctx,row.Payment.CostNature) }
+							if row.NatureDefault {
+								· { T(ctx,"review.default") }
+							}
+						</span>
+						<span class="badge badge-muted">
+							{ BudgetClassLabel(ctx,row.Payment.BudgetClass) }
+							if row.ClassDefault {
+								· { T(ctx,"review.default") }
+							}
+						</span>
 						if !row.Payment.Settle {
 							<span class="badge badge-muted">{ T(ctx,"import.noSettlement") }</span>
 						}
 					}
 					if row.AllocationLabel!="" {
 						<span class="badge badge-muted max-w-full whitespace-normal text-left">{ row.AllocationLabel }</span>
+						if row.AllocationDefault {
+							<span class="text-xs text-slate-500 dark:text-slate-400">{ T(ctx,"review.ownerDefault") }</span>
+						}
 					}
 					if row.PlanName!="" {
-						<span class="badge badge-muted max-w-full whitespace-normal text-left">{ Tf(ctx,"import.planLabel",row.PlanName) }</span>
-						if row.PlanAmount!=row.Payment.AmountCents {
-							<span class="badge badge-warn">{ T(ctx,"import.deviation") }</span>
+						<a class="badge badge-info max-w-full whitespace-normal text-left underline" href={ templ.SafeURL(row.PlanURL()) }>{ Tf(ctx,"import.planLabel",row.PlanName) }</a>
+						<span class={ "badge",templ.KV("badge-warn",row.PlanAmount!=row.Payment.AmountCents),templ.KV("badge-muted",row.PlanAmount==row.Payment.AmountCents) }>{ Tf(ctx,"review.planAmount",FormatEUR(row.PlanAmount),FormatEUR(row.Payment.AmountCents),row.PlanDifference()) }</span>
+						if row.PlanOwnerMismatch {
+							<span class="badge badge-warn">{ T(ctx,"review.planOwner") }</span>
 						}
 					}
 					for _, tag:=range row.Tags {
@@ -145,6 +236,12 @@ templ importPayment(nav Nav, vm ImportVM, row ImportRow) {
 					}
 					if row.Suggestion!="" {
 						<span class="text-xs text-slate-500 dark:text-slate-400">{ ImportSuggestionLabel(ctx,row.Suggestion) }</span>
+					}
+					if row.AIReason!="" {
+						<span class="block w-full min-w-0 break-words text-xs text-slate-600 dark:text-slate-300">{ row.AIReason }</span>
+					}
+					if row.TransferPairLabel!="" {
+						<span class="block w-full min-w-0 break-words text-xs">{ T(ctx, "review.pair") }: { row.TransferPairLabel }</span>
 					}
 				</span>
 			</summary>
@@ -213,6 +310,9 @@ templ importPayment(nav Nav, vm ImportVM, row ImportRow) {
 									<option value="plan" selected?={ row.Allocation == "plan" }>{ T(ctx, "import.allocatePlan") }</option>
 									if row.HistoryID!=0 {
 										<option value="history" selected?={ row.Allocation=="history" }>{ T(ctx,"import.allocateHistory") }</option>
+									}
+									if row.Allocation == "draft" {
+										<option value="draft" selected>{ T(ctx,"review.allocateDraft") }</option>
 									}
 								</select>
 							</label>
@@ -286,5 +386,19 @@ templ importPayment(nav Nav, vm ImportVM, row ImportRow) {
 				}
 			</div>
 		</details>
+		if row.Payment.Decision=="pending" && row.TransferCandidate!="" && !row.Closed {
+			<form method="post" action="/imports/review-batch" class="mt-2" data-bank-pair>
+				@importHouseholdField(nav)
+				<input type="hidden" name="upload_generation" value={ strconv.FormatUint(vm.UploadGeneration, 10) }/>
+				<input type="hidden" name="month" value={ nav.Month }/>
+				<input type="hidden" name="operation" value="transfer"/>
+				<input type="hidden" name="payment" value={ strconv.FormatInt(row.Payment.ID, 10) }/>
+				<input type="hidden" name="pair_token" value={ row.TransferPairToken }/>
+				<button class="btn-ghost" type="submit" disabled?={ row.TransferPairID == 0 } title={ T(ctx, "review.pairConfirm") }>{ T(ctx, "review.confirmPair") }</button>
+			</form>
+		}
+		if row.Payment.Decision=="accepted" {
+			<button class="btn-ghost mt-2" type="button" data-copy-classification data-copy-category={ strconv.FormatInt(row.Payment.CategoryID, 10) } data-copy-nature={ string(row.Payment.CostNature) } data-copy-class={ string(row.Payment.BudgetClass) } data-copy-count={ strconv.Itoa(vm.CopyCount(row)) } disabled title={ T(ctx, "review.copyHint") }>{ T(ctx, "review.copy") } · { strconv.Itoa(vm.CopyCount(row)) }</button>
+		}
 	</article>
 }

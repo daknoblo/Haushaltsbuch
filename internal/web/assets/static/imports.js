@@ -26,6 +26,11 @@
     var followedUpload = false;
     var stale = false;
     var dragDepth = 0;
+    var reviewFilter = "all";
+    var reviewSelection = new Map();
+    var reviewBusy = false;
+    var reviewReplaceIDs = new Set();
+    var autoAnalysisPaused = false;
     picker.required = false;
 
     function showMessage(text) {
@@ -38,6 +43,7 @@
       entries.forEach(function (entry) { entry.retry.disabled = running || stale; });
       if (stale) document.querySelectorAll("[data-import-mapping] select, [data-import-mapping] button").forEach(function (input) { input.disabled = true; });
       if (stale) document.querySelectorAll("[data-bank-quick]").forEach(function (input) { input.disabled = true; });
+      updateReviewControls();
     }
 
     function snapshotFields() {
@@ -209,6 +215,9 @@
           result.detected.length > 20 || result.detected.some(function (line) {
             return typeof line !== "string" || line.length > 2048;
           }))) throw new Error("Invalid detection details");
+      if (result.analysis_ids !== undefined && (!Array.isArray(result.analysis_ids) ||
+          result.analysis_ids.length !== result.added || result.analysis_ids.some(function (id) { return typeof id !== "string" || !/^[1-9][0-9]{0,18}$/.test(id); }) ||
+          new Set(result.analysis_ids).size !== result.analysis_ids.length)) throw new Error("Invalid analysis IDs");
       return result;
     }
 
@@ -345,7 +354,12 @@
           rows.forEach(function (fresh, index) {
             var old = document.getElementById(fresh.id);
             if (old && list.contains(old)) {
-              if (!old.querySelector(".import-payment[open], [data-import-dirty]") && !old.hasAttribute("data-review-busy")) old.replaceWith(fresh);
+              var dirty = old.querySelector("[data-import-dirty]");
+              if (!dirty && !old.hasAttribute("data-review-busy") &&
+                  (reviewReplaceIDs.has(old.dataset.bankRow) || (!old.querySelector(".import-payment[open]") && !reviewSelection.has(old.dataset.bankRow)))) {
+                fresh.querySelector(".import-payment").open = old.querySelector(".import-payment").open;
+                old.replaceWith(fresh);
+              }
             } else {
               var next = rows.slice(index + 1).map(function (row) { return document.getElementById(row.id); }).find(function (node) { return node && list.contains(node); });
               list.insertBefore(fresh, next || null);
@@ -357,15 +371,26 @@
           ["data-review-toolbar", "data-review-counts", "data-review-months"].forEach(function (selector) {
             current.querySelector("[" + selector + "]").replaceWith(replacement.querySelector("[" + selector + "]"));
           });
+          ["data-review-filters", "data-bank-analyze"].forEach(function (selector) {
+            current.querySelector("[" + selector + "]").replaceWith(replacement.querySelector("[" + selector + "]"));
+          });
+          replacement.querySelectorAll("[data-bank-bulk] select").forEach(function (fresh) {
+            var existing = current.querySelector('[data-bank-bulk] select[name="' + fresh.name + '"]');
+            var value = existing.value;
+            existing.replaceChildren.apply(existing, Array.from(fresh.childNodes));
+            existing.value = value;
+          });
+          updateReviewControls();
           return true;
         }
       }
       current.replaceWith(replacement);
+      if (id === "import-review") updateReviewControls();
       return true;
     }
 
     function reviewEditing() {
-      return document.querySelector("#import-review [data-import-dirty], #import-review [data-review-busy]");
+      return reviewBusy || reviewSelection.size > 0 || document.querySelector("#import-review [data-import-dirty], #import-review [data-review-busy]");
     }
 
     async function showImported(url, interactive) {
@@ -383,6 +408,7 @@
           return;
         }
         discard = true;
+        reviewSelection.clear();
       }
       var target = new URL(form.dataset.reviewUrl, location.origin);
       target.searchParams.set("m", month);
@@ -446,6 +472,7 @@
               followedUpload = true;
               await showImported(entry.result.url, false);
             }
+            if (entry.state === "imported") await autoAnalyze(entry.result);
           } catch {
             refreshError.hidden = false;
           }
@@ -524,6 +551,7 @@
         });
         card.remove();
         if (result) await showImported(result.url, false);
+        if (result) await autoAnalyze(result);
       } catch {
         mappingError(card, labels.network);
       } finally {
@@ -582,7 +610,203 @@
       reviewForm.dataset.importDirty = "true";
       var button = reviewForm.closest("[data-bank-row]").querySelector("[data-bank-quick]");
       if (button) { button.disabled = true; button.title = labels.reviewChanged; }
+      reviewSelection.delete(reviewForm.closest("[data-bank-row]").dataset.bankRow);
+      updateReviewControls();
     }
+
+    function reviewNotice(text, isError) {
+      var target = document.querySelector(isError ? "[data-review-operation-error]" : "[data-review-operation-status]");
+      if (isError && text && !target.hidden && target.textContent) {
+        if (!target.textContent.includes(text)) target.textContent += " " + text;
+        return;
+      }
+      target.textContent = text;
+      target.hidden = !text;
+    }
+
+    function updateReviewControls() {
+      var rows = Array.from(document.querySelectorAll("#import-review [data-bank-row]"));
+      var present = new Set();
+      rows.forEach(function (row) {
+        var id = row.dataset.bankRow;
+        present.add(id);
+        var checkbox = row.querySelector("[data-review-select]");
+        var busy = reviewBusy || stale || row.hasAttribute("data-review-busy");
+        var dirty = !!row.querySelector("[data-import-dirty]");
+        checkbox.disabled = busy || dirty || !row.querySelector("[data-bank-review-form]");
+        if (reviewSelection.has(id) && (reviewSelection.get(id) !== row.dataset.reviewToken || !row.querySelector("[data-bank-review-form]") || dirty)) {
+          reviewSelection.delete(id);
+          reviewNotice(labels.selectionChanged, true);
+        }
+        checkbox.checked = reviewSelection.has(id);
+        row.hidden = reviewFilter !== "all" && row.dataset.reviewStage !== reviewFilter;
+        var quick = row.querySelector("[data-bank-quick]");
+        if (quick) quick.disabled = busy || dirty || row.dataset.reviewQuick !== "true";
+        var pair = row.querySelector("[data-bank-pair]");
+        if (pair) pair.querySelector("button").disabled = busy || dirty || !pair.elements.pair_token.value;
+        var copy = row.querySelector("[data-copy-classification]");
+        if (copy) copy.disabled = busy || Number(copy.dataset.copyCount) === 0;
+      });
+      reviewSelection.forEach(function (_, id) { if (!present.has(id)) reviewSelection.delete(id); });
+      document.querySelectorAll("[data-review-filter]").forEach(function (button) {
+        button.setAttribute("aria-pressed", String(button.dataset.reviewFilter === reviewFilter));
+        button.disabled = reviewBusy;
+      });
+      document.querySelector("[data-selected-count]").textContent = String(reviewSelection.size);
+      var selected = rows.filter(function (row) { return reviewSelection.has(row.dataset.bankRow); });
+      document.querySelector("[data-bulk-accept]").disabled = stale || reviewBusy || !selected.length ||
+        selected.some(function (row) { return row.dataset.reviewQuick !== "true"; });
+      var bulk = document.querySelector("[data-bank-bulk]");
+      Array.from(bulk.elements.category.options).forEach(function (option) {
+        option.disabled = !!option.value && selected.some(function (row) { return row.dataset.reviewDirection !== option.dataset.direction; });
+      });
+      var category = bulk.elements.category.selectedOptions[0];
+      bulk.querySelector("[data-bulk-category]").disabled = stale || reviewBusy || !selected.length || !category || !category.value || category.disabled;
+      document.querySelector("[data-select-ready]").disabled = stale || reviewBusy ||
+        !rows.some(function (row) { return !row.hidden && row.dataset.reviewStage === "ready" && !row.querySelector("[data-review-select]").disabled; });
+      document.querySelector("[data-select-visible]").disabled = stale || reviewBusy ||
+        !rows.some(function (row) { return !row.hidden && !row.querySelector("[data-review-select]").disabled; });
+      document.querySelector("[data-clear-selection]").disabled = reviewBusy || !reviewSelection.size;
+      var analyze = document.querySelector("[data-bank-analyze] button");
+      analyze.disabled = stale || reviewBusy || analyze.dataset.aiAvailable !== "true" || Number(analyze.dataset.aiCount) === 0;
+      form.dataset.autoAnalyze = analyze.dataset.aiAvailable;
+    }
+
+    async function reviewRequest(path, body, analysis) {
+      if (stale || reviewBusy) { reviewNotice(stale ? labels.context : labels.aiRunning, true); return false; }
+      var ids = body.getAll("payment");
+      if (ids.length > 1000) { reviewNotice(labels.limit, true); return false; }
+      var targets = ids.length ? ids.map(function (id) { return document.querySelector('[data-bank-row="' + id + '"]'); }).filter(Boolean) :
+        Array.from(document.querySelectorAll('#import-review [data-bank-row]:not([data-review-stage="done"])'));
+      if (body.get("operation") === "transfer") {
+        document.querySelectorAll("[data-bank-pair]").forEach(function (pair) {
+          var row = pair.closest("[data-bank-row]");
+          if (pair.elements.pair_token.value === body.get("pair_token") && !targets.includes(row)) targets.push(row);
+        });
+      }
+      if (targets.some(function (row) { return row.querySelector("[data-import-dirty]") || row.hasAttribute("data-review-busy"); })) {
+        reviewNotice(labels.dirty, true);
+        return false;
+      }
+      reviewBusy = true;
+      reviewNotice("", true);
+      reviewNotice(analysis ? labels.aiRunning : "", false);
+      var disabled = [];
+      targets.forEach(function (row) {
+        row.setAttribute("data-review-busy", "");
+        row.querySelectorAll("button, input, select, textarea").forEach(function (input) {
+          disabled.push({input:input, disabled:input.disabled});
+          input.disabled = true;
+        });
+      });
+      updateReviewControls();
+      var successful = false;
+      var statusText = "";
+      try {
+        var response = await fetch(path, {
+          method:"POST", body:body, credentials:"same-origin", redirect:"error", cache:"no-store",
+          headers:{Accept:"application/json"}
+        });
+        if (!response.ok) {
+          var reason = (response.headers.get("Content-Type") || "").startsWith("text/plain") ?
+            (await response.text()).trim().slice(0,1000) : labels.http.replace("%d",String(response.status));
+          if (reason === labels.context || reason === labels.household) stale = true;
+          reviewNotice(reason || labels.response, true);
+        } else {
+          var result = await response.json();
+          if (!Number.isInteger(result.updated) || result.updated < 0 || result.updated > 1000) throw new Error("Invalid review action response");
+          successful = true;
+          statusText = (analysis ? labels.aiComplete : labels.updated).replace("%d", String(result.updated));
+          if (!analysis) reviewSelection.clear();
+        }
+      } catch {
+        reviewNotice(analysis ? labels.aiFailed : labels.network, true);
+      } finally {
+        reviewBusy = false;
+        targets.forEach(function (row) { row.removeAttribute("data-review-busy"); reviewReplaceIDs.add(row.dataset.bankRow); });
+        if (body.get("operation") === "transfer") {
+          document.querySelectorAll("[data-bank-pair]").forEach(function (pair) {
+            if (pair.elements.pair_token.value === body.get("pair_token")) reviewReplaceIDs.add(pair.closest("[data-bank-row]").dataset.bankRow);
+          });
+        }
+        disabled.forEach(function (saved) { saved.input.disabled = stale || saved.disabled; });
+        try {
+          await refreshHistory();
+          await refreshPart(form.dataset.reviewUrl, "import-review");
+        } catch { refreshError.hidden = false; }
+        reviewReplaceIDs.clear();
+        reviewNotice(statusText, false);
+        updateReviewControls();
+      }
+      return successful;
+    }
+
+    async function autoAnalyze(result) {
+      if (form.dataset.autoAnalyze !== "true" || autoAnalysisPaused || !result.analysis_ids || !result.analysis_ids.length) return;
+      var body = new URLSearchParams();
+      body.set("household", form.elements.household.value);
+      body.set("upload_generation", form.elements.upload_generation.value);
+      body.set("month", document.getElementById("import-review").dataset.reviewMonth);
+      result.analysis_ids.forEach(function (id) { body.append("payment", String(id)); });
+      if (!await reviewRequest("/imports/analyze", body, true)) autoAnalysisPaused = true;
+    }
+
+    document.addEventListener("change", function (event) {
+      if (event.target.hasAttribute("data-review-select")) {
+        var row = event.target.closest("[data-bank-row]");
+        if (event.target.checked) reviewSelection.set(row.dataset.bankRow, row.dataset.reviewToken);
+        else reviewSelection.delete(row.dataset.bankRow);
+        updateReviewControls();
+      } else if (event.target.closest("[data-bank-bulk]")) updateReviewControls();
+    });
+    document.addEventListener("click", function (event) {
+      var button = event.target.closest("button");
+      if (!button || button.disabled) return;
+      if (button.hasAttribute("data-review-filter")) {
+        reviewFilter = button.dataset.reviewFilter;
+        reviewSelection.clear();
+      } else if (button.hasAttribute("data-clear-selection")) {
+        reviewSelection.clear();
+      } else if (button.hasAttribute("data-select-ready") || button.hasAttribute("data-select-visible")) {
+        reviewSelection.clear();
+        document.querySelectorAll('[data-bank-row]').forEach(function (row) {
+          if (!row.hidden && !row.querySelector("[data-review-select]").disabled &&
+              (button.hasAttribute("data-select-visible") || row.dataset.reviewStage === "ready")) reviewSelection.set(row.dataset.bankRow,row.dataset.reviewToken);
+        });
+      } else if (button.hasAttribute("data-copy-classification")) {
+        var source = button.closest("[data-bank-row]");
+        var bulk = document.querySelector("[data-bank-bulk]");
+        reviewFilter = "all";
+        reviewSelection.clear();
+        document.querySelectorAll("[data-bank-row]").forEach(function (row) {
+          if (row.dataset.reviewMatch === source.dataset.reviewMatch && !row.querySelector("[data-review-select]").disabled) reviewSelection.set(row.dataset.bankRow,row.dataset.reviewToken);
+        });
+        bulk.elements.category.value = button.dataset.copyCategory;
+        bulk.elements.nature.value = button.dataset.copyNature;
+        bulk.elements.class.value = button.dataset.copyClass;
+        bulk.scrollIntoView({block:"center"});
+      } else return;
+      if (reviewSelection.size > 1000) { reviewSelection.clear(); reviewNotice(labels.limit,true); }
+      updateReviewControls();
+    });
+    document.addEventListener("submit", async function (event) {
+      var actionForm = event.target;
+      var analysis = actionForm.hasAttribute("data-bank-analyze");
+      var pair = actionForm.hasAttribute("data-bank-pair");
+      var bulk = actionForm.hasAttribute("data-bank-bulk");
+      if (!analysis && !pair && !bulk) return;
+      event.preventDefault();
+      if (event.submitter && event.submitter.disabled) return;
+      var body = new URLSearchParams(new FormData(actionForm));
+      if (bulk) {
+        if (!reviewSelection.size) { reviewNotice(labels.noSelection,true); return; }
+        body.set("operation", event.submitter ? event.submitter.value : "category");
+        reviewSelection.forEach(function (token,id) { body.append("payment",id); body.set("token_"+id,token); });
+      }
+      if (pair && !window.confirm(labels.pairConfirm)) return;
+      if (analysis) autoAnalysisPaused = false;
+      await reviewRequest(analysis ? "/imports/analyze" : "/imports/review-batch",body,analysis);
+    });
 
     document.addEventListener("submit", async function (event) {
       var reviewForm = event.target;

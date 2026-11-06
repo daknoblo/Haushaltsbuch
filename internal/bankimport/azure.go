@@ -333,29 +333,37 @@ func (c *Azure) Extract(ctx context.Context, deployment, text string) ([]store.B
 	if text == "" || len(text) > MaxTextBytes {
 		return nil, ErrResult
 	}
-	names, err := c.Deployments(ctx)
+	content, err := c.chat(ctx, deployment, extractionPrompt, "<statement>\n"+text+"\n</statement>")
 	if err != nil {
 		return nil, err
 	}
+	return ParseResult(content)
+}
+
+func (c *Azure) chat(ctx context.Context, deployment, prompt, text string) (string, error) {
+	names, err := c.Deployments(ctx)
+	if err != nil {
+		return "", err
+	}
 	if !slices.Contains(names, deployment) {
-		return nil, ErrDeployment
+		return "", ErrDeployment
 	}
 	c.mu.RLock()
 	endpoint := c.endpoint
 	c.mu.RUnlock()
 	if endpoint == "" {
-		return nil, ErrUpstream
+		return "", ErrUpstream
 	}
 	payload, err := json.Marshal(struct {
 		Model     string              `json:"model"`
 		Messages  []map[string]string `json:"messages"`
 		MaxTokens int                 `json:"max_completion_tokens"`
 	}{deployment, []map[string]string{
-		{"role": "system", "content": extractionPrompt},
-		{"role": "user", "content": "<statement>\n" + text + "\n</statement>"},
+		{"role": "system", "content": prompt},
+		{"role": "user", "content": text},
 	}, 24000})
 	if err != nil {
-		return nil, ErrResult
+		return "", ErrResult
 	}
 	var response struct {
 		Choices []struct {
@@ -369,12 +377,12 @@ func (c *Azure) Extract(ctx context.Context, deployment, text string) ([]store.B
 	defer cancel()
 	if err := c.request(ctx, http.MethodPost, endpoint+"/chat/completions",
 		"https://cognitiveservices.azure.com/.default", payload, &response); err != nil {
-		return nil, err
+		return "", err
 	}
 	if len(response.Choices) != 1 || response.Choices[0].Finish != "stop" {
-		return nil, ErrResult
+		return "", ErrResult
 	}
-	return ParseResult(response.Choices[0].Message.Content)
+	return response.Choices[0].Message.Content, nil
 }
 
 var _ policy.Transporter = identityTransport{}

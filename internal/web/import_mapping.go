@@ -271,6 +271,7 @@ func (s *Server) handleImportMappingConfirm(w http.ResponseWriter, r *http.Reque
 		outcome.Digest, outcome.Accounts = item.digest, len(item.sources)
 		outcome.Added, outcome.Existing = comparison.Added, comparison.Existing
 		outcome.Preserved = comparison.Preserved
+		outcome.AnalysisIDs = bankAnalysisIDs(comparison.AddedIDs)
 		for _, source := range item.sources {
 			outcome.Transactions += len(source.Payments)
 		}

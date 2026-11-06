@@ -131,7 +131,14 @@ The deployment is selected in Settings and saved globally in `app_state`, not
 per household or per upload. Import requests use that saved selection, ignoring
 any submitted deployment. Account administration also belongs in Settings;
 Import selects the member's bank account and performs reading/review. CSV and
-XLSX are parsed locally without AI, even when Azure is disabled. `internal/bankimport`
+XLSX are parsed locally, even when Azure is disabled. Optional classification
+then uses the same configured Azure model for new unresolved payments, or an
+explicit analysis of existing pending payments. Only existing category IDs of
+the matching direction are permitted. Store cached explanations and suggestions
+as `BankTransaction.Analysis`, never as additional bookings or accepted facts;
+discard results if the payment, category catalog or selected model changed.
+Never call AI from report/page GETs or inside a database transaction.
+`internal/bankimport`
 owns strict column mapping, cent-exact parsing and bounded spreadsheet decoding.
 Invalid rows fail the whole import; never silently skip rows, guess ambiguous
 columns or evaluate spreadsheet formulas. PDF-only configuration guards must
@@ -140,7 +147,8 @@ Structured exports with multiple own accounts require explicit, distinct
 destination mappings before persistence. Counterparty IBANs are not source
 accounts. Mapping previews are bounded, household-scoped and in-memory only;
 confirmation is atomic and serialized with data resets/restores.
-Backup format 4 also preserves original payment fingerprints; formats 1–3 still
+Backup format 5 preserves original payment fingerprints, cached AI suggestions
+and pending allocation drafts; formats 1–4 still
 restore. Missing account defaults are backfilled
 only after all original IDs have been restored.
 Text is sent only when the user starts analysis; there is no separate consent

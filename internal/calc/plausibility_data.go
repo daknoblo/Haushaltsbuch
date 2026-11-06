@@ -158,17 +158,22 @@ func checkSource(ctx context.Context, out *PlausibilityResult, s store.Household
 			key, err := hex.DecodeString(p.SourceFingerprint)
 			check(err == nil && len(key) == sha256.Size, "fingerprint", p.Name)
 		}
+		if p.Analysis != nil {
+			check(p.Analysis.Valid(), "data", p.Name)
+		}
 		if len(p.BookedOn) >= 7 && closed[p.BookedOn[:7]] {
 			check(p.Decision != "pending", "closedPending", p.Name)
 		}
 		if p.Decision == "transfer" {
 			check(accounts[p.TransferAccountID] != 0 && p.TransferAccountID != imports[p.ImportID], "reference", p.Name)
 		}
-		if p.Decision != "accepted" {
+		if p.Decision != "accepted" && (p.Decision != "pending" || len(p.Splits) == 0) {
 			check(len(p.Splits) == 0 && len(p.TagIDs) == 0, "excluded", p.Name)
 			continue
 		}
-		check(p.CategoryID != 0 && p.TransferAccountID == 0, "reference", p.Name)
+		if p.Decision == "accepted" {
+			check(p.CategoryID != 0 && p.TransferAccountID == 0, "reference", p.Name)
+		}
 		var sum int64
 		seen := map[int64]bool{}
 		for _, sp := range p.Splits {
@@ -178,6 +183,9 @@ func checkSource(ctx context.Context, out *PlausibilityResult, s store.Household
 		}
 		check(len(p.Splits) > 0 && sum == p.AmountCents, "paymentAllocation", p.Name)
 		checkTags(p.TagIDs, p.Name)
+		if p.Decision == "pending" {
+			continue
+		}
 		key := fmt.Sprintf("%d:%s", imports[p.ImportID], store.PaymentFingerprint(p))
 		if duplicates[key] {
 			month := ""

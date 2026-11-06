@@ -70,14 +70,18 @@
   }
   .import-payment-summary {
     @apply grid cursor-pointer list-none items-center gap-x-3 gap-y-1 px-3 py-2.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500;
-    grid-template-columns: 0.75rem minmax(0, 1fr) auto;
-    grid-template-areas: "expand description amount" ". date state" ". labels labels" ". actions actions";
+    grid-template-columns: 1rem 0.75rem minmax(0, 1fr) auto;
+    grid-template-areas: "select expand description amount" ". . date date" ". . state state" ". . labels labels" ". . actions actions";
   }
   .import-payment-summary::-webkit-details-marker { display: none; }
   .import-expand { grid-area: expand; @apply text-lg text-slate-400 transition-transform; }
+  .import-select { grid-area: select; @apply flex items-center; }
+  [data-review-filter][aria-pressed="true"] {
+    @apply border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-950 dark:text-indigo-200;
+  }
   .import-date { grid-area: date; @apply text-xs text-slate-500 dark:text-slate-400; }
   .import-description { grid-area: description; @apply min-w-0; }
-  .import-state { grid-area: state; @apply flex flex-wrap justify-end gap-1; }
+  .import-state { grid-area: state; @apply flex flex-wrap justify-start gap-1; }
   .import-amount { grid-area: amount; @apply whitespace-nowrap text-right font-semibold; }
   .import-actions { grid-area: actions; @apply flex justify-end; }
   .import-labels { grid-area: labels; @apply flex min-w-0 flex-wrap items-center gap-1 pt-1; }
@@ -121,12 +125,12 @@
   .upload-queue-row[data-upload-state="mapping"] .upload-state-label {
     @apply text-amber-700 dark:text-amber-300;
   }
-  @screen md {
+  @screen lg {
     .import-payment-summary {
-      grid-template-columns: 0.75rem 6rem minmax(0, 1fr) auto 8.5rem auto;
-      grid-template-areas: "expand date description state amount actions" ". labels labels labels labels labels";
+      grid-template-columns: 1rem 0.75rem 6rem minmax(0, 1fr) auto 8.5rem auto;
+      grid-template-areas: "select expand date description state amount actions" ". . labels labels labels labels labels";
     }
-    .import-state { @apply max-w-xs; }
+    .import-state { @apply max-w-xs justify-end; }
   }
 
   .nav-link {
@@ -159,7 +163,10 @@
   .btn-icon-danger {
     @apply border-rose-300 text-rose-600 hover:bg-rose-500 hover:text-white dark:border-rose-500/40 dark:text-rose-400 dark:hover:bg-rose-500 dark:hover:text-white;
   }
-  .btn-icon:disabled, .btn-icon:disabled:hover {
+  .btn-icon:disabled, .btn-icon:disabled:hover,
+  .btn-ghost:disabled, .btn-ghost:disabled:hover,
+  .btn-primary:disabled, .btn-primary:disabled:hover,
+  .btn-danger:disabled, .btn-danger:disabled:hover {
     @apply cursor-not-allowed border-slate-300 bg-slate-100 text-slate-400 opacity-60 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-500;
   }
   /* The booking count of a category. A fixed width keeps the rows of the list

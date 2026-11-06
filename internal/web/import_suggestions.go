@@ -25,8 +25,11 @@ func containsPhrase(text, phrase string) bool {
 
 func historyKey(p store.BankTransaction) string {
 	key := matchText(p.Name)
-	for _, processor := range []string{"paypal", "klarna", "stripe", "sumup"} {
+	for _, processor := range []string{"paypal", "klarna", "stripe", "sumup", "amazon", "ebay", "etsy"} {
 		if containsPhrase(p.Name, processor) {
+			if matchText(p.Reference) == "" {
+				return key + "\x00payment:" + strconv.FormatInt(p.ID, 10)
+			}
 			return key + "\x00" + matchText(p.Reference)
 		}
 	}
@@ -75,8 +78,17 @@ func proposeImport(row *ImportRow, data calc.Data, ledger store.BankLedger, acco
 	if p.Decision != "pending" {
 		return
 	}
+	hasDraft := len(p.Splits) > 0 && p.PlanID == 0
+	if hasDraft {
+		row.Allocation = "draft"
+	}
+	if p.PlanID != 0 {
+		row.Suggestion = "plan"
+	} else if p.CategoryID != 0 {
+		row.Suggestion = "manual"
+	}
 	p.Name, p.Reference = strings.TrimSpace(p.Name), strings.TrimSpace(p.Reference)
-	if p.CategoryID == 0 && p.PlanID == 0 {
+	if p.CategoryID == 0 && p.PlanID == 0 && !hasDraft {
 		nature, class, settle := p.CostNature, p.BudgetClass, p.Settle
 		suggestPlan(p, data)
 		if nature != store.CostVariable || class != store.ClassNeed {
@@ -189,10 +201,13 @@ func suggestCategory(row *ImportRow, data calc.Data, account store.BankAccount) 
 			if slices.ContainsFunc(rule.categories, func(name string) bool { return matchText(name) == matchText(category.Name) }) {
 				matches[category.ID] = true
 				nature, class = rule.nature, rule.class
+				row.RuleClassification = true
 			}
 		}
 	}
+	source := "rule"
 	if len(matches) == 0 {
+		source = "account"
 		for _, category := range data.Categories {
 			if category.Classification == p.Direction && containsPhrase(account.Name, category.Name) {
 				matches[category.ID] = true
@@ -208,7 +223,7 @@ func suggestCategory(row *ImportRow, data calc.Data, account store.BankAccount) 
 	if p.CostNature == store.CostVariable && p.BudgetClass == store.ClassNeed {
 		p.CostNature, p.BudgetClass = nature, class
 	}
-	row.Suggestion = "rule"
+	row.Suggestion = source
 }
 
 func describeImport(ctx context.Context, row *ImportRow, data calc.Data) {
@@ -233,8 +248,27 @@ func describeImport(ctx context.Context, row *ImportRow, data calc.Data) {
 		}
 	}
 	row.AllocationLabel = strings.Join(parts, " · ")
-	row.CanQuick = row.Payment.Decision == "pending" && !row.Closed && !row.Duplicate && row.TransferCandidate == "" && row.SimilarCandidate == "" && row.Payment.TransferAccountID == 0 &&
+	row.CanQuick = row.Payment.Decision == "pending" && !row.Closed && !row.Duplicate && row.TransferCandidate == "" && row.Payment.TransferAccountID == 0 &&
 		row.Category != "" && len(row.Payment.Splits) > 0 && row.AllocationLabel != "" && row.Suggestion != "conflict"
+	row.Stage = "needs"
+	switch {
+	case row.Payment.Decision != "pending":
+		row.Stage = "done"
+	case row.CanQuick:
+		row.Stage = "ready"
+		if row.Suggestion == "account" || row.Suggestion == "ai" || row.SimilarCandidate != "" ||
+			row.PlanOwnerMismatch || (row.PlanName != "" && row.PlanAmount != row.Payment.AmountCents) {
+			row.Stage = "suggested"
+		}
+	}
+	classificationInferred := row.Suggestion == "plan" || row.Suggestion == "history" || (row.Suggestion == "rule" && row.RuleClassification)
+	row.NatureDefault = row.Payment.Decision == "pending" && row.Payment.CostNature == store.CostVariable && !classificationInferred
+	row.ClassDefault = row.Payment.Decision == "pending" && row.Payment.BudgetClass == store.ClassNeed && !classificationInferred
+	if row.Suggestion == "ai" && row.Payment.Analysis != nil {
+		row.NatureDefault = row.Payment.Analysis.CostNature == ""
+		row.ClassDefault = row.Payment.Analysis.BudgetClass == ""
+	}
+	row.AllocationDefault = row.Payment.Decision == "pending" && row.Allocation == "owner" && row.Suggestion != "history"
 	if row.AllocationLabel == "" && row.Payment.Decision == "pending" {
 		row.AllocationLabel = T(ctx, "import.allocationMissing")
 	}
@@ -273,6 +307,12 @@ func ImportSuggestionLabel(ctx context.Context, source string) string {
 		return T(ctx, "import.suggestionRule")
 	case "conflict":
 		return T(ctx, "import.suggestionConflict")
+	case "account":
+		return T(ctx, "review.sourceAccount")
+	case "manual":
+		return T(ctx, "review.sourceManual")
+	case "ai":
+		return T(ctx, "review.sourceAI")
 	default:
 		return ""
 	}

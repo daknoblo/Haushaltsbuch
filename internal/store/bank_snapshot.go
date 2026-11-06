@@ -37,6 +37,13 @@ func (s *Store) importBankLedger(ctx context.Context, householdID int64, l BankL
 		if err := ValidateBankTransaction(b); err != nil {
 			return fmt.Errorf("%w: %w", ErrBadSnapshot, err)
 		}
+		if b.Analysis != nil && !b.Analysis.Valid() {
+			return ErrBadSnapshot
+		}
+		if (b.Decision != "pending" && b.Decision != "accepted" && (len(b.Splits) != 0 || len(b.TagIDs) != 0)) ||
+			(b.Decision == "pending" && len(b.Splits) == 0 && len(b.TagIDs) != 0) {
+			return ErrBadSnapshot
+		}
 		if b.SourceFingerprint != "" {
 			key, err := hex.DecodeString(b.SourceFingerprint)
 			if err != nil || len(key) != sha256.Size {
@@ -47,7 +54,7 @@ func (s *Store) importBankLedger(ctx context.Context, householdID int64, l BankL
 		if err := s.validateBankReferences(ctx, householdID, b); err != nil {
 			return err
 		}
-		if err := s.insertBankTransaction(ctx, householdID, b); err != nil {
+		if err := s.insertBankTransaction(ctx, householdID, &b); err != nil {
 			return err
 		}
 	}

@@ -14,7 +14,7 @@ container (distroless, non-root).
 - **Frontend:** server-rendered with [templ](https://templ.guide) + HTMX and
   Tailwind CSS, compiled into the binary – no Node build step required
 - **PDF export:** pure Go via [maroto](https://maroto.tech)
-- **Statement import:** CSV and Excel (`.xlsx`) read locally without AI;
+- **Statement import:** CSV and Excel (`.xlsx`) parsed locally;
   optional PDF text extraction with Azure OpenAI. All formats require explicit
   review before an actual payment counts.
 
@@ -192,22 +192,64 @@ signed amount, plus category, cost nature, budget class, exact proposed member
 shares, tags and any plan link directly in the row. Local suggestions use active
 plans, consistent accepted history from the same bank account, known merchant
 patterns and matching category/account names. Conflicting history and unknown
-categories are not silently replaced by a catch-all category. Payment-processor
-history also requires the same reference. Pending and ignored rows never train
-the history-based suggestions; CSV/XLSX classification does not call AI.
+categories are not silently replaced by a catch-all category. Marketplace and
+payment-processor history requires the same nonempty reference; a generic
+Amazon or PayPal name alone does not establish a repeat purchase. Pending and ignored rows never train
+the history-based suggestions. Account-name guesses are explicitly distinguished
+from merchant rules and confirmed history; default cost/budget values and
+account-owner allocations are labelled as defaults, not detected properties.
+
+When a model is configured, new unresolved payments are automatically analyzed
+after upload or account mapping. Existing unresolved payments can be analyzed
+with the review toolbar button. Only payee, reference, direction, opaque payment
+IDs and existing categories are sent to the configured Azure endpoint. No
+separate account-number, balance, member-list or payment-amount fields are
+included; the original payee/reference text itself may contain personal or
+banking details and is transmitted as provided. The model may choose
+only an existing category of the matching direction, or explicitly return no
+category. Explanations are shown alongside the proposal. AI never accepts a
+payment or creates categories or plans. Completed proposals (including unknown
+results) are cached on the original payment; unchanged results are not billed
+again. Edits, catalog changes and stale in-flight results are checked before
+storage. Failed analysis is reported separately from the successful file import;
+there are no automatic retries. Without JavaScript, use the analysis button
+after importing. Analysis is bounded to 50 payments per request to Azure and
+1,000 selected payments per application request.
+
+The review list separates **Ready to confirm**, **Review suggestion**,
+**Needs clarification** and **Done**, with filterable counts. Ready is not a
+guarantee of factual correctness. Select visible clear matches, inspect the
+selection, then accept it together. Selected pending rows can also receive a
+shared category and optional cost/budget classes without being accepted.
+An accepted row can preselect matching pending rows from the same account,
+payee and direction and prefill those fields for explicit application.
+Existing proposed member allocations are retained as pending drafts, never
+included in actual totals. Each batch is revalidated and committed atomically;
+stale, foreign, closed or otherwise invalid selections cannot partially save.
 
 An eligible row can be **accepted directly** without opening its details.
-Possible duplicates, internal-transfer hints, missing categories or incomplete
+Exact-duplicate warnings, internal-transfer hints, missing categories or incomplete
 allocations require inspection. Details remain available for corrections and
-explicit duplicate overrides. Suggestions are request-local, not extra stored
-bookings. Direct acceptance checks the displayed values and allocations against
+explicit duplicate overrides. Weaker same-merchant similarities remain visible
+without blocking explicit acceptance; they are not selected as clear matches.
+Unique reciprocal payments between own accounts can be explicitly confirmed
+together as a transfer, including across adjacent months. Both dates, accounts
+and the counterpart are shown, and neither side contributes to income/expenses.
+Suggestions do not create extra stored bookings. Direct acceptance checks the displayed values and allocations against
 a fresh database snapshot inside the write transaction; changed payment, plan
 or allocation data must be reviewed again. There is no automatic approval,
 duplicate override or retry. Existing accepted allocation snapshots remain
 unchanged. Editing detail fields disables the row shortcut until those changes
 are submitted through the detailed form.
 
-State counts summarize the selected month. Duplicate and possible transfer
+State counts and completion progress summarize the selected month. A source
+explanation distinguishes actuals from open historical plan estimates and
+current/future plans. Linked plans are reachable from each row, with planned
+amount, actual amount and difference shown; payer differences require review.
+Plan amounts retain their recurrence meaning: an annual premium is normalized
+monthly in planning but appears in its payment month in actuals. No accepted
+payment or batch silently changes a future plan or duplicates it.
+Duplicate and possible transfer
 indicators remain visible when collapsed. Original source names remain available
 in booking details as provenance, not as stored files. The generic AI warning
 banner has been removed; manual review and month-completeness confirmation are
@@ -329,15 +371,16 @@ or automatic bank access. Processing runs one at a time, is time-bounded and
 rejects partial, truncated or malformed input without persisting a partial import.
 Bank account names, default-account markers, import digests, review decisions,
 allocations, month closures and the non-secret global model selection are
-included in backup format 4, together with original payment fingerprints.
-Formats 1–3 remain readable; missing accounts
+included in backup format 5, together with original payment fingerprints,
+cached AI suggestions and pending allocation drafts.
+Formats 1–4 remain readable; missing accounts
 and defaults are filled in without changing existing IDs. Older backups do not
 contain a model selection, so select one in Settings after restoring them.
 Resetting bookings also clears statements, actual payments and month closures,
 but keeps the account setup and model selection. A full reset clears the model
 selection and creates default accounts for the newly seeded members. Versions
-before this change cannot read format 4 backups. Back up before upgrading;
-migration 0010 adds fingerprint tracking without changing existing payment data.
+before this change cannot read format 5 backups. Back up before upgrading;
+migration 0011 adds optional analysis metadata without changing existing payment data.
 
 ### CSV and Excel formats
 

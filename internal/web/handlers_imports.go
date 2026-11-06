@@ -38,6 +38,7 @@ type ImportVM struct {
 	Rows             []ImportRow
 	AIEnabled        bool
 	AIConfigured     bool
+	CanAnalyze       bool
 	Closed           bool
 	PendingMappings  []ImportMappingVM
 	MappingMessage   string
@@ -53,24 +54,34 @@ type ImportMonth struct {
 
 // ImportRow adds non-binding duplicate, transfer and plan hints to a payment.
 type ImportRow struct {
-	Payment           store.BankTransaction
-	AccountID         int64
-	Account           string
-	Source            string
-	Duplicate         bool
-	TransferCandidate string
-	PlanAmount        int64
-	PlanName          string
-	Category          string
-	Allocation        string
-	AllocationLabel   string
-	HistoryID         int64
-	Suggestion        string
-	Tags              []store.Tag
-	Closed            bool
-	CanQuick          bool
-	SimilarCandidate  string
-	original          store.BankTransaction
+	Payment            store.BankTransaction
+	AccountID          int64
+	Account            string
+	Source             string
+	Duplicate          bool
+	TransferCandidate  string
+	PlanAmount         int64
+	PlanName           string
+	Category           string
+	Allocation         string
+	AllocationLabel    string
+	HistoryID          int64
+	Suggestion         string
+	Tags               []store.Tag
+	Closed             bool
+	CanQuick           bool
+	SimilarCandidate   string
+	Stage              string
+	AIReason           string
+	NatureDefault      bool
+	ClassDefault       bool
+	AllocationDefault  bool
+	RuleClassification bool
+	PlanOwnerMismatch  bool
+	TransferPairID     int64
+	TransferPairLabel  string
+	TransferPairToken  string
+	original           store.BankTransaction
 }
 
 // DecisionCount summarizes the visible month's review state without mixing amounts.
@@ -122,6 +133,8 @@ func (s *Server) buildImportVM(ctx context.Context, household int64, month strin
 		return vm, err
 	}
 	vm.AIConfigured = deployment != ""
+	_, classifier := s.bankAI.(bankClassifier)
+	vm.CanAnalyze = classifier && vm.AIConfigured
 	if household != 0 {
 		snapshot, err := s.store.ReadHousehold(ctx, household)
 		if err != nil {
@@ -173,10 +186,12 @@ func importRows(ctx context.Context, l store.BankLedger, data calc.Data, month s
 		batch := batches[p.ImportID]
 		row := ImportRow{Payment: p, original: p, AccountID: batch.AccountID, Account: accounts[batch.AccountID], Source: batch.Filename, Closed: slices.Contains(l.ClosedMonths, p.BookedOn[:7])}
 		proposeImport(&row, data, l, accountRecords[batch.AccountID])
+		applyBankAnalysis(&row, data)
 		p = row.Payment
 		if plan, ok := plans[p.PlanID]; ok {
 			row.PlanName = plan.Name
 			row.PlanAmount = calc.AmountFor(plan, data.Overrides[plan.ID], month)
+			row.PlanOwnerMismatch = plan.PayerMemberID != nil && *plan.PayerMemberID != accountRecords[batch.AccountID].MemberID
 		}
 		for _, other := range l.Transactions {
 			if other.ID == p.ID {
@@ -188,13 +203,19 @@ func importRows(ctx context.Context, l store.BankLedger, data calc.Data, month s
 			}
 			if otherAccount == batch.AccountID && other.BookedOn == p.BookedOn && other.Direction == p.Direction &&
 				store.BankSourceFingerprint(other) != store.BankSourceFingerprint(p) &&
-				(other.AmountCents == p.AmountCents || (matchText(other.Name) == matchText(p.Name) && strings.TrimSpace(p.Reference) != "" && matchText(other.Reference) == matchText(p.Reference))) {
+				matchText(other.Name) == matchText(p.Name) && other.Decision != "ignored" &&
+				(other.AmountCents == p.AmountCents || (strings.TrimSpace(p.Reference) != "" && matchText(other.Reference) == matchText(p.Reference))) {
 				row.SimilarCandidate = FormatDate(other.BookedOn) + " · " + other.Name + " · " + FormatEUR(other.AmountCents)
 			}
 			if otherAccount != batch.AccountID && p.AmountCents == other.AmountCents &&
 				other.Decision != "ignored" && p.Direction != other.Direction && nearbyBankDates(p.BookedOn, other.BookedOn) {
 				row.TransferCandidate = accounts[otherAccount]
 			}
+		}
+		if partner, ok := transferPartner(l, row.original.ID); ok && !row.Closed && !slices.Contains(l.ClosedMonths, partner.BookedOn[:7]) {
+			row.TransferPairID = partner.ID
+			row.TransferPairLabel = accounts[batches[partner.ImportID].AccountID] + " · " + FormatDate(partner.BookedOn) + " · " + partner.Name + " · " + FormatEUR(partner.AmountCents)
+			row.TransferPairToken = transferPairToken(row.original, partner)
 		}
 		if row.TransferCandidate == "" && p.Decision == "pending" {
 			for _, member := range data.Members {
@@ -402,7 +423,7 @@ func (s *Server) handleBankUpload(w http.ResponseWriter, r *http.Request) {
 		s.bankError(w, r, err)
 		return
 	}
-	s.uploadResult(w, r, uploadOutcome{Status: "imported", URL: importMonthURL(comparison.ReviewMonth), Digest: digest, Transactions: len(payments), Accounts: 1, Detected: detected, Added: comparison.Added, Existing: comparison.Existing, Preserved: comparison.Preserved})
+	s.uploadResult(w, r, uploadOutcome{Status: "imported", URL: importMonthURL(comparison.ReviewMonth), Digest: digest, Transactions: len(payments), Accounts: 1, Detected: detected, Added: comparison.Added, Existing: comparison.Existing, Preserved: comparison.Preserved, AnalysisIDs: bankAnalysisIDs(comparison.AddedIDs)})
 }
 
 func suggestPlan(p *store.BankTransaction, data calc.Data) {
@@ -461,6 +482,7 @@ func (s *Server) handleBankReview(w http.ResponseWriter, r *http.Request) {
 		s.bankError(w, r, err)
 		return
 	}
+	draft := p
 	if p.Decision == "pending" {
 		p, err = pendingReview(r, p)
 		if err != nil {
@@ -470,8 +492,10 @@ func (s *Server) handleBankReview(w http.ResponseWriter, r *http.Request) {
 	}
 	p.Decision = r.FormValue("decision")
 	p.Splits, p.TagIDs = nil, nil
-	if p.Decision == "accepted" {
-		p.TransferAccountID = 0
+	if p.Decision == "accepted" || p.Decision == "pending" {
+		if p.Decision == "accepted" {
+			p.TransferAccountID = 0
+		}
 		switch r.FormValue("allocation") {
 		case "owner":
 			p.Splits = []store.BankSplit{{MemberID: account.MemberID, Cents: p.AmountCents}}
@@ -509,9 +533,18 @@ func (s *Server) handleBankReview(w http.ResponseWriter, r *http.Request) {
 				s.bankError(w, r, store.ErrInvalid)
 				return
 			}
+		case "draft":
+			if len(draft.Splits) == 0 {
+				s.bankError(w, r, store.ErrInvalid)
+				return
+			}
+			p.Splits = historyAllocation(draft, p.AmountCents)
+			p.TagIDs = slices.Clone(draft.TagIDs)
 		default:
-			s.bankError(w, r, store.ErrInvalid)
-			return
+			if p.Decision == "accepted" {
+				s.bankError(w, r, store.ErrInvalid)
+				return
+			}
 		}
 	}
 	err = s.store.ReviewBankTransaction(r.Context(), hh, p, r.FormValue("allow_duplicate") == "yes")

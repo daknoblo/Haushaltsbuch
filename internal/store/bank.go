@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -58,7 +59,8 @@ type BankTransaction struct {
 	Name              string
 	Reference         string
 	Fingerprint       string
-	SourceFingerprint string `json:",omitempty"`
+	SourceFingerprint string        `json:",omitempty"`
+	Analysis          *BankAnalysis `json:",omitempty"`
 	Decision          string
 	CategoryID        int64
 	PlanID            int64
@@ -177,12 +179,16 @@ func (s *Store) readBankLedger(ctx context.Context, householdID int64, l *BankLe
 		}},
 		{`SELECT id, import_id, booked_on, direction, amount_cents, name, reference, fingerprint,
 			decision, COALESCE(category_id,0), COALESCE(plan_id,0), COALESCE(transfer_account_id,0),
-			cost_nature, budget_class, settle, source_fingerprint FROM bank_transactions WHERE household_id = ? ORDER BY booked_on, id`, func(r *sql.Rows) error {
+			cost_nature, budget_class, settle, source_fingerprint, analysis FROM bank_transactions WHERE household_id = ? ORDER BY booked_on, id`, func(r *sql.Rows) error {
 			var b BankTransaction
+			var analysis string
 			if err := r.Scan(&b.ID, &b.ImportID, &b.BookedOn, &b.Direction, &b.AmountCents, &b.Name,
 				&b.Reference, &b.Fingerprint, &b.Decision, &b.CategoryID, &b.PlanID, &b.TransferAccountID,
-				&b.CostNature, &b.BudgetClass, &b.Settle, &b.SourceFingerprint); err != nil {
+				&b.CostNature, &b.BudgetClass, &b.Settle, &b.SourceFingerprint, &analysis); err != nil {
 				return err
+			}
+			if err := json.Unmarshal([]byte(analysis), &b.Analysis); err != nil {
+				return fmt.Errorf("read bank analysis: %w", err)
 			}
 			l.Transactions = append(l.Transactions, b)
 			return nil
@@ -336,7 +342,8 @@ func (s *Store) CreateBankImport(ctx context.Context, householdID int64, batch B
 			if err := tx.validateBankReferences(ctx, householdID, b); err != nil {
 				return err
 			}
-			if err := tx.insertBankTransaction(ctx, householdID, b); err != nil {
+			b.Analysis = nil
+			if err := tx.insertBankTransaction(ctx, householdID, &b); err != nil {
 				return err
 			}
 		}
@@ -351,17 +358,21 @@ func optionalID(id int64) any {
 	return id
 }
 
-func (s *Store) insertBankTransaction(ctx context.Context, householdID int64, b BankTransaction) error {
+func (s *Store) insertBankTransaction(ctx context.Context, householdID int64, b *BankTransaction) error {
+	analysis, err := json.Marshal(b.Analysis)
+	if err != nil {
+		return err
+	}
 	res, err := s.q.ExecContext(ctx, `INSERT INTO bank_transactions
 		(id, household_id, import_id, booked_on, direction, amount_cents, name, reference, fingerprint,
-		decision, category_id, plan_id, transfer_account_id, cost_nature, budget_class, settle, source_fingerprint)
+		decision, category_id, plan_id, transfer_account_id, cost_nature, budget_class, settle, source_fingerprint, analysis)
 		VALUES (?, ?, (SELECT id FROM bank_imports WHERE id = ? AND household_id = ?),
 		?, ?, ?, ?, ?, ?, ?, `+categoryRef+`,
 		(SELECT id FROM bookings WHERE id = ? AND household_id = ?),
-		(SELECT id FROM bank_accounts WHERE id = ? AND household_id = ?), ?, ?, ?, ?)`,
+		(SELECT id FROM bank_accounts WHERE id = ? AND household_id = ?), ?, ?, ?, ?, ?)`,
 		optionalID(b.ID), householdID, b.ImportID, householdID, b.BookedOn, b.Direction, b.AmountCents,
-		b.Name, b.Reference, PaymentFingerprint(b), b.Decision, b.CategoryID, householdID,
-		b.PlanID, householdID, b.TransferAccountID, householdID, b.CostNature, b.BudgetClass, b.Settle, b.SourceFingerprint)
+		b.Name, b.Reference, PaymentFingerprint(*b), b.Decision, b.CategoryID, householdID,
+		b.PlanID, householdID, b.TransferAccountID, householdID, b.CostNature, b.BudgetClass, b.Settle, b.SourceFingerprint, string(analysis))
 	if err != nil {
 		return err
 	}
@@ -369,7 +380,8 @@ func (s *Store) insertBankTransaction(ctx context.Context, householdID int64, b 
 	if err != nil {
 		return err
 	}
-	return s.replaceBankAllocation(ctx, householdID, id, b)
+	b.ID = id
+	return s.replaceBankAllocation(ctx, householdID, id, *b)
 }
 
 func (s *Store) validateBankReferences(ctx context.Context, householdID int64, b BankTransaction) error {
@@ -435,7 +447,7 @@ func (s *Store) replaceBankAllocation(ctx context.Context, householdID, id int64
 	if _, err := s.q.ExecContext(ctx, `DELETE FROM bank_tags WHERE transaction_id = ?`, id); err != nil {
 		return err
 	}
-	if b.Decision != "accepted" {
+	if b.Decision != "accepted" && (b.Decision != "pending" || len(b.Splits) == 0) {
 		return nil
 	}
 	var total int64
@@ -518,10 +530,11 @@ func (s *Store) ReviewBankTransaction(ctx context.Context, householdID int64, b 
 			decision = ?, category_id = `+categoryRef+`,
 			plan_id = (SELECT id FROM bookings WHERE id = ? AND household_id = ?),
 			transfer_account_id = (SELECT id FROM bank_accounts WHERE id = ? AND household_id = ?),
-			cost_nature = ?, budget_class = ?, settle = ?, source_fingerprint = ? WHERE id = ? AND household_id = ?`,
+			cost_nature = ?, budget_class = ?, settle = ?, source_fingerprint = ?,
+			analysis = CASE WHEN ? = 'pending' THEN 'null' ELSE analysis END WHERE id = ? AND household_id = ?`,
 			b.BookedOn, b.Direction, b.AmountCents, b.Name, b.Reference, PaymentFingerprint(b), b.Decision,
 			b.CategoryID, householdID, b.PlanID, householdID, b.TransferAccountID, householdID,
-			b.CostNature, b.BudgetClass, b.Settle, original.SourceFingerprint, b.ID, householdID)); err != nil {
+			b.CostNature, b.BudgetClass, b.Settle, original.SourceFingerprint, b.Decision, b.ID, householdID)); err != nil {
 			return err
 		}
 		return tx.replaceBankAllocation(ctx, householdID, b.ID, b)

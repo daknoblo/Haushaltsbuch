@@ -15,6 +15,7 @@ templ ImportUploader(nav Nav, vm ImportVM) {
 				enctype="multipart/form-data"
 				class="grid gap-3"
 				data-bank-upload
+				data-auto-analyze={ strconv.FormatBool(vm.CanAnalyze) }
 				data-max-bytes={ strconv.Itoa(UploadByteLimit()) }
 				data-history-url={ "/imports/status?part=history&m=" + nav.Month + "&household=" + strconv.FormatInt(nav.ActiveHousehold.ID, 10) }
 				data-review-url={ "/imports/status?part=review&m=" + nav.Month + "&household=" + strconv.FormatInt(nav.ActiveHousehold.ID, 10) }
@@ -47,6 +48,7 @@ templ ImportUploader(nav Nav, vm ImportVM) {
 				@statementTableOptionsForm()
 				<noscript>
 					<p class="alert-info">{ T(ctx, "import.uploadNoJS") }</p>
+					<p class="alert-info">{ T(ctx, "review.aiNoJS") }</p>
 					<button class="btn-primary" type="submit" disabled?={ len(vm.Ledger.Accounts)==0 }>{ T(ctx, "import.analyze") }</button>
 				</noscript>
 				<div data-upload-queue-area hidden>
@@ -94,6 +96,15 @@ templ ImportUploader(nav Nav, vm ImportVM) {
 					data-mapping-accounts-changed={ T(ctx, "import.mappingAccountsChanged") }
 					data-review-changed={ T(ctx, "import.reviewChanged") }
 					data-discard-edits={ T(ctx, "import.discardReviewEdits") }
+					data-selection-changed={ T(ctx, "review.selectionChanged") }
+					data-dirty={ T(ctx, "review.dirty") }
+					data-no-selection={ T(ctx, "review.noSelection") }
+					data-updated={ T(ctx, "review.updated") }
+					data-ai-running={ T(ctx, "review.aiRunning") }
+					data-ai-complete={ T(ctx, "review.aiComplete") }
+					data-ai-failed={ T(ctx, "review.aiFailed") }
+					data-pair-confirm={ T(ctx, "review.pairConfirm") }
+					data-limit={ T(ctx, "review.limit") }
 				></div>
 				<template data-upload-item>
 					<li class="upload-queue-row" data-upload-state="queued">

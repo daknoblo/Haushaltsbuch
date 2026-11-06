@@ -115,7 +115,7 @@ func TestReconciliationIsAtomicScopedAndRespectsClosedMonths(t *testing.T) {
 	closed.Name = "New closed payment"
 	batch.Import.Digest = strings.Repeat("b", 64)
 	batch.Payments = []BankTransaction{open, closed}
-	if result, err := st.ReconcileBankImports(ctx, household, []BankImportBatch{batch}); !errors.Is(err, ErrClosedMonth) || result != (BankReconciliation{}) {
+	if result, err := st.ReconcileBankImports(ctx, household, []BankImportBatch{batch}); !errors.Is(err, ErrClosedMonth) || result.Added != 0 || len(result.AddedIDs) != 0 || result.Existing != 0 {
 		t.Fatalf("closed month did not roll back whole upload: %+v %v", result, err)
 	}
 	after, err := st.BankLedger(ctx, household)

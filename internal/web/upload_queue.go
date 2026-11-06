@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/daknoblo/Haushaltsbuch/internal/bankimport"
 )
@@ -18,6 +19,15 @@ type uploadOutcome struct {
 	Added        int      `json:"added"`
 	Existing     int      `json:"existing"`
 	Preserved    int      `json:"preserved"`
+	AnalysisIDs  []string `json:"analysis_ids,omitempty"`
+}
+
+func bankAnalysisIDs(ids []int64) []string {
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, strconv.FormatInt(id, 10))
+	}
+	return out
 }
 
 var (
