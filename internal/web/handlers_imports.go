@@ -62,7 +62,9 @@ type ImportRow struct {
 	TransferCandidate  string
 	PlanAmount         int64
 	PlanName           string
+	PlanColor          string
 	Category           string
+	CategoryColor      string
 	Allocation         string
 	AllocationLabel    string
 	HistoryID          int64
@@ -190,6 +192,12 @@ func importRows(ctx context.Context, l store.BankLedger, data calc.Data, month s
 		p = row.Payment
 		if plan, ok := plans[p.PlanID]; ok {
 			row.PlanName = plan.Name
+			for _, category := range data.Categories {
+				if category.ID == plan.CategoryID {
+					row.PlanColor = category.Color
+					break
+				}
+			}
 			row.PlanAmount = calc.AmountFor(plan, data.Overrides[plan.ID], month)
 			row.PlanOwnerMismatch = plan.PayerMemberID != nil && *plan.PayerMemberID != accountRecords[batch.AccountID].MemberID
 		}

@@ -189,7 +189,11 @@ at startup, so environment changes require a restart as before.
 
 Statement transactions show booking date, payee, bank account, review state and
 signed amount, plus category, cost nature, budget class, exact proposed member
-shares, tags and any plan link directly in the row. Local suggestions use active
+shares, tags and any plan link directly in the row. Category, member-share and
+tag labels use their current colors from Settings; each member has a separate
+share label. Plan links use the linked plan's category color, while status and
+warning colors remain independent. Budget classes use the same color markers
+as the planned booking list. Local suggestions use active
 plans, consistent accepted history from the same bank account, known merchant
 patterns and matching category/account names. Conflicting history and unknown
 categories are not silently replaced by a catch-all category. Marketplace and

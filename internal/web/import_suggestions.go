@@ -230,6 +230,7 @@ func describeImport(ctx context.Context, row *ImportRow, data calc.Data) {
 	for _, category := range data.Categories {
 		if category.ID == row.Payment.CategoryID && category.Classification == row.Payment.Direction {
 			row.Category = category.Name
+			row.CategoryColor = category.Color
 		}
 	}
 	for _, tagID := range row.Payment.TagIDs {

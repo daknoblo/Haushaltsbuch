@@ -197,7 +197,7 @@ templ importPayment(nav Nav, vm ImportVM, row ImportRow) {
 				</span>
 				<span class="import-labels">
 					if row.Category!="" {
-						<span class="badge badge-info">{ row.Category }</span>
+						<span class="badge border" style={ tagStyle(row.CategoryColor) }>{ row.Category }</span>
 					} else {
 						<span class="badge badge-warn">{ T(ctx,"import.categoryMissing") }</span>
 					}
@@ -209,6 +209,7 @@ templ importPayment(nav Nav, vm ImportVM, row ImportRow) {
 							}
 						</span>
 						<span class="badge badge-muted">
+							<span class={ "inline-block h-2 w-2 shrink-0 rounded-full",BudgetClassDot(row.Payment.BudgetClass) } aria-hidden="true"></span>
 							{ BudgetClassLabel(ctx,row.Payment.BudgetClass) }
 							if row.ClassDefault {
 								· { T(ctx,"review.default") }
@@ -219,20 +220,30 @@ templ importPayment(nav Nav, vm ImportVM, row ImportRow) {
 						}
 					}
 					if row.AllocationLabel!="" {
-						<span class="badge badge-muted max-w-full whitespace-normal text-left">{ row.AllocationLabel }</span>
+						if len(row.Payment.Splits)>0 {
+							for _, split:=range row.Payment.Splits {
+								for _, member:=range vm.Data.Members {
+									if member.ID==split.MemberID {
+										<span class="badge border" style={ tagStyle(member.Color) }>{ member.Name }: { FormatEUR(split.Cents) }</span>
+									}
+								}
+							}
+						} else {
+							<span class="badge badge-muted">{ row.AllocationLabel }</span>
+						}
 						if row.AllocationDefault {
 							<span class="text-xs text-slate-500 dark:text-slate-400">{ T(ctx,"review.ownerDefault") }</span>
 						}
 					}
 					if row.PlanName!="" {
-						<a class="badge badge-info max-w-full whitespace-normal text-left underline" href={ templ.SafeURL(row.PlanURL()) }>{ Tf(ctx,"import.planLabel",row.PlanName) }</a>
+						<a class="badge border max-w-full whitespace-normal text-left underline" style={ tagStyle(row.PlanColor) } href={ templ.SafeURL(row.PlanURL()) }>{ Tf(ctx,"import.planLabel",row.PlanName) }</a>
 						<span class={ "badge",templ.KV("badge-warn",row.PlanAmount!=row.Payment.AmountCents),templ.KV("badge-muted",row.PlanAmount==row.Payment.AmountCents) }>{ Tf(ctx,"review.planAmount",FormatEUR(row.PlanAmount),FormatEUR(row.Payment.AmountCents),row.PlanDifference()) }</span>
 						if row.PlanOwnerMismatch {
 							<span class="badge badge-warn">{ T(ctx,"review.planOwner") }</span>
 						}
 					}
 					for _, tag:=range row.Tags {
-						<span class="badge badge-muted">{ tag.Name }</span>
+						<span class="badge border" style={ tagStyle(tag.Color) }>{ tag.Name }</span>
 					}
 					if row.Suggestion!="" {
 						<span class="text-xs text-slate-500 dark:text-slate-400">{ ImportSuggestionLabel(ctx,row.Suggestion) }</span>
