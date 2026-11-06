@@ -77,13 +77,13 @@ templ bankAccountSettings(householdID int64, members []store.Member, accounts []
 					<legend class="mb-1 text-sm font-semibold">{ m.Name }</legend>
 					for _, a := range accounts {
 						if a.MemberID == m.ID {
-							<div class="bank-account-row">
+							<div class="settings-row">
 								<form class="min-w-0" hx-post={ "/settings/bank-accounts/" + strconv.FormatInt(a.ID, 10) } hx-trigger="change, keyup changed delay:600ms" hx-swap="none" hx-sync="this:queue last" data-settings-save>
 									<input type="hidden" name="household" value={ strconv.FormatInt(householdID, 10) }/>
 									<input class="input w-full" name="name" value={ a.Name } maxlength="120" aria-label={ Tf(ctx, "settings.accountFor", m.Name) } required/>
 									<p class="alert-error mt-2" role="alert" data-settings-error data-fallback={ T(ctx, "settings.saveError") } hidden></p>
 								</form>
-								<div class="bank-account-actions">
+								<div class="settings-row-actions">
 									if a.Default {
 										<span class="badge badge-ok shrink-0 whitespace-nowrap">{ T(ctx, "settings.defaultAccount") }</span>
 										<button type="button" class="btn-icon btn-icon-danger" disabled aria-label={ T(ctx, "import.deleteUnusedAccount") } title={ T(ctx, "settings.defaultAccountProtected") }>✕</button>
@@ -101,11 +101,11 @@ templ bankAccountSettings(householdID int64, members []store.Member, accounts []
 							</div>
 						}
 					}
-					<form method="post" action="/settings/bank-accounts" class="bank-account-row mt-2">
+					<form method="post" action="/settings/bank-accounts" class="settings-row mt-2">
 						<input type="hidden" name="household" value={ strconv.FormatInt(householdID, 10) }/>
 						<input type="hidden" name="member" value={ strconv.FormatInt(m.ID, 10) }/>
 						<input class="input min-w-0" name="name" maxlength="120" aria-label={ Tf(ctx, "settings.newAccountFor", m.Name) } placeholder={ T(ctx, "import.accountExample") } required/>
-						<div class="bank-account-actions">
+						<div class="settings-row-actions">
 							<button class="btn-primary" type="submit" aria-label={ T(ctx, "settings.addBankAccount") }>{ T(ctx, "action.add") }</button>
 						</div>
 					</form>

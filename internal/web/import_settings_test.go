@@ -172,11 +172,98 @@ func TestBankAccountFieldsShareOneRowLayout(t *testing.T) {
 	}
 	body := get(t, handler, "/settings/bank-accounts").Body.String()
 	rows := len(accounts) + len(members)
-	if strings.Count(body, `class="bank-account-row`) != rows || strings.Count(body, `class="bank-account-actions"`) != rows {
+	if strings.Count(body, `class="settings-row`) != 2*rows || strings.Count(body, `class="settings-row-actions"`) != rows {
 		t.Fatal("default, additional and new accounts do not share the same field/action columns")
 	}
 	if strings.Count(body, `data-settings-save`) != len(accounts) || strings.Count(body, `hx-swap="none"`) != len(accounts) {
 		t.Fatal("account autosave behavior changed")
+	}
+}
+
+func TestSettingsTilesShareTextAndActionColumns(t *testing.T) {
+	srv, handler, household := newTestServer(t)
+	if _, err := srv.store.CreateHouseholdSeeded(t.Context(), "Another synthetic household"); err != nil {
+		t.Fatal(err)
+	}
+	households, err := srv.store.ListHouseholds(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	members, err := srv.store.ListMembers(t.Context(), household.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accounts, err := srv.store.ListBankAccounts(t.Context(), household.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attribute := func(node *html.Node, key string) string {
+		for _, attr := range node.Attr {
+			if attr.Key == key {
+				return attr.Val
+			}
+		}
+		return ""
+	}
+	for _, lang := range []i18n.Lang{i18n.German, i18n.English} {
+		t.Run(string(lang), func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, "/settings", nil)
+			request.Header.Set("Accept-Language", string(lang))
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+			if response.Code != http.StatusOK {
+				t.Fatalf("settings: %d", response.Code)
+			}
+			document, err := html.Parse(response.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rows, memberForms := 0, 0
+			var visit func(*html.Node)
+			visit = func(node *html.Node) {
+				if strings.Contains(" "+attribute(node, "class")+" ", " settings-row ") {
+					rows++
+					var columns []*html.Node
+					for child := node.FirstChild; child != nil; child = child.NextSibling {
+						if child.Type == html.ElementNode && attribute(child, "type") != "hidden" {
+							columns = append(columns, child)
+						}
+					}
+					if len(columns) != 2 || attribute(columns[1], "class") != "settings-row-actions" {
+						t.Fatal("every row needs a name column followed by the shared action column")
+					}
+					name := columns[0]
+					if name.Data == "form" {
+						name = name.FirstChild
+						for name != nil && (name.Data != "input" || attribute(name, "type") == "hidden") {
+							name = name.NextSibling
+						}
+					}
+					if name == nil || name.Data != "input" || attribute(name, "name") != "name" {
+						t.Fatal("text field must be the first visible control")
+					}
+					if node.Data == "form" && strings.HasPrefix(attribute(node, "hx-post"), "/members/") {
+						memberForms++
+						color := columns[1].FirstChild
+						if color == nil || attribute(color, "type") != "color" ||
+							attribute(node, "hx-swap") != "none" || attribute(node, "hx-trigger") != "change, keyup changed delay:600ms" {
+							t.Fatal("color must follow the name inside the same autosave form")
+						}
+					}
+				}
+				if node.Data == "button" && strings.HasPrefix(attribute(node, "hx-post"), "/members/") &&
+					attribute(node, "type") != "button" {
+					t.Fatal("member action must not submit the enclosing autosave form")
+				}
+				for child := node.FirstChild; child != nil; child = child.NextSibling {
+					visit(child)
+				}
+			}
+			visit(document)
+			if want := len(households) + 2*len(members) + len(accounts) + 2; rows != want || memberForms != len(members) {
+				t.Fatalf("rows = %d (want %d), member forms = %d (want %d)", rows, want, memberForms, len(members))
+			}
+		})
 	}
 }
 

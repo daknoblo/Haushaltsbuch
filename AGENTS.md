@@ -21,6 +21,11 @@ disabled rather than disappearing. Keep their place in the layout, use native
 `disabled` controls where possible, and explain the restriction when helpful.
 Visual disabling never replaces server-side validation.
 
+Comparable settings tiles share the same text-field and reserved action-column
+widths, including their add rows. Start each row with the text field, followed
+by options such as the member color picker. Add buttons fill the action column
+and center their label; fewer options must not make the text field wider.
+
 ## Domain model
 
 - **Household** – the top-level container. Exactly one is active at a time; the

@@ -498,7 +498,7 @@ func bankAccountSettings(householdID int64, members []store.Member, accounts []s
 			}
 			for _, a := range accounts {
 				if a.MemberID == m.ID {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<div class=\"bank-account-row\"><form class=\"min-w-0\" hx-post=\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<div class=\"settings-row\"><form class=\"min-w-0\" hx-post=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -563,7 +563,7 @@ func bankAccountSettings(householdID int64, members []store.Member, accounts []s
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "\" hidden></p></form><div class=\"bank-account-actions\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "\" hidden></p></form><div class=\"settings-row-actions\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -714,7 +714,7 @@ func bankAccountSettings(householdID int64, members []store.Member, accounts []s
 					}
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "<form method=\"post\" action=\"/settings/bank-accounts\" class=\"bank-account-row mt-2\"><input type=\"hidden\" name=\"household\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "<form method=\"post\" action=\"/settings/bank-accounts\" class=\"settings-row mt-2\"><input type=\"hidden\" name=\"household\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -766,7 +766,7 @@ func bankAccountSettings(householdID int64, members []store.Member, accounts []s
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "\" required><div class=\"bank-account-actions\"><button class=\"btn-primary\" type=\"submit\" aria-label=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "\" required><div class=\"settings-row-actions\"><button class=\"btn-primary\" type=\"submit\" aria-label=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

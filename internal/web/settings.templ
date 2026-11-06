@@ -24,14 +24,16 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 							}
 						</div>
 						<form
-							class="mt-3 flex gap-2"
+							class="settings-row mt-3"
 							hx-post="/households"
 							hx-target="#household-list"
 							hx-swap="beforeend"
 							data-reset-on-success
 						>
-							<input class="input min-w-0 flex-1" type="text" name="name" placeholder={ T(ctx, "settings.newHousehold") } required/>
-							<button class="btn-primary shrink-0" type="submit">{ T(ctx, "action.add") }</button>
+							<input class="input min-w-0" type="text" name="name" placeholder={ T(ctx, "settings.newHousehold") } required/>
+							<div class="settings-row-actions">
+								<button class="btn-primary" type="submit">{ T(ctx, "action.add") }</button>
+							</div>
 						</form>
 					</div>
 				</div>
@@ -44,14 +46,16 @@ templ SettingsPage(nav Nav, vm SettingsVM) {
 							}
 						</div>
 						<form
-							class="mt-3 flex gap-2"
+							class="settings-row mt-3"
 							hx-post="/members"
 							hx-target="#member-list"
 							hx-swap="beforeend"
 							data-reset-on-success
 						>
-							<input class="input min-w-0 flex-1" type="text" name="name" placeholder={ T(ctx, "settings.name") } required/>
-							<button class="btn-primary shrink-0" type="submit">{ T(ctx, "action.add") }</button>
+							<input class="input min-w-0" type="text" name="name" placeholder={ T(ctx, "settings.name") } required/>
+							<div class="settings-row-actions">
+								<button class="btn-primary" type="submit">{ T(ctx, "action.add") }</button>
+							</div>
 						</form>
 					</div>
 				</div>
@@ -280,56 +284,61 @@ templ categorySuggestions(vm SettingsVM) {
 }
 
 templ HouseholdRowView(h store.Household, activeID int64) {
-	<div id={ "hh-" + strconv.FormatInt(h.ID, 10) } class="flex items-center gap-2 border-b border-slate-200/70 pb-2 last:border-0 last:pb-0 dark:border-slate-800/60">
+	<div id={ "hh-" + strconv.FormatInt(h.ID, 10) } class="settings-row border-b border-slate-200/70 pb-2 last:border-0 last:pb-0 dark:border-slate-800/60">
 		<form
-			class="min-w-0 flex-1"
+			class="min-w-0"
 			hx-post={ "/households/" + strconv.FormatInt(h.ID, 10) }
 			hx-trigger="change, keyup changed delay:600ms"
 			hx-swap="none"
 		>
 			<input class="input min-w-0" type="text" name="name" value={ h.Name } required/>
 		</form>
-		if h.ID == activeID {
-			<span class="badge badge-ok shrink-0">{ T(ctx, "settings.active") }</span>
-		} else {
+		<div class="settings-row-actions">
+			if h.ID == activeID {
+				<span class="badge badge-ok shrink-0">{ T(ctx, "settings.active") }</span>
+			} else {
+				<button
+					class="btn-ghost shrink-0"
+					hx-post={ "/households/activate?id=" + strconv.FormatInt(h.ID, 10) }
+					hx-swap="none"
+				>{ T(ctx, "settings.activate") }</button>
+			}
+			@moveButtons("/households/" + strconv.FormatInt(h.ID, 10))
 			<button
-				class="btn-ghost shrink-0"
-				hx-post={ "/households/activate?id=" + strconv.FormatInt(h.ID, 10) }
+				class="btn-icon shrink-0 no-print"
+				hx-post={ "/households/" + strconv.FormatInt(h.ID, 10) + "/delete" }
 				hx-swap="none"
-			>{ T(ctx, "settings.activate") }</button>
-		}
-		@moveButtons("/households/" + strconv.FormatInt(h.ID, 10))
-		<button
-			class="btn-icon shrink-0 no-print"
-			hx-post={ "/households/" + strconv.FormatInt(h.ID, 10) + "/delete" }
-			hx-swap="none"
-			hx-confirm={ T(ctx, "settings.confirmHousehold") }
-			aria-label={ T(ctx, "action.delete") }
-		>✕</button>
+				hx-confirm={ T(ctx, "settings.confirmHousehold") }
+				aria-label={ T(ctx, "action.delete") }
+			>✕</button>
+		</div>
 	</div>
 }
 
 templ MemberRowView(m store.Member) {
-	<div id={ "mem-" + strconv.FormatInt(m.ID, 10) } class="flex items-center gap-2 border-b border-slate-200/70 pb-2 last:border-0 last:pb-0 dark:border-slate-800/60">
+	<div id={ "mem-" + strconv.FormatInt(m.ID, 10) } class="border-b border-slate-200/70 pb-2 last:border-0 last:pb-0 dark:border-slate-800/60">
 		<form
-			class="flex min-w-0 flex-1 items-center gap-2"
+			class="settings-row"
 			hx-post={ "/members/" + strconv.FormatInt(m.ID, 10) }
 			hx-trigger="change, keyup changed delay:600ms"
 			hx-swap="none"
 		>
-			<input class="h-9 w-10 shrink-0 cursor-pointer rounded-md border border-slate-300 bg-transparent p-0.5 dark:border-slate-700" type="color" name="color" value={ ColorOr(m.Color) } aria-label={ T(ctx, "settings.color") }/>
 			// A person without a name cannot be told apart in a split.
 			<input class="input min-w-0" type="text" name="name" value={ m.Name } aria-label={ T(ctx, "settings.name") } required/>
+			<div class="settings-row-actions">
+				<input class="h-9 w-10 shrink-0 cursor-pointer rounded-md border border-slate-300 bg-transparent p-0.5 dark:border-slate-700" type="color" name="color" value={ ColorOr(m.Color) } aria-label={ T(ctx, "settings.color") }/>
+				@moveButtons("/members/" + strconv.FormatInt(m.ID, 10))
+				<button
+					type="button"
+					class="btn-icon shrink-0 no-print"
+					hx-post={ "/members/" + strconv.FormatInt(m.ID, 10) + "/delete" }
+					hx-target={ "#mem-" + strconv.FormatInt(m.ID, 10) }
+					hx-swap="outerHTML"
+					hx-confirm={ T(ctx, "settings.confirmMember") }
+					aria-label={ T(ctx, "action.delete") }
+				>✕</button>
+			</div>
 		</form>
-		@moveButtons("/members/" + strconv.FormatInt(m.ID, 10))
-		<button
-			class="btn-icon shrink-0 no-print"
-			hx-post={ "/members/" + strconv.FormatInt(m.ID, 10) + "/delete" }
-			hx-target={ "#mem-" + strconv.FormatInt(m.ID, 10) }
-			hx-swap="outerHTML"
-			hx-confirm={ T(ctx, "settings.confirmMember") }
-			aria-label={ T(ctx, "action.delete") }
-		>✕</button>
 	</div>
 }
 
